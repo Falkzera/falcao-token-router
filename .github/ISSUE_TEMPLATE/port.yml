@@ -1,0 +1,65 @@
+name: Port to another platform
+description: You want to bring this to Linux, Windows, or somewhere else
+labels: ["help wanted", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ports are welcome, and this issue is how one starts: it makes the work
+        visible so nobody duplicates it, and it's where the platform-specific
+        findings get written down. Read `docs/PORTING.md` first — it maps each
+        macOS-specific piece to what a port needs.
+
+        The maintainer works on macOS and can't test your platform. A port lives
+        or dies on its own tests, and on verifying every assumption in
+        `docs/ARCHITECTURE.md` against your own Claude Code install.
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - "Linux"
+        - "Windows"
+        - "Other (say which below)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: verified
+    attributes:
+      label: What have you verified on your platform?
+      description: >
+        Where does Claude Code store credentials there? Is the session registry
+        (`<config>/sessions/<pid>.json`) written? Does the status line receive
+        `rate_limits`? Even "I checked X and it's the same" is valuable.
+      placeholder: |
+        - Credentials: ~/.claude/.credentials.json (file, not keychain)
+        - sessions/ registry: present, pidDomain is "linux"
+        - statusline: receives rate_limits as on macOS
+    validations:
+      required: false
+
+  - type: textarea
+    id: approach
+    attributes:
+      label: Approach
+      description: >
+        Reusing `CCUsageCore` with a new adapter and UI? A rewrite in another
+        language reading the same files? Both are fine — say which, so the
+        review can be about the right things.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: invariants
+    attributes:
+      label: The invariants hold everywhere
+      description: These are the review criteria for a port, same as for macOS.
+      options:
+        - label: No network calls of the app's own — usage comes from the official client
+        - label: No OAuth refresh; the refresh token has no reader
+        - label: One account, one place; mirror before swap; never probe the home of an active account
+        - label: Every number says where it came from
+    validations:
+      required: false

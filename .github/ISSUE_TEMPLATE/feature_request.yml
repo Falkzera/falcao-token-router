@@ -1,13 +1,14 @@
 name: Feature request
 description: Suggest something the app should do
-labels: ["enhancement"]
+labels: ["enhancement", "needs-triage"]
 body:
   - type: markdown
     attributes:
       value: |
-        Feature requests are welcome. One thing the project won't trade away: a
-        number on screen always says where it came from. A proposal that makes the
-        display simpler by dropping provenance is the wrong trade for this app.
+        Feature requests are welcome. Two things the project won't trade away:
+        the app makes **no network calls of its own**, and a number on screen
+        **always says where it came from**. A proposal that needs one of those
+        to go is the wrong trade for this app — but say why, and let's argue.
 
   - type: textarea
     id: problem
@@ -18,7 +19,8 @@ body:
         best features here came from someone describing a moment where the app
         left them guessing.
       placeholder: |
-        I only find out I'm near the weekly ceiling when I'm already mid-task.
+        I can't tell which of my open terminals is on which account without
+        running /status in each one.
     validations:
       required: true
 
@@ -34,12 +36,13 @@ body:
     attributes:
       label: Does it fit the project's constraints?
       description: >
-        Not a filter — just so we start from the same place. If your idea needs one
-        of these, say why it's worth it in the box above.
+        Not a filter — just so we start from the same place. If your idea needs
+        one of these, say why it's worth it in the box above.
       options:
-        - label: It doesn't require a server, telemetry, or a second network call
-        - label: It doesn't require reading the refreshToken
-        - label: It works without Xcode (Command Line Tools only)
+        - label: It doesn't require any network call, server or telemetry
+        - label: It doesn't require reading or refreshing an OAuth token
+        - label: It keeps saying where every number came from
+        - label: It builds without Xcode (Command Line Tools only)
         - label: I'm not sure
     validations:
       required: false

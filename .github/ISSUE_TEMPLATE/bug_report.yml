@@ -1,13 +1,16 @@
 name: Bug report
 description: Something behaves differently than it should
-labels: ["bug"]
+labels: ["bug", "needs-triage"]
 body:
   - type: markdown
     attributes:
       value: |
         Thanks for reporting. The fields below are the ones that actually shorten
-        the round trip — especially the provenance line, since a wrong number
-        means something very different depending on where it came from.
+        the round trip. The most useful one is the `router doctor` output — it
+        names the problem in most of the failure modes this app has.
+
+        **Please redact account e-mails** before pasting anything. They're yours,
+        and they don't need to be public.
 
   - type: textarea
     id: what-happened
@@ -15,44 +18,56 @@ body:
       label: What happened
       description: What you saw, and what you expected instead.
       placeholder: |
-        The menu bar showed 35% while the 5-hour window was nearly spent.
+        `claude trabalho` opened a session on the wrong account. The panel showed
+        the group's active account as X, but `/status` inside the session said Y.
     validations:
       required: true
 
-  - type: dropdown
-    id: provenance
+  - type: textarea
+    id: doctor
     attributes:
-      label: What did the panel say the source was?
+      label: Output of `router doctor`
+      description: |
+        Run this and paste the result (e-mails redacted):
+        `'/Applications/FalcaoTokenRouter.app/Contents/MacOS/router' doctor`
+      render: text
+    validations:
+      required: false
+
+  - type: dropdown
+    id: source
+    attributes:
+      label: Where did the number come from?
       description: >
-        Open the panel and read the provenance line. If the app won't open or the
-        line isn't visible, pick the last option.
+        The panel says under each account: "measured … by the account's own
+        session" (sensor) or "probed … by asking Claude Code directly" (probe).
       options:
-        - "live"
-        - "Claude Code cache"
-        - "stale cache (amber)"
-        - "estimated from your history"
-        - "Can't tell — app won't open or the line isn't shown"
+        - "Sensor (the status line)"
+        - "Probe (Measure accounts / router measure)"
+        - "No number — the account showed as 'ready'"
+        - "Not about a number"
     validations:
       required: true
 
   - type: dropdown
-    id: live-fetch
+    id: group-kind
     attributes:
-      label: Is live fetching on?
-      description: Settings → Usage numbers → Fetch live
+      label: Which kind of group?
+      description: The default group runs in `~/.claude`; the others in a dedicated profile.
       options:
-        - "On"
-        - "Off"
-        - "Not sure"
+        - "The default group (~/.claude)"
+        - "A dedicated group"
+        - "Both / not sure"
+        - "Not about a group"
     validations:
-      required: true
+      required: false
 
   - type: input
     id: app-version
     attributes:
       label: App version
-      description: Shown in Settings.
-      placeholder: "1.2.0"
+      description: Shown in the Meter tab, or `defaults read /Applications/FalcaoTokenRouter.app/Contents/Info.plist CFBundleShortVersionString`.
+      placeholder: "1.0.0"
     validations:
       required: true
 
@@ -83,18 +98,13 @@ body:
       required: false
 
   - type: checkboxes
-    id: keychain
+    id: context
     attributes:
-      label: Keychain prompts
-      description: >
-        Only relevant if macOS asked you for authorization. An ad-hoc signed build
-        gets a new signature hash on every build, so every install is a new app to
-        the Keychain and every "Always Allow" dies with the previous binary — that
-        part is known.
+      label: Anything of these apply?
       options:
+        - label: The terminal I used was open before I installed the integration (or I hadn't run `source ~/.zshrc` in it)
+        - label: I had just updated or moved the app
         - label: macOS asked me to authorize Keychain access
-        - label: I clicked "Allow" rather than "Always Allow"
-        - label: It kept asking again after I had already authorized once
-        - label: I had just updated the app when it started asking
+        - label: The account is shared with other people
     validations:
       required: false

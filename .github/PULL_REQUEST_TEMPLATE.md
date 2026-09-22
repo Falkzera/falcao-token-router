@@ -1,6 +1,9 @@
 <!--
 Keep PRs to one concern. A PR that fixes a bug and reorganizes three files is
 two PRs that are harder to review and harder to revert.
+
+Title = a Conventional Commit line (feat:, fix:, docs:, refactor:, chore:, ci:).
+It becomes the squash commit's subject on main.
 -->
 
 ## What this changes
@@ -16,16 +19,21 @@ problem and left it alone on purpose, say so here so nobody re-derives it later.
 
 ## Checks
 
-- [ ] `./Scripts/test.sh` passes (core suite + string catalogs)
+- [ ] `./Scripts/test.sh` passes (string catalogs + core suite)
+- [ ] `swift build -c release` passes
 - [ ] New user-facing strings have keys in **both** `en.lproj` and `pt-BR.lproj`
 - [ ] Logic changes in `CCUsageCore` come with tests
-- [ ] No new SwiftUI import in `CCUsageCore`, and no `@State` (needs Xcode-only macros)
+- [ ] No `@State` (use `@ViewState`), no SwiftUI import in `CCUsageCore`
+- [ ] `agent.md` of every touched folder updated if a file, decision or gap changed
+- [ ] No real account e-mail, employer name or measured usage anywhere in the diff
 
-## Privacy invariants
+## Invariants
 
-<!-- Delete this section if the change doesn't go near credentials or the network. -->
+<!-- Delete this section if the change doesn't go near credentials, the keychain, rotation or measurement. Otherwise, keep it and add the `privacy` label. -->
 
-- [ ] Doesn't add a reader for `refreshToken`
-- [ ] Doesn't extract `accessToken` outside the live-fetch toggle
-- [ ] Doesn't add a second network endpoint
-- [ ] Doesn't increase how often the Keychain is read
+- [ ] Adds **no** network call (the app has none)
+- [ ] Adds no reader for `refreshToken`, and no OAuth refresh
+- [ ] Goes through `RotationEngine.activate` (mirror before swap; one account, one place)
+- [ ] Never probes the home of an active account (`probeConfigDir`)
+- [ ] Keychain access stays on `/usr/bin/security`
+- [ ] Every number shown still carries its window, source and age

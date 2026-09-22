@@ -31,6 +31,7 @@ App de menu bar para macOS que gerencia **grupos de contas do Claude Code** com 
 - `Sources/router/` — a CLI `router` embutida no bundle.
 - `Tests/CCUsageCoreTests/` — testes do motor e do store.
 - `Resources/{pt-BR,en}.lproj/` — catálogos de strings (checados por script).
+- `docs/` — `ARCHITECTURE.md` (o mapa, em inglês, para quem chega de fora) e `PORTING.md` (o que uma porta Linux/Windows precisa trocar).
 
 ## 🚨 Este repositório é público
 

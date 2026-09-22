@@ -104,6 +104,34 @@ drop the live session into "Login expired".
 
 ## Install
 
+### Download
+
+Grab `FalcaoTokenRouter-<version>.dmg` from the
+[latest release](../../releases/latest), open it, and drag the app onto
+*Applications*. The binary is universal — Apple Silicon and Intel.
+
+The app is **ad-hoc signed, not notarized** (that needs a paid Apple Developer
+account, which is on the roadmap). macOS will refuse to open it the first time.
+Clear the quarantine flag once, after copying it to *Applications*:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/FalcaoTokenRouter.app
+```
+
+Or open it, let macOS block it, then **System Settings → Privacy & Security →
+Open Anyway**. If macOS says the app is *damaged*, that is the quarantine flag,
+not a bad download — the command above fixes it.
+
+Then open the window (the app shows in the menu bar; **Settings → System → Show
+in Dock** makes it a regular app), create a group, add accounts, and click
+**Activate** under *Terminal integration*.
+
+> **Open a new terminal afterwards.** The integration is a shell function that
+> shadows the binary. In a terminal opened before the install, `claude trabalho`
+> is just an argument to `claude` and your session silently opens in `~/.claude`,
+> on the wrong account. `source ~/.zshrc` fixes an already-open terminal;
+> `router doctor` tells you what's wrong.
+
 ### From source
 
 No Xcode needed — Command Line Tools with Swift 6.4+ is enough.
@@ -114,28 +142,8 @@ cd falcao-token-router
 ./Scripts/bundle.sh --native --install   # builds and copies to /Applications
 ```
 
-Then open **Grupos**, create a group, add accounts, and click **Ativar** under
-*Integração com o terminal*. That writes the shell function and appends the
-`source` line to your `~/.zshrc` — you do not edit a file.
-
-> **Open a new terminal afterwards.** The integration is a shell function that
-> shadows the binary. In a terminal opened before the install, `claude trabalho`
-> is just an argument to `claude` and your session silently opens in `~/.claude`,
-> on the wrong account. `source ~/.zshrc` fixes an already-open terminal;
-> `type claude` should print a function that mentions the app.
-
-Requires **macOS 26+**.
-
-### DMG
-
-`./Scripts/dmg.sh` builds one. It is ad-hoc signed and not notarized, so macOS
-blocks it on first launch:
-
-```bash
-xattr -dr com.apple.quarantine /Applications/FalcaoTokenRouter.app
-```
-
-Notarization with a Developer ID is on the pre-sale roadmap.
+An app you assembled yourself never carries the quarantine flag. Requires
+**macOS 26+** and Swift 6.4+ — Command Line Tools is enough, Xcode is not needed.
 
 ## Languages
 
@@ -187,7 +195,8 @@ observation and are expensive to rediscover.
 
 ### Architecture
 
-Three targets, and `CCUsageCore` imports no SwiftUI — all logic is testable
+The full map is [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). In short:
+three targets, and `CCUsageCore` imports no SwiftUI — all logic is testable
 without instantiating a window.
 
 | Target | What it is |
@@ -205,6 +214,41 @@ provider is a new adapter, not a new engine.
 the same alerts, which is what makes rearming testable at all. The `Alert` type
 carries the fact — which window, what percentage — never the sentence. Wording
 lives in the app target with every other user-facing string.
+
+## Platforms
+
+macOS 26+ today, because that's what the maintainer runs and can test.
+
+**Ports are welcome.** Everything platform-specific sits behind a few small
+seams — the credential store, process liveness, the sign-in terminal, the shell
+hook, the tray UI — and the files the app reads and writes are the ones Claude
+Code writes the same way everywhere. [`docs/PORTING.md`](docs/PORTING.md) maps
+each piece to what a Linux or Windows port needs to replace, what it can keep,
+and what it must verify first. Open a [port issue](../../issues/new?template=port.yml)
+to start one.
+
+## Contributing
+
+Issues and pull requests are welcome, and the project is set up for it:
+
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — building without Xcode, the branch and
+  PR workflow, the two checks that fail a PR, and the invariants a change near
+  credentials has to preserve.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — how the swap, the sensor, the
+  probe and the sessions registry actually work, and what's macOS-specific.
+- Every folder has an `agent.md`: what it's for, what each file does, the
+  decisions taken there and why. Read it before touching the folder.
+- Issue templates for [bugs](../../issues/new?template=bug_report.yml),
+  [features](../../issues/new?template=feature_request.yml) and
+  [ports](../../issues/new?template=port.yml). `good first issue` and
+  `help wanted` mark what a newcomer can pick up.
+- CI runs the string check, the suite and a release build on every PR.
+
+Bug reports: paste the output of `router doctor` (e-mails redacted). It names
+the problem in most of the failure modes this app has.
+
+Two things the project won't trade away: **no network calls of its own**, and
+**every number says where it came from**.
 
 ## Lineage
 
