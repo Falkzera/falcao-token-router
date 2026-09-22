@@ -1,34 +1,36 @@
 #!/usr/bin/env bash
 #
-# Corta uma release: testa, empacota universal, monta o DMG e publica no GitHub.
+# Corta uma release: confere, cria a tag e empurra. O BUILD acontece na nuvem
+# (.github/workflows/release.yml), que tem o Xcode completo para o binário
+# universal — esta máquina, só com Command Line Tools, não tem.
 #
-# Existe porque cortar release à mão é como se publica artefato velho: bastou
-# esquecer de rodar o bundle depois de mudar o ícone, e o DMG da release fica
-# sendo o da versão anterior, sem nada indicar isso.
+# Existe porque cortar release à mão é como se publica artefato velho ou tag
+# fora de sincronia com VERSION. O workflow confere de novo do lado de lá.
 #
 # Uso: ./Scripts/release.sh [--dry-run]
 #
-# A versão vem do arquivo VERSION. Para subir de versão, edite aquele arquivo —
-# não há segundo lugar para manter em sincronia.
+# A versão vem do arquivo VERSION. Para subir de versão, edite aquele arquivo,
+# atualize o CHANGELOG.md, mergeie na main — e aí rode isto NA main.
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DIST="$ROOT/dist"
 VERSION="$(tr -d '[:space:]' < "$ROOT/VERSION")"
 TAG="v$VERSION"
 DRY_RUN=false
-TITLE="$TAG"
-while [ $# -gt 0 ]; do
-    case "$1" in
+for arg in "$@"; do
+    case "$arg" in
         --dry-run) DRY_RUN=true ;;
-        --title) TITLE="$2"; shift ;;
-        *) echo "erro: argumento desconhecido: $1" >&2; exit 1 ;;
+        *) echo "erro: argumento desconhecido: $arg" >&2; exit 1 ;;
     esac
-    shift
 done
 
 echo "==> Release $TAG${DRY_RUN:+ (simulação)}"
+
+# A main é protegida e é dela que o workflow constrói; uma tag em outra branch
+# publicaria um commit que a página do projeto não mostra.
+BRANCH="$(git -C "$ROOT" rev-parse --abbrev-ref HEAD)"
+[ "$BRANCH" = "main" ] || { echo "erro: release sai da main, não de '$BRANCH'" >&2; exit 1; }
 
 if [ -n "$(git -C "$ROOT" status --porcelain)" ]; then
     echo "erro: há mudanças não commitadas — a release sairia de um estado que" >&2
@@ -36,61 +38,35 @@ if [ -n "$(git -C "$ROOT" status --porcelain)" ]; then
     exit 1
 fi
 
-if git -C "$ROOT" rev-parse "$TAG" >/dev/null 2>&1; then
+git -C "$ROOT" fetch -q origin main
+if [ "$(git -C "$ROOT" rev-parse HEAD)" != "$(git -C "$ROOT" rev-parse origin/main)" ]; then
+    echo "erro: a main local difere da origin/main — dê pull (ou push) antes" >&2
+    exit 1
+fi
+
+if git -C "$ROOT" rev-parse "$TAG" >/dev/null 2>&1 \
+   || git -C "$ROOT" ls-remote --tags origin "refs/tags/$TAG" | grep -q .; then
     echo "erro: a tag $TAG já existe. Suba a versão no arquivo VERSION." >&2
     exit 1
 fi
 
+grep -q "^## \[$VERSION\]" "$ROOT/CHANGELOG.md" \
+    || { echo "erro: CHANGELOG.md não tem a seção [$VERSION]" >&2; exit 1; }
+
+# Barato, e evita empurrar uma tag que o workflow vai rejeitar dez minutos depois.
 echo "==> Testes"
 "$ROOT/Scripts/test.sh" >/dev/null
 
-echo "==> Empacotando"
-"$ROOT/Scripts/bundle.sh" >/dev/null
-"$ROOT/Scripts/dmg.sh" >/dev/null
-
-APP="$DIST/FalcaoTokenRouter.app"
-DMG="$DIST/FalcaoTokenRouter-$VERSION.dmg"
-ZIP="$DIST/FalcaoTokenRouter-$VERSION-universal.zip"
-
-# A versão que o app declara precisa bater com a tag. Sem esta checagem, o
-# arquivo VERSION vira só mais um lugar para esquecer de atualizar.
-BUNDLED="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")"
-[ "$BUNDLED" = "$VERSION" ] || {
-    echo "erro: o app se diz $BUNDLED, mas a release é $VERSION" >&2; exit 1; }
-
-for arch in arm64 x86_64; do
-    lipo -archs "$APP/Contents/MacOS/FalcaoTokenRouter" | grep -qw "$arch" \
-        || { echo "erro: o binário publicado não tem a fatia $arch" >&2; exit 1; }
-done
-
-codesign -v "$APP" || { echo "erro: assinatura inválida" >&2; exit 1; }
-
-rm -f "$ZIP"
-ditto -c -k --keepParent --sequesterRsrc "$APP" "$ZIP"
-
-echo "==> Artefatos"
-echo "    $(basename "$DMG") ($(du -h "$DMG" | cut -f1))"
-echo "    $(basename "$ZIP") ($(du -h "$ZIP" | cut -f1))"
-
 if $DRY_RUN; then
-    echo "==> Simulação: nada foi marcado nem publicado."
+    echo "==> Simulação: a tag $TAG seria criada em $(git -C "$ROOT" rev-parse --short HEAD)."
     exit 0
 fi
 
-echo "==> Publicando"
-# O branch vai junto com a tag. Empurrar so a tag publica os artefatos mas deixa
-# a pagina do projeto na versao anterior — README, banner e docs/art nao
-# chegariam, e a tag apontaria para um commit que ninguem ve.
-BRANCH="$(git -C "$ROOT" rev-parse --abbrev-ref HEAD)"
-git -C "$ROOT" push origin "$BRANCH"
-git -C "$ROOT" tag -a "$TAG" -m "$TITLE"
+echo "==> Tag"
+git -C "$ROOT" tag -a "$TAG" -m "$TAG"
 git -C "$ROOT" push origin "$TAG"
-# `--generate-notes` em vez de `--notes-file -`: aquele lê da entrada padrão e
-# trava um script que ninguém está observando. As notas saem dos commits e podem
-# ser editadas no GitHub depois.
-gh release create "$TAG" "$DMG" "$ZIP" \
-    --repo Falkzera/falcao-token-router \
-    --title "$TITLE" \
-    --generate-notes
 
-echo "==> Done: https://github.com/Falkzera/falcao-token-router/releases/tag/$TAG"
+echo "==> A nuvem constrói agora. Acompanhe:"
+echo "    gh run watch \$(gh run list --workflow release.yml --limit 1 --json databaseId -q '.[0].databaseId')"
+echo "    A release nasce como RASCUNHO — revise as notas e publique em:"
+echo "    https://github.com/Falkzera/falcao-token-router/releases/tag/$TAG"
