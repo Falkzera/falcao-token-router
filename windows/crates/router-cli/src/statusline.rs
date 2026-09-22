@@ -19,6 +19,7 @@ use serde_json::{Map, Value};
 use router_core::engine::anthropic_adapter::AnthropicAdapter;
 use router_core::engine::config_dir::ConfigDir;
 use router_core::engine::group_usage::{GroupUsageSample, GroupUsageStore, UsageOrigin};
+use router_core::engine::provider::ProviderAdapter;
 use router_core::engine::router_paths::RouterPaths;
 use router_core::usage::usage_percent::UsagePercent;
 
@@ -29,7 +30,7 @@ pub fn run() {
     let input = read_stdin_with_deadline();
     let dir = current_config_dir();
     // Identidade do PERFIL (o `.claude.json`), nunca do stdin.
-    let email = AnthropicAdapter::identity(&dir).map(|id| id.email);
+    let email = AnthropicAdapter.identity(&dir).map(|id| id.email);
 
     let limits = input.get("rate_limits").and_then(Value::as_object);
     let (five_pct, five_reset) = window(limits, "five_hour");
