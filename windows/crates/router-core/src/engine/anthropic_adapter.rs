@@ -6,6 +6,7 @@
 //! documentado; quando uma versão do Claude Code mudar algo, muda-se aqui.
 
 use std::io;
+use std::path::PathBuf;
 
 use serde_json::{Map, Value};
 
@@ -78,6 +79,14 @@ fn parse_root(bytes: &[u8]) -> Result<Map<String, Value>, String> {
 impl ProviderAdapter for AnthropicAdapter {
     fn provider(&self) -> Provider {
         Provider::Anthropic
+    }
+
+    /// `<perfil>\.credentials.json` — no padrão, `%USERPROFILE%\.claude\.credentials.json`.
+    /// Conferido no Windows 11 com o Claude Code 2.1.280 (22/09/2026): arquivo,
+    /// nada no Credential Manager. (`CLAUDE_SECURESTORAGE_CONFIG_DIR` desviaria a
+    /// leitura para outra pasta; o router a remove de todo processo que lança.)
+    fn credential_location(&self, dir: &ConfigDir) -> PathBuf {
+        dir.path().join(".credentials.json")
     }
 
     fn identity(&self, dir: &ConfigDir) -> Option<AccountIdentity> {

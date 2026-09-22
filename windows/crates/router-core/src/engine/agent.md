@@ -16,6 +16,14 @@ Modelos, formato da amostra, leitor de uso, adapter e caminhos. Sem UI, sem rede
   vai para a de horizonte mais longo (`max_by` = último dos empatados, igual `max(by:<=)`).
 - `anthropic_adapter.rs` — `AnthropicAdapter`: lê o `.claude.json` (`identity`) e grava a
   identidade de forma **cirúrgica** (`write_identity` + `splice_identity`).
+- `credential_store.rs` — ≙ `KeychainStore`: `CredentialBlob` (bytes OPACOS; `Debug` não mostra
+  o conteúdo; `is_complete` = checagem estrutural "JSON completo com objeto `claudeAiOauth`", que
+  pula os valores sem guardá-los), o trait `CredentialStore` e o `FileCredentialStore`
+  (`<perfil>\.credentials.json`: temp+rename com mtime novo, bytes idênticos não regravados,
+  blob incompleto recusado na escrita e não devolvido na leitura, que espera ~0,2 s por uma
+  escrita em andamento).
+- `default_profile_guard.rs` — antes da 1ª escrita do router no perfil padrão (`~\.claude`), copia o
+  login que havia (`.credentials.json` + `oauthAccount`) para `<base>\backups\default-profile-<ts>\`.
 - `router_paths.rs` — base `%LOCALAPPDATA%\com.synqo.falcao-router` (override `ROUTER_APP_SUPPORT`).
 
 ## Decisões
@@ -26,7 +34,9 @@ Modelos, formato da amostra, leitor de uso, adapter e caminhos. Sem UI, sem rede
   diferem em caixa; **recusa** arquivo existente e ilegível (o macOS o trocava por `{}`); arquivo
   vazio conta como ausente; relê depois de gravar. Saída com recuo de 2 (como o Claude Code).
 - No Windows não há hash de chaveiro; o `config.json` mantém `configDir {raw,isDefault}` igual.
+- 22/09/2026: a credencial é arquivo; `ProviderAdapter::credential_location` (≙ `keychainService`)
+  devolve `<perfil>\.credentials.json` nos dois tipos de perfil. Os 4 testes de hash do macOS não
+  se aplicam; no lugar, testes de onde a credencial mora.
 
 ## Pendências (Fase 4)
-- Credencial em arquivo, `RotationEngine`,
-  `RouterConfigStore`, `provider_env`, `session_registry`, liveness, resolvedor do `claude`.
+- `RotationEngine`, `RouterConfigStore`, `provider_env`, `session_registry`, liveness, resolvedor do `claude`.

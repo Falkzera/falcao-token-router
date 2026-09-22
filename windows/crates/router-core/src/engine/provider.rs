@@ -53,6 +53,12 @@ pub enum IdentityError {
 pub trait ProviderAdapter: Send + Sync {
     fn provider(&self) -> Provider;
 
+    /// Onde mora a credencial de um perfil (≙ `keychainService(forConfigDir:)`).
+    ///
+    /// No Windows é um ARQUIVO dentro do perfil, tanto no padrão quanto num
+    /// dedicado — sem o hash do caminho que o item de chaveiro do macOS tem.
+    fn credential_location(&self, dir: &ConfigDir) -> PathBuf;
+
     /// A conta com que um perfil está logado, lida do disco (nunca da rede).
     /// `None` quando o perfil não tem identidade legível.
     fn identity(&self, dir: &ConfigDir) -> Option<AccountIdentity>;
