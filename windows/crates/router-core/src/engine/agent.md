@@ -32,9 +32,21 @@ Modelos, formato da amostra, leitor de uso, credencial, rotação e o store. Sem
 - `account_login_service.rs` — `login_result`: identidade no `.claude.json` **e** credencial
   completa na casa; uma sem a outra é login pela metade.
 - `router_config_store.rs` — ≙ `RouterConfigStore` (sem UI): grupos, contas, login/relogin,
-  remoção, ativar, `refresh_usage`, `rotate_all`. Erros tipados em `StoreError`.
+  remoção, ativar, `refresh_usage` (uso, ativa e sessões vivas por grupo — leitor de sessões
+  injetável), `rotate_all`. Erros tipados em `StoreError`.
 - `engine_lock.rs` — trava entre processos (mutex nomeado `Local\com.synqo.falcao-router.engine.<fnv>`,
   nome derivado da base) em volta de toda escrita de credencial do store e da CLI.
+- `session_launcher.rs` — ≙ `SessionLauncher`: `group_named` (sem caixa, sem espaço nas pontas) e
+  `prepare` (ativa com folga → próxima com folga → ativa → primeira; erro de ativação vira
+  `NoUsableAccount`). O processo fica na CLI.
+- `provider_env.rs` — ≙ `ProviderEnv`, **sem caixa**: listas do macOS + `WINDOWS_KEYS`/`WINDOWS_PREFIXES`
+  (token OAuth por variável/arquivo/descritor, `CLAUDE_SECURESTORAGE_CONFIG_DIR`, perfil/org
+  alternativos, identidade federada, Foundry, Bedrock por token); `without_nested_session`
+  (`CLAUDE_CODE*`, `CLAUDECODE`) para sonda e login; `with_var`.
+- `session_registry.rs` — ≙ `SessionRegistry`/`ProcessLiveness`: lê `<perfil>\sessions\*.json`
+  (exige `pid` e `cwd`), `procStart` FILETIME (Windows) ou `ctime` (macOS), filtra `pidDomain`
+  de outra máquina, confere o processo (tolerância 300 s; sem prova confia no pid), mais nova
+  primeiro.
 - `router_paths.rs` — base `%LOCALAPPDATA%\com.synqo.falcao-router` (override `ROUTER_APP_SUPPORT`).
 
 ## Decisões
@@ -55,5 +67,4 @@ Modelos, formato da amostra, leitor de uso, credencial, rotação e o store. Sem
 - O item do GRUPO não é apagado ao remover conta nem grupo (paridade macOS): pode haver sessão viva.
 
 ## Pendências (Fase 4)
-- `session_launcher`, `provider_env`, `session_registry` + liveness, resolvedor do `claude`,
-  `profile_sharing`, `shell_integration`; no store: sessões vivas, `measure_accounts`, integração.
+- `profile_sharing`, `shell_integration`; no store: `measure_accounts` e a integração de terminal.

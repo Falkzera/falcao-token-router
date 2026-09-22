@@ -479,6 +479,45 @@ fn removing_an_account_never_deletes_a_folder_outside_the_base() {
         .deleted(&env.adapter.credential_location(&outside)));
 }
 
+/// As sessões vivas são publicadas POR GRUPO — é o que mostra uma sessão que
+/// devia estar num grupo e subiu no perfil errado. O leitor é injetado: no macOS
+/// este caminho lia o `~/.claude/sessions` real durante os testes.
+#[test]
+fn live_sessions_are_published_per_group() {
+    use router_core::engine::session_registry::{LiveSession, SessionStatus};
+
+    let env = make_store();
+    let tmp = env.tmp;
+    let creds = env.creds;
+    let adapter = env.adapter;
+    let mut first = open(tmp.path(), &creds, &adapter);
+    let busy = first.add_group("trabalho");
+    let quiet = first.add_group("pessoal");
+    drop(first);
+
+    let busy_dir = busy.config_dir.clone();
+    let store = open(tmp.path(), &creds, &adapter).with_session_reader(move |dir| {
+        if *dir == busy_dir {
+            vec![LiveSession {
+                pid: 4242,
+                session_id: None,
+                cwd: "C:\\Users\\exemplo\\Projects\\app".into(),
+                name: None,
+                started_at: None,
+                status: SessionStatus::Busy,
+                status_updated_at: None,
+                pid_domain: None,
+            }]
+        } else {
+            Vec::new()
+        }
+    });
+
+    assert_eq!(store.session_count(busy.id), 1);
+    assert_eq!(store.session_count(quiet.id), 0);
+    assert_eq!(store.live_sessions()[&busy.id][0].label(), "app");
+}
+
 /// A volta de rotação: primeiro o espelho (a casa da ativa recebe o token vivo
 /// do grupo), depois a troca se a ativa passou do limiar.
 #[test]

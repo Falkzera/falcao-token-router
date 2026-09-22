@@ -30,6 +30,7 @@ use super::group_usage_reader::{AccountUsage, GroupUsageReader};
 use super::provider::{Provider, ProviderAdapter};
 use super::rotation_engine::{RotationEngine, RotationError};
 use super::router_paths::RouterPaths;
+use super::session_registry::{LiveSession, SessionRegistry};
 use crate::ids::Id;
 use crate::platform::atomic_write::{read_retrying, write_atomic};
 use crate::platform::paths::is_strictly_inside;
@@ -69,6 +70,9 @@ pub enum ReloginOutcome {
     },
 }
 
+/// De onde vêm as sessões vivas de um perfil.
+type SessionReader = Box<dyn Fn(&ConfigDir) -> Vec<LiveSession> + Send + Sync>;
+
 /// O que se achou no `config.json` ao abrir.
 enum Loaded {
     Missing,
@@ -86,6 +90,13 @@ pub struct RouterConfigStore {
     usage_detail: HashMap<Id, AccountUsage>,
     /// A conta ativa de cada grupo (grupo → conta).
     active_by_group: HashMap<Id, Id>,
+    /// As sessões do Claude Code vivas em cada grupo (grupo → sessões). O
+    /// registro é POR PERFIL: diz qual sessão roda em qual grupo, e por qual
+    /// conta ela é atendida — a resposta que o `/status` não dá.
+    live_sessions: HashMap<Id, Vec<LiveSession>>,
+    /// De onde vêm as sessões de um perfil. Injetável: os testes do macOS liam o
+    /// `~/.claude/sessions` real sem perceber.
+    session_reader: SessionReader,
     last_error: Option<StoreError>,
     /// O `config.json` existia e não pôde ser lido: no primeiro `save` ele é
     /// guardado de lado, nunca sobrescrito.
@@ -121,6 +132,8 @@ impl RouterConfigStore {
             usage_sampled_at: HashMap::new(),
             usage_detail: HashMap::new(),
             active_by_group: HashMap::new(),
+            live_sessions: HashMap::new(),
+            session_reader: Box::new(SessionRegistry::live_sessions),
             last_error: None,
             unreadable_on_disk,
             usage: GroupUsageReader::new(paths.usage_dir()),
@@ -164,6 +177,25 @@ impl RouterConfigStore {
 
     pub fn last_error(&self) -> Option<&StoreError> {
         self.last_error.as_ref()
+    }
+
+    pub fn live_sessions(&self) -> &HashMap<Id, Vec<LiveSession>> {
+        &self.live_sessions
+    }
+
+    /// Quantas sessões vivas um grupo tem agora.
+    pub fn session_count(&self, group_id: Id) -> usize {
+        self.live_sessions.get(&group_id).map_or(0, Vec::len)
+    }
+
+    /// Troca de onde vêm as sessões (testes) e republica o quadro.
+    pub fn with_session_reader(
+        mut self,
+        reader: impl Fn(&ConfigDir) -> Vec<LiveSession> + Send + Sync + 'static,
+    ) -> Self {
+        self.session_reader = Box::new(reader);
+        self.refresh_usage();
+        self
     }
 
     // MARK: - Persistência
@@ -464,7 +496,8 @@ impl RouterConfigStore {
         }
     }
 
-    /// Relê o uso das amostras e a conta ativa de cada grupo, e publica.
+    /// Relê o uso das amostras, a conta ativa e as sessões vivas de cada grupo, e
+    /// publica.
     pub fn refresh_usage(&mut self) {
         let detail = self.usage.detail_by_account(&self.config, Utc::now());
         self.usage_snapshot = detail.iter().map(|(id, u)| (*id, u.fraction)).collect();
@@ -484,6 +517,13 @@ impl RouterConfigStore {
                     .active_account(g, &self.config)
                     .map(|a| (g.id, a.id))
             })
+            .collect();
+        self.live_sessions = self
+            .config
+            .groups
+            .iter()
+            .map(|g| (g.id, (self.session_reader)(&g.config_dir)))
+            .filter(|(_, sessions)| !sessions.is_empty())
             .collect();
     }
 

@@ -1,6 +1,10 @@
 # usage — uso (≙ Sources/CCUsageCore/Usage)
 
 ## Arquivos
+- `claude_binary.rs` — o resolvedor ÚNICO do `claude`: `ROUTER_CLAUDE_BIN` →
+  `%USERPROFILE%\.local\bin\claude.exe` → `PATH` (`claude.exe`, `claude.cmd`) → `%APPDATA%\npm`.
+  Shim do npm LIDO (vira `node` + `cli.js` ou o `.exe` do pacote — nunca `cmd.exe`); cópia do
+  Claude Desktop e aliases do WindowsApps excluídos. `ClaudeCommand::command()` dá o `Command`.
 - `usage_percent.rs` — `UsagePercent::value/text`: fração 0–1 → inteiro, **num lugar só**
   (arredonda meio para longe do zero, igual ao `.rounded()` do Swift). Evita o painel
   truncar enquanto a status line arredonda.

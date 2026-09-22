@@ -2,5 +2,7 @@
 //! atômica de arquivo, e — nas próximas fases — links, liveness, caminhos curtos.
 
 pub mod atomic_write;
+pub mod host;
 pub mod named_mutex;
 pub mod paths;
+pub mod process_times;
