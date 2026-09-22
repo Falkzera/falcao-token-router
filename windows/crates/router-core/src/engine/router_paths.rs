@@ -12,6 +12,7 @@ use super::config_dir::ConfigDir;
 use super::group_usage::GroupUsageStore;
 use crate::ids::Id;
 
+#[derive(Clone, Debug)]
 pub struct RouterPaths {
     pub base: PathBuf,
 }

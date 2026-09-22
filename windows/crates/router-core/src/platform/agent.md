@@ -9,8 +9,12 @@ Funções pequenas atrás das quais mora o que é da plataforma.
   Nunca `CopyFile`, que preservaria o mtime da origem. `retrying`/`read_retrying`/
   `remove_retrying`: nova tentativa (~0,6 s) nos erros 5/32/33/1224 — outro processo com o
   arquivo aberto sem compartilhar (antivírus, indexador, o próprio Claude Code).
+- `named_mutex.rs` — `acquire(nome, prazo)`: mutex nomeado (`CreateMutexW`), trava entre
+  processos. Guarda `!Send` (a posse é da thread); mutex abandonado por dono morto é assumido.
+- `paths.rs` — comparação de caminho do Windows sem tocar o disco (`normalized`,
+  `is_strictly_inside`: sem caixa, `/` = `\`, `..` desqualifica).
 
 ## Pendências (Fase 4+)
-- `credential_store` (usa o `write_atomic`/`read_retrying` daqui),
-  `links` (junction/symlink + Developer Mode), `process_liveness` (FILETIME), `short_path`,
-  `known_folders` (Documentos via OneDrive), `git_bash`, `profile_append` (bytes/encoding).
+- `links` (junction/symlink + Developer Mode), `process_times` (liveness por FILETIME),
+  `short_path`, `known_folders` (Documentos via OneDrive), `git_bash`, `profile_append`
+  (bytes/encoding), console (Ctrl+C no `launch`).

@@ -2,3 +2,5 @@
 //! atômica de arquivo, e — nas próximas fases — links, liveness, caminhos curtos.
 
 pub mod atomic_write;
+pub mod named_mutex;
+pub mod paths;
