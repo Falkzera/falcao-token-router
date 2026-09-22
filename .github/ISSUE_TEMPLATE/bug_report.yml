@@ -1,0 +1,100 @@
+name: Bug report
+description: Something behaves differently than it should
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. The fields below are the ones that actually shorten
+        the round trip — especially the provenance line, since a wrong number
+        means something very different depending on where it came from.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+      placeholder: |
+        The menu bar showed 35% while the 5-hour window was nearly spent.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: provenance
+    attributes:
+      label: What did the panel say the source was?
+      description: >
+        Open the panel and read the provenance line. If the app won't open or the
+        line isn't visible, pick the last option.
+      options:
+        - "live"
+        - "Claude Code cache"
+        - "stale cache (amber)"
+        - "estimated from your history"
+        - "Can't tell — app won't open or the line isn't shown"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: live-fetch
+    attributes:
+      label: Is live fetching on?
+      description: Settings → Usage numbers → Fetch live
+      options:
+        - "On"
+        - "Off"
+        - "Not sure"
+    validations:
+      required: true
+
+  - type: input
+    id: app-version
+    attributes:
+      label: App version
+      description: Shown in Settings.
+      placeholder: "1.2.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install-method
+    attributes:
+      label: How did you install it?
+      options:
+        - "DMG from the releases page"
+        - "Built from source"
+    validations:
+      required: true
+
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version and hardware
+      placeholder: "macOS 26.1, Apple Silicon (M2)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: If it's reproducible. If it isn't, say what you were doing when it happened.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: keychain
+    attributes:
+      label: Keychain prompts
+      description: >
+        Only relevant if macOS asked you for authorization. An ad-hoc signed build
+        gets a new signature hash on every build, so every install is a new app to
+        the Keychain and every "Always Allow" dies with the previous binary — that
+        part is known.
+      options:
+        - label: macOS asked me to authorize Keychain access
+        - label: I clicked "Allow" rather than "Always Allow"
+        - label: It kept asking again after I had already authorized once
+        - label: I had just updated the app when it started asking
+    validations:
+      required: false

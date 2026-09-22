@@ -1,0 +1,191 @@
+/* Painel — seções e medidores */
+"panel.section.session" = "SESSÃO";
+"panel.section.value" = "VALOR";
+"panel.gauge.current" = "Atual";
+"panel.gauge.weekly" = "Semanal";
+"panel.burnRate.format" = "%@/min";
+"panel.pace.recent.format" = "%1$@ nos últimos 7 dias";
+"panel.pace.typical.format" = "%1$@ · típico %2$@";
+"panel.column.today" = "HOJE";
+"panel.column.week" = "SEMANA";
+"panel.column.month" = "MÊS";
+"panel.return.suffix" = "de retorno";
+"panel.unknownModels.format" = "Sem preço conhecido: %@";
+"panel.groups" = "Grupos";
+"panel.settings" = "Ajustes";
+"panel.quit" = "Sair";
+"panel.enableLive" = "Ligar ao vivo";
+
+/* Painel — de onde veio o número */
+"panel.provenance.live" = "ao vivo";
+"panel.provenance.cached.format" = "cache do Claude Code · há %@";
+"panel.provenance.stale.format" = "cache defasada · há %@";
+"panel.provenance.expired.format" = "credencial expirada · rode o Claude Code (cache de há %@)";
+"panel.provenance.offline.format" = "sem conexão · cache de há %@";
+"panel.provenance.derived" = "estimado do seu histórico";
+
+/* Painel — reset das janelas */
+"panel.reset.format" = "reseta %@";
+"panel.reset.remaining.format" = "%1$@ · em %2$@";
+"panel.reset.noSession" = "nenhuma sessão ativa";
+"panel.reset.estimatedSuffix.format" = "%@ · estimado";
+
+/* Formatadores */
+"format.duration.hoursMinutes" = "%1$dh %2$dm";
+"format.duration.minutes" = "%dm";
+"format.plan.price.format" = "%@/mês";
+
+/* Notificações */
+"alerts.threshold.session.title.format" = "%d%% da janela de 5h";
+"alerts.threshold.weekly.title.format" = "%d%% da janela semanal";
+"alerts.session.body.format" = "Reseta às %1$@, em %2$@.";
+"alerts.weekly.body.format" = "Reseta %@.";
+"alerts.reset.session.title" = "Janela de 5h resetou";
+"alerts.reset.weekly.title" = "Janela semanal resetou";
+"alerts.reset.body" = "Capacidade cheia de novo.";
+"alerts.liveRequired.title" = "Alertas precisam da busca ao vivo";
+"alerts.liveRequired.body" = "Sem ela o app lê o cache do Claude Code, que pode estar horas atrasado — e um alerta em cima disso erra nos dois sentidos. Ligue em Ajustes → Números de uso.";
+
+/* Ajustes — plano */
+"settings.section.plan" = "Plano";
+"settings.plan.subscription" = "Assinatura";
+"settings.plan.detected" = "Detectado pela sua conta.";
+"settings.plan.detected.help" = "Lido do keychain do Claude Code.";
+"settings.plan.disagrees.format" = "Sua conta indica %@.";
+"settings.plan.disagrees.help" = "A detecção lê o plano do keychain do Claude Code. Sua seleção manual está sobrescrevendo — o que é o certo se você mudou de plano há pouco.";
+"settings.plan.unknown" = "Não foi possível ler o plano — selecione manualmente.";
+
+/* Ajustes — números de uso */
+"settings.section.usage" = "Números de uso";
+"settings.live.toggle" = "Número ao vivo (sensor)";
+"settings.live.help" = "Ligado, o app usa o número que o sensor grava a partir do que o Claude Code recebe — atualizado a cada interação, sem chamar nenhuma API nem ler o seu token. Desligado, usa o cache de ~/.claude.json, que só se move quando o Claude Code roda e já foi medido 13 horas atrasado.";
+"settings.live.on" = "Usando o sensor: número recente, sem chamada de API.";
+"settings.live.off" = "Usando o cache do Claude Code, que pode estar horas atrasado.";
+
+/* Ajustes — alertas */
+"settings.section.alerts" = "Alertas";
+"settings.alerts.thresholds.toggle" = "Avisar ao aproximar do teto";
+"settings.alerts.thresholds.help" = "Notifica ao passar de um limiar de consumo. O alerta só sai com a busca ao vivo ligada: sobre o cache, ele erraria nos dois sentidos — e o pior deles é o silêncio enquanto você estoura o teto.";
+"settings.alerts.thresholds.label" = "Limiares";
+"settings.alerts.thresholds.empty" = "Nenhum limiar selecionado — nada será avisado.";
+"settings.alerts.reset.toggle" = "Avisar quando a janela resetar";
+"settings.alerts.reset.help" = "Avisa quando a janela reseta e a capacidade volta — é quando dá para retomar trabalho pesado. Não vira ruído de madrugada: parando de usar o Claude Code, a janela deixa de ser substituída por outra ativa e o aviso não acontece.";
+"settings.alerts.windows.label" = "Janelas";
+"settings.alerts.window.session" = "5 horas";
+"settings.alerts.window.weekly" = "semanal";
+"settings.alerts.needsLive" = "Alertas precisam da busca ao vivo.";
+"settings.alerts.enableLive" = "Ligar busca ao vivo";
+"settings.alerts.denied" = "Notificações negadas nos Ajustes do Sistema.";
+"settings.alerts.openSystem" = "Abrir Ajustes do Sistema";
+
+/* Ajustes — teto e sistema */
+"settings.section.ceiling" = "Teto do bloco de 5h";
+"settings.ceiling.calibrate" = "Calibrar pelo histórico";
+"settings.ceiling.manual" = "Definir manualmente";
+"settings.ceiling.tokens" = "Tokens";
+"settings.ceiling.calibrated.format" = "Calibrado: %@ tokens";
+"settings.ceiling.help" = "A Anthropic não publica os limites do plano, então o teto não é lido de lugar nenhum: é o maior consumo que o app já observou num bloco de 5h completo do seu histórico.";
+"settings.section.system" = "Sistema";
+"settings.system.loginItem" = "Abrir no login";
+"settings.system.loginItem.failure.format" = "Não foi possível registrar: %@. Apps assinados ad-hoc costumam precisar estar em /Applications.";
+
+/* Painel — contas dos dois pools */
+"panel.section.accounts" = "CONTAS";
+"panel.accounts.ready" = "pronta";
+"panel.accounts.columns.help" = "As duas janelas do limite: as últimas 5 horas e os últimos 7 dias. O valor em destaque é o que está mandando na conta — é ele que dispara a troca.";
+"panel.accounts.window.fiveHour" = "5h";
+"panel.accounts.window.sevenDay" = "7d";
+"panel.accounts.window.absent" = "—";
+"panel.accounts.usage.help.format" = "5h %1$@ · 7d %2$@ — medido há %3$@. O painel mostra o maior dos dois, que é o que dispara a troca.";
+"panel.accounts.stale.help.sensor.format" = "Sem medir há %@. O sensor só lê quando a conta serve uma mensagem — em conta compartilhada, este número pode estar otimista. \u201cMedir contas\u201d atualiza agora.";
+"panel.accounts.stale.help.probe.format" = "Sondado há %@. Era uma consulta de um instante, e o que foi gasto depois não está aqui. \u201cMedir contas\u201d atualiza agora.";
+"panel.section.account" = "CONTA";
+"panel.account.back" = "voltar para a sessão";
+"panel.account.sampled.sensor.format" = "medido há %@, pela sessão da própria conta";
+"panel.account.sampled.probe.format" = "sondado há %@, por consulta direta ao Claude Code";
+"panel.account.window.expired" = "sem medida válida — volta na próxima mensagem que ela servir";
+
+/* Ajustes — grupos e rodízio */
+"groups.subtitle" = "Cada grupo rotaciona suas contas sozinho ao bater o limiar.";
+"groups.new" = "Novo grupo";
+"groups.empty.title" = "Nenhum grupo ainda";
+"groups.empty.detail" = "Crie um grupo — por exemplo, trabalho e pessoal — e adicione as contas Claude que devem se revezar dentro dele.";
+"groups.empty.create" = "Criar o primeiro grupo";
+"groups.accounts.empty" = "Nenhuma conta neste grupo. Adicione a primeira abaixo.";
+"groups.account.add" = "Adicionar conta";
+"groups.name.placeholder" = "Nome do grupo";
+"groups.name.save" = "Salvar";
+"groups.default.badge" = "padrão";
+"groups.makeDefault" = "Tornar o grupo padrão";
+"groups.delete" = "Apagar grupo";
+"groups.autoRotate" = "Trocar sozinho";
+"groups.threshold.label" = "Trocar em";
+"groups.account.unmeasured" = "—";
+"groups.account.use" = "Usar";
+"groups.new.title" = "Novo grupo";
+"groups.new.detail" = "Dê um nome. O primeiro grupo vira o padrão — o que roda quando você abre o Claude sem escolher grupo.";
+"groups.cancel" = "Cancelar";
+"groups.new.create" = "Criar";
+"groups.login.done" = "Conta adicionada";
+"groups.login.close" = "Fechar";
+"groups.login.waiting.title" = "Concluindo o login…";
+
+/* Grupos — integração com o terminal */
+"groups.terminal.title" = "Integração com o terminal";
+"groups.terminal.reinstall" = "Reinstalar";
+
+/* Grupos — login dentro do app e exclusão */
+"groups.login.inapp.starting" = "Iniciando o login oficial…";
+"groups.login.inapp.detail" = "O navegador abriu no login da Anthropic. Conclua por lá — esta janela fecha sozinha. Se o navegador não abrir, use o link:";
+"groups.login.openBrowser" = "Abrir no navegador";
+"groups.login.code.disclosure" = "Pediu um código?";
+"groups.login.code.placeholder" = "Cole o código aqui";
+"groups.login.code.submit" = "Enviar";
+"groups.login.failed" = "Login não concluído";
+"groups.login.error.noClaude" = "Não encontrei o Claude Code na sua máquina.";
+"groups.login.error.pty" = "Não foi possível iniciar o login.";
+"groups.login.error.ended" = "O login foi encerrado antes de concluir.";
+"groups.account.delete.title" = "Remover conta do grupo?";
+"groups.account.delete.confirm" = "Remover";
+"groups.account.delete.message.format" = "%@ sai deste grupo e o login dela é apagado do chaveiro do Mac. Para usá-la de novo será preciso entrar pelo fluxo oficial outra vez. Sessões abertas agora continuam até o token vencer.";
+"groups.login.duplicate.title" = "O navegador entrou na conta anterior";
+"groups.login.duplicate.detail.format" = "O login voltou como %@, que já está no grupo. O navegador provavelmente ainda estava logado nela. Saia dessa conta no claude.ai e tente de novo — ou use uma janela anônima.";
+"groups.login.duplicate.logout" = "Sair no claude.ai";
+"groups.login.duplicate.retry" = "Tentar de novo";
+"groups.command.needsInstall" = "instale a integração ↓";
+"groups.terminal.activate" = "Ativar";
+"groups.terminal.pitch" = "Um clique cria o comando claude <grupo> e ajusta seu ~/.zshrc. Depois é só abrir um terminal novo.";
+"groups.terminal.ready" = "Pronto! Abra um terminal novo e digite o comando do grupo (ex.: claude trabalho). Nos terminais já abertos: source ~/.zshrc.";
+"groups.terminal.reinstalled" = "Instalada ✓";
+"groups.command.copy.help" = "Copiar o comando";
+"groups.delete.confirm.title" = "Apagar este grupo?";
+"groups.delete.confirm.message.format" = "\"%@\" sai do app, e as %d conta(s) que só existiam nele têm o login apagado do chaveiro do Mac. Sessões abertas continuam até o token vencer.";
+"groups.delete.confirm.button" = "Apagar grupo";
+"groups.account.relogin" = "Relogar…";
+"groups.account.remove" = "Remover conta";
+"groups.account.menu.help" = "Mais ações";
+"groups.relogin.waiting.title" = "Renovando o login";
+"groups.relogin.done" = "Login renovado!";
+"groups.relogin.wrong.title" = "Veio outra conta";
+"groups.relogin.wrong.detail.format" = "O navegador entrou como %@, mas esta conta é %@. Saia do claude.ai e tente de novo.";
+"panel.session.profile.format" = "%1$@ (%2$@)";
+"panel.session.profile.plain" = "claude puro (~/.claude)";
+"groups.clearDefault" = "Não usar como padrão (deixar o ~/.claude livre)";
+
+/* Janela unica: abas */
+"home.title" = "Falcão Token Router";
+"home.tab.groups" = "Grupos";
+"home.tab.meter" = "Medidor";
+"home.menu.settings" = "Ajustes…";
+"panel.accounts.model.help.format" = "Limite do %1$@: %2$@ — sondado há %3$@. Este limite não chega na status line; só a sondagem o enxerga, e é ele que costuma travar a conta antes dos outros dois.";
+"panel.accounts.ready.help.probe" = "Sem uso registrado ainda — o sensor só lê quando a conta serve uma mensagem. Use \u201cMedir contas\u201d para saber agora, sem esperar ela entrar no rodízio.";
+"groups.measure" = "Medir contas";
+"groups.measuring" = "Medindo\u2026";
+"groups.measure.help" = "Pergunta o uso de cada conta ao Claude Code oficial \u2014 inclusive o limite por modelo, que a status line não entrega, e o número das contas ociosas, que nunca serviram uma mensagem. Leva alguns segundos por conta.";
+"panel.account.probed.format" = "Sondado há %@ — o limite por modelo só se move quando você pede \u201cMedir contas\u201d.";
+"groups.sessions.help.active.format" = "%1$d sessão(ões) do Claude Code rodando neste grupo, %2$d delas trabalhando ou esperando você. Todas são atendidas pela conta ativa — quando o rodízio trocar, trocam junto, sem encerrar.";
+"groups.sessions.help.idle.format" = "%1$d sessão(ões) do Claude Code abertas neste grupo, todas ociosas. Se você esperava ver uma sessão aqui e ela está contada noutro grupo, o terminal dela foi aberto antes da integração — rode `source ~/.zshrc` nele.";
+"panel.accounts.origin.sensor" = "Medido pelo sensor: o `rate_limits` da requisição que esta conta atendeu. É o gasto dela como ela mesma viu — em conta compartilhada, o que os colegas gastaram depois não aparece.";
+"panel.accounts.origin.probe" = "Medido por sondagem: uma consulta direta ao Claude Code, feita quando você pediu. Vale para conta ociosa, que nunca atendeu nada.";
+"settings.system.dock" = "Mostrar no Dock";
+"settings.system.dock.detail" = "O app nasce só na barra de menus. Numa barra cheia o macOS esconde o que não cabe sem avisar, e aí não há por onde abri-lo. No Dock, ele responde ao ⌘-Tab e o ícone abre a janela.";
