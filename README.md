@@ -174,7 +174,7 @@ token, so no code path can reach one.
 ./Scripts/icon.sh          # draws the .icns, installer art, banner, social card
 ./Scripts/bundle.sh        # assembles dist/FalcaoTokenRouter.app
 ./Scripts/dmg.sh           # builds dist/FalcaoTokenRouter-<version>.dmg
-./Scripts/release.sh       # tests, packages, builds the DMG, publishes (--dry-run)
+./Scripts/release.sh       # checks, tags and pushes; CI builds the universal DMG
 ```
 
 **Plain `swift test` does not work** in this toolchain: Command Line Tools ships

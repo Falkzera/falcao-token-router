@@ -1,0 +1,90 @@
+name: Release
+
+# Uma tag `v*` produz a release: build universal, DMG, zip, e a página no GitHub
+# com as notas geradas dos commits. Roda na nuvem porque o build universal
+# (arm64 + x86_64) precisa do xcbuild, que só vem com o Xcode completo — e a
+# máquina do mantenedor tem só o Command Line Tools. O runner tem o Xcode.
+#
+# Como cortar uma release: suba o número em VERSION, mergeie, e rode
+# `./Scripts/release.sh` — ele confere, cria a tag e empurra. O resto é aqui.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-26
+    timeout-minutes: 40
+
+    steps:
+      - uses: actions/checkout@v5
+
+      # A tag e o arquivo VERSION têm de concordar. Sem isto, uma tag v1.0.1
+      # podia publicar um app que se diz 1.0.0 — e o único lugar onde isso
+      # apareceria seria em "Sobre", na máquina de quem instalou.
+      - name: Versão bate com a tag
+        run: |
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          TAG="${GITHUB_REF_NAME#v}"
+          if [ "$VERSION" != "$TAG" ]; then
+            echo "::error::VERSION diz $VERSION, a tag diz $TAG"
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Toolchain
+        run: |
+          xcode-select -p
+          swift --version
+
+      # A release não confia que a CI da main passou: ela é o artefato que o
+      # usuário instala, então prova de novo, do zero.
+      - name: Testes
+        run: ./Scripts/test.sh
+
+      # Universal de propósito (é o padrão do script): o macOS 26 ainda roda em
+      # alguns Macs Intel, e um binário só arm64 não abre neles — sem mensagem
+      # que explique o porquê. O script já recusa publicar sem as duas fatias.
+      - name: Build universal e .app
+        run: ./Scripts/bundle.sh
+
+      # Sem tela, o Finder não pode ser controlado: o script avisa e produz o
+      # DMG sem a diagramação da janela. Funciona igual; só não fica bonito.
+      - name: DMG
+        run: ./Scripts/dmg.sh
+
+      - name: Artefatos
+        run: |
+          APP="dist/FalcaoTokenRouter.app"
+          DMG="dist/FalcaoTokenRouter-$VERSION.dmg"
+          ZIP="dist/FalcaoTokenRouter-$VERSION-universal.zip"
+          for arch in arm64 x86_64; do
+            lipo -archs "$APP/Contents/MacOS/FalcaoTokenRouter" | grep -qw "$arch" \
+              || { echo "::error::binário sem a fatia $arch"; exit 1; }
+          done
+          codesign -v "$APP"
+          ditto -c -k --keepParent --sequesterRsrc "$APP" "$ZIP"
+          # Uma cópia com nome FIXO: `releases/latest/download/FalcaoTokenRouter.dmg`
+          # resolve sempre para a mais nova, e o README nunca precisa mudar.
+          cp "$DMG" dist/FalcaoTokenRouter.dmg
+          ls -la dist/*.dmg dist/*.zip
+
+      # `--generate-notes` monta as notas dos commits desde a tag anterior. Um
+      # rascunho, não uma publicação: a página existe mas não aparece na lista
+      # nem dispara notificação até o mantenedor ler as notas e clicar em
+      # "Publish". É a pausa entre "o build passou" e "está no ar".
+      - name: Release no GitHub (rascunho)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            "dist/FalcaoTokenRouter-$VERSION.dmg" \
+            "dist/FalcaoTokenRouter.dmg" \
+            "dist/FalcaoTokenRouter-$VERSION-universal.zip" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            --draft
+          echo "::notice::Rascunho criado — revise e publique em releases/tag/$GITHUB_REF_NAME"
