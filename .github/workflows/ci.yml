@@ -1,0 +1,55 @@
+name: CI
+
+# Num repositório aberto a contribuição, isto é o portão: um PR só é mergeável
+# se a suíte e o verificador de catálogos passarem aqui. Rodar na `main` também
+# pega o caso em que dois PRs verdes conflitam depois do merge.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Um PR que recebe três pushes em cinco minutos não precisa de três execuções
+# completas; a última é a única que responde alguma coisa.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    # `macos-26` porque o pacote declara `platforms: [.macOS("26.0")]` e o alvo
+    # do app precisa do SDK do macOS 26 — `ViewState` é um typealias para
+    # `SwiftUICore.State`, que não existe nos SDKs anteriores. Um runner mais
+    # antigo não falharia com uma mensagem útil: falharia dizendo que o pacote
+    # não suporta a plataforma.
+    runs-on: macos-26
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Toolchain
+        run: |
+          swift --version
+          echo "SDK: $(xcrun --show-sdk-path)"
+          echo "developer dir: $(xcode-select -p)"
+
+      # Antes da suíte, e de propósito: chave sem tradução não quebra compilação
+      # nem teste — só aparece crua para o usuário. É aqui que isso vira erro.
+      - name: Catálogos de string
+        run: ./Scripts/check-strings.sh
+
+      # `swift test` sozinho NÃO funciona nesta toolchain: o Command Line Tools
+      # traz o swift-testing mas não o conecta (plugin de macro fora do plugin
+      # path, `Testing.framework` fora do rpath do bundle de teste). O script
+      # injeta os três e repassa argumentos. Ver CONTRIBUTING.md.
+      - name: Testes
+        run: ./Scripts/test.sh
+
+      # A suíte constrói em debug. O release usa outro caminho de otimização e
+      # já escondeu problema que o debug não mostra; é barato garantir que os
+      # três alvos linkam do jeito que a distribuição vai usar.
+      - name: Build de release
+        run: swift build -c release
