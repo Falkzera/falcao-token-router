@@ -1,0 +1,10 @@
+/target/
+**/*.rs.bk
+# artefatos do app (fases futuras)
+/app/node_modules/
+/app/dist/
+/app/src-tauri/binaries/*.exe
+/app/src-tauri/gen/
+# rascunhos locais de teste
+/.sandbox/
+*.log

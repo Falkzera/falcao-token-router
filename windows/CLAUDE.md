@@ -1,0 +1,37 @@
+# Falcão Token Router — porte Windows (Rust + Tauri)
+
+Porte do **router** para Windows. Lê e escreve os mesmos arquivos do app macOS
+(`config.json`, `usage/<email>.json`), com as mesmas regras de motor. O medidor
+herdado (custo por JSONL, preços, alertas) **não** entra neste porte.
+
+## Comandos (rode a partir de `windows/`)
+```powershell
+# o cargo pode não estar no PATH desta sessão; use o caminho completo se preciso:
+& "$env:USERPROFILE\.cargo\bin\cargo.exe" build --workspace
+& "$env:USERPROFILE\.cargo\bin\cargo.exe" test --workspace
+.\scripts\test.ps1        # fmt --check + clippy -D warnings + test (igual à CI)
+```
+
+## Mapa
+- `crates/router-core` = ≙ `Sources/CCUsageCore` (parte do router). Sem UI, sem rede.
+- `crates/router-cli`  = ≙ `Sources/router` → `router.exe`.
+- Fonte macOS a portar: `Sources/CCUsageCore/{Engine,Usage}`, `Sources/router/main.swift`,
+  `Tests/CCUsageCoreTests/*`.
+
+## Regras de código
+- Comentários e `agent.md` em **pt-BR**; identificadores em inglês; strings de UI (fase 5)
+  só via catálogo en/pt-BR (en = base).
+- **Nada de chamada de rede.** O uso vem do cliente oficial (sensor + sonda).
+- Credencial é **blob opaco** (`Vec<u8>` validado estruturalmente, nunca decodificado);
+  nenhum tipo tem campo de refresh token.
+- Datas das amostras em ISO-8601 **sem fração** (o decodificador do Swift recusa fração).
+- UUID serializa em MAIÚSCULAS (como o `uuidString` do Swift).
+- Descobertas do Claude Code têm comentário com o PORQUÊ e a data — custa caro redescobrir.
+
+## Achados do Windows que moldam o porte (spike, 22/09/2026)
+- Troca a quente vale: escrever `<perfil>\.credentials.json` com **mtime novo**
+  (temp+rename) faz a sessão viva servir a nova conta no próximo request.
+- Status line roda por **Git Bash**; o **stdin pode nunca fechar** (leitor com prazo).
+- 1º render vem **sem** `rate_limits` → não gravar amostra vazia.
+- `/usage`: data com **vírgula** (`MMM d, h:mma`), `·`=U+00B7, CRLF; deslogado = exit 0
+  sem linhas `Current`.

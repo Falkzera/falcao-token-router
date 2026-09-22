@@ -1,0 +1,21 @@
+# Workspace do porte Windows. Nada aqui muda o app macOS — tudo vive sob windows/.
+[workspace]
+resolver = "2"
+members = ["crates/router-core", "crates/router-cli"]
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.89"
+license = "MIT"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+# preserve_order: o oauthAccount cru é regravado preservando a ordem das chaves.
+serde_json = { version = "1", features = ["preserve_order"] }
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
