@@ -32,6 +32,18 @@ App de menu bar para macOS que gerencia **grupos de contas do Claude Code** com 
 - `Tests/CCUsageCoreTests/` — testes do motor e do store.
 - `Resources/{pt-BR,en}.lproj/` — catálogos de strings (checados por script).
 
+## 🚨 Este repositório é público
+
+Nunca versionar aqui: e-mail de conta real, nome de empregador ou cliente,
+consumo medido de conta compartilhada, screenshot com conta de verdade, ou
+documento operacional pessoal. Em teste e exemplo: `conta1@exemplo.com`,
+`/Users/exemplo`, organização `Acme`.
+
+Não é hipótese. A história anterior teve de ser recomeçada porque commits,
+testes e documentação citavam contas de trabalho de terceiros — e-mails de
+colegas e quanto cada um consumia. Nada disso é necessário para usar nem para
+contribuir.
+
 ## Regras de código
 
 - Comentários e strings de UI em **pt-BR**; identificadores em inglês.
