@@ -287,6 +287,68 @@ fn the_sensor_falls_back_to_the_embedded_profile() {
     assert_eq!(sample.config_dir_raw, profile.to_string_lossy());
 }
 
+/// A linha do grupo, do `router.exe` de verdade: o grupo dono do perfil (do
+/// `config.json`), modelo e esforço, o branch da pasta da sessão, o contexto, a
+/// janela, o custo e o e-mail da conta ativa — e a amostra gravada como antes.
+#[test]
+fn the_status_line_names_the_group_and_shows_the_session() {
+    let w = world(1);
+    let group_dir = w.group_dir();
+    fs::create_dir_all(&group_dir).unwrap();
+    fs::write(
+        w.group.config_dir.global_config_path(),
+        r#"{"oauthAccount":{"emailAddress":"conta1@exemplo.com"}}"#,
+    )
+    .unwrap();
+    let repo = w.sandbox.cwd.join("repo");
+    fs::create_dir_all(repo.join(".git")).unwrap();
+    fs::write(repo.join(".git").join("HEAD"), "ref: refs/heads/feat/x\n").unwrap();
+    let input = serde_json::json!({
+        "model": {"id": "claude-opus-5-5", "display_name": "Opus 5.5 (1M context)"},
+        "effort": {"level": "high"},
+        "workspace": {"current_dir": repo.to_string_lossy()},
+        "context_window": {
+            "total_input_tokens": 20000, "context_window_size": 200000, "used_percentage": 10
+        },
+        "cost": {"total_cost_usd": 0.5},
+        "rate_limits": {"five_hour": {"used_percentage": 42, "resets_at": 4102444800u64}}
+    });
+
+    let mut child = w
+        .sandbox
+        .router(&["statusline"])
+        .env("CLAUDE_CONFIG_DIR", &group_dir)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    {
+        use std::io::Write;
+        let mut stdin = child.stdin.take().unwrap();
+        stdin.write_all(input.to_string().as_bytes()).unwrap();
+    }
+    let output = child.wait_with_output().unwrap();
+    assert!(output.status.success());
+
+    let ansi = regex::Regex::new("\x1b\\[[0-9;]*m").unwrap();
+    let line = ansi.replace_all(&stdout(&output), "").into_owned();
+    for part in [
+        "● Trabalho │ ",
+        "Opus 5.5 high",
+        " feat/x ",
+        "10% 20k/200k",
+        "5h ",
+        " 42% ↻ ",
+        "$0.50",
+        "conta1@exemplo.com",
+    ] {
+        assert!(line.contains(part), "{part:?} em {line:?}");
+    }
+    let sample =
+        GroupUsageStore::read("conta1@exemplo.com", &w.sandbox.paths().usage_dir()).unwrap();
+    assert_eq!(sample.five_hour_percent, Some(0.42));
+}
+
 // --- doctor ---
 
 /// O `doctor` diz o estado sem mexer em nada — e o sensor do grupo roda DE

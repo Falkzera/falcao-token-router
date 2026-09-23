@@ -2,6 +2,7 @@
 //! bandeja: tooltip e menu) e para o front, que recebe daqui em vez de adivinhar
 //! pelo `navigator.language` — assim as duas superfícies nunca discordam.
 
+use router_core::platform::ui_language;
 use serde::Serialize;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize)]
@@ -12,22 +13,19 @@ pub enum Locale {
     PtBr,
 }
 
-/// Qualquer português vai para o catálogo pt-BR (o único que há); o resto, para
-/// o inglês, a base.
-pub fn for_language_id(langid: u16) -> Locale {
-    const LANG_PORTUGUESE: u16 = 0x16;
-    if langid & 0x3FF == LANG_PORTUGUESE {
+/// O idioma da interface do usuário atual: qualquer português vai para o
+/// catálogo pt-BR (o único que há); o resto, para o inglês, a base. O critério
+/// mora no núcleo (`ui_language`): a status line da CLI usa o mesmo.
+pub fn system() -> Locale {
+    from_portuguese(ui_language::portuguese_ui())
+}
+
+fn from_portuguese(portuguese: bool) -> Locale {
+    if portuguese {
         Locale::PtBr
     } else {
         Locale::En
     }
-}
-
-/// O idioma da interface do usuário atual.
-pub fn system() -> Locale {
-    // SAFETY: sem argumentos; só lê a configuração do usuário.
-    let langid = unsafe { windows_sys::Win32::Globalization::GetUserDefaultUILanguage() };
-    for_language_id(langid)
 }
 
 #[cfg(test)]
@@ -36,9 +34,10 @@ mod tests {
 
     #[test]
     fn portuguese_of_any_country_uses_the_pt_br_catalog() {
-        assert_eq!(for_language_id(0x0416), Locale::PtBr); // pt-BR
-        assert_eq!(for_language_id(0x0816), Locale::PtBr); // pt-PT
-        assert_eq!(for_language_id(0x0409), Locale::En); // en-US
-        assert_eq!(for_language_id(0x0C0A), Locale::En); // es-ES
+        let locale = |langid| from_portuguese(ui_language::is_portuguese(langid));
+        assert_eq!(locale(0x0416), Locale::PtBr); // pt-BR
+        assert_eq!(locale(0x0816), Locale::PtBr); // pt-PT
+        assert_eq!(locale(0x0409), Locale::En); // en-US
+        assert_eq!(locale(0x0C0A), Locale::En); // es-ES
     }
 }

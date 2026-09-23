@@ -72,6 +72,19 @@ and `router doctor` reports it when set.
   project settings. `router doctor` warns about a competing project status line.
 - Claude Code rewrites `<profile>\.claude.json` many times per session (always a new
   file), but keeps the identity the router wrote.
+- What the group's line shows comes from the stdin JSON as the status line docs
+  describe it (`model`, `effort.level`, `workspace`, `context_window`, `rate_limits`,
+  `cost`), plus the group from `config.json` and the account from the profile's
+  `.claude.json`. `effort` is absent when the model doesn't take it,
+  `context_window.used_percentage` may be `null` early in a session, and each
+  `rate_limits` window may be missing on its own; the line leaves out whatever
+  didn't come. The branch is read from `.git/HEAD` (a `.git` file points to a
+  worktree's gitdir), so a render doesn't start a `git` process. Claude Code
+  debounces updates at 300 ms and cancels a status line still running when the next
+  one starts.
+- Secondary text uses an explicit light gray (`ESC[38;2;153;153;153m`) where the
+  terminal has truecolor: Windows Terminal renders "faint" (`ESC[2m`) by halving the
+  color, which disappears on a dark background.
 
 ## PowerShell and Git Bash
 
@@ -234,6 +247,11 @@ The port does not reproduce these macOS behaviours (each has a regression test):
   and its variants, `CLAUDE_SECURESTORAGE_CONFIG_DIR` — are stripped on macOS too since #6;
 - no lock between the app and the CLI (the port uses a named mutex around every
   credential write);
+- a group's status line reduced to `account 5h 7d`, which replaced whatever status
+  line the user had with less than it showed. The port's line shows the group, the
+  model and its effort, the branch, the context window, both windows with the time
+  they reset, the session's cost and the active account's e-mail (the sensor behind
+  it is unchanged);
 - reordering accounts dropping one that the requested order forgot.
 
 And these in the app (checked in the browser against the mocked backend, and in the

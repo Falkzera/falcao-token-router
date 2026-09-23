@@ -22,6 +22,9 @@ Funções pequenas atrás das quais mora o que é da plataforma.
   `is_strictly_inside`: sem caixa, `/` = `\`, `..` desqualifica).
 - `short_path.rs` — nome 8.3 (`GetShortPathNameW`) de um caminho que existe; `None` se o 8.3
   está desligado no volume (ainda sobra espaço no nome).
+- `ui_language.rs` — o idioma da interface (`GetUserDefaultUILanguage`): qualquer português
+  conta como português. Um critério só para o app (catálogo) e a CLI (dias da semana na
+  status line) — 23/09/2026, saiu do app para o núcleo.
 - `git_bash.rs` — `find_git_bash`: o bash que o Claude Code usa para a status line, na ordem
   dele (`CLAUDE_CODE_GIT_BASH_PATH` → Program Files → Program Files (x86) → git do PATH).
 - `known_folders.rs` — `documents_dir`: a Documentos real (`SHGetKnownFolderPath`), que com o

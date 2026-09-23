@@ -12,7 +12,8 @@ serde_json.workspace = true
 chrono.workspace = true
 uuid.workspace = true
 thiserror.workspace = true
-windows-sys.workspace = true
+# Globalization: o idioma da interface (`platform::ui_language`).
+windows-sys = { workspace = true, features = ["Win32_Globalization"] }
 junction.workspace = true
 regex.workspace = true
 chrono-tz.workspace = true

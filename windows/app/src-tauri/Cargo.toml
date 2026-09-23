@@ -29,7 +29,6 @@ serde.workspace = true
 serde_json.workspace = true
 chrono.workspace = true
 windows-sys = { workspace = true, features = [
-    "Win32_Globalization",
     "Win32_UI_HiDpi",
     "Win32_UI_WindowsAndMessaging",
 ] }

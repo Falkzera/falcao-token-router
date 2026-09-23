@@ -80,7 +80,8 @@
   escala do sistema, o `router.exe` ao lado do app (`ROUTER_EXE`, o nome do sidecar do
   instalador), o shell da status line. Os testes também fixam o contrato do empacotamento
   (sidecar só no `tauri.installer.conf.json`, com esse nome; pasta e exe com nome ASCII).
-- `locale.rs` — o idioma da interface do Windows: qualquer português → pt-BR; o resto → en.
+- `locale.rs` — o idioma da interface do Windows: qualquer português → pt-BR; o resto → en. O
+  critério mora no núcleo (`platform::ui_language`), que a status line da CLI também usa.
 
 ## Verificado à mão (22/09/2026, sandbox com contas @exemplo.com)
 - O Windows 11 registrou o ícone com o tooltip esperado (`HKCU\Control Panel\NotifyIconSettings`,

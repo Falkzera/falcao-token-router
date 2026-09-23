@@ -1,5 +1,6 @@
 //! O sensor: lê `rate_limits` do stdin, grava a amostra por conta e imprime a
-//! linha colorida. Nenhuma chamada de rede, nenhum token nosso.
+//! linha do grupo (o layout mora em `statusline_view`). Nenhuma chamada de rede,
+//! nenhum token nosso.
 //!
 //! Mudanças do Windows sobre o macOS:
 //! - stdin **pode nunca fechar** (medido: processos pendurados), então o leitor
@@ -11,11 +12,12 @@
 //! - respeita o `ROUTER_APP_SUPPORT` (o sensor do macOS o ignora).
 
 use std::io::Write;
+use std::path::Path;
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, Local, TimeZone, Utc};
 use serde::Deserialize;
 use serde_json::{Map, Value};
 
@@ -25,7 +27,11 @@ use router_core::engine::engine_lock::EngineLock;
 use router_core::engine::group_usage::{GroupUsageSample, GroupUsageStore, UsageOrigin};
 use router_core::engine::provider::ProviderAdapter;
 use router_core::engine::router_paths::RouterPaths;
-use router_core::usage::usage_percent::UsagePercent;
+use router_core::platform::{paths, ui_language};
+use router_core::RouterConfig;
+
+use crate::shared;
+use crate::statusline_view::{self, Context, Label, Style, View, Window};
 
 /// Prazo do leitor de stdin. O sensor real precisa ser rápido e nunca pendurar.
 const DEADLINE_MS: u64 = 250;
@@ -45,6 +51,7 @@ pub fn run(args: &[String]) {
     let (seven_pct, seven_reset) = window(limits, "seven_day");
 
     // Grava a amostra SÓ se houver e-mail E ao menos uma janela.
+    let paths = RouterPaths::new();
     if let Some(email) = &email {
         if five_pct.is_some() || seven_pct.is_some() {
             let sample = GroupUsageSample::new(
@@ -58,13 +65,27 @@ pub fn run(args: &[String]) {
                 None,
                 UsageOrigin::Sensor,
             );
-            let paths = RouterPaths::new();
             let _lock = EngineLock::acquire(&paths.base, LOCK_WAIT);
             let _ = GroupUsageStore::write(&sample, email, &paths.usage_dir());
         }
     }
 
-    let line = render_line(email.as_deref(), five_pct, seven_pct);
+    // A linha: o grupo sai do `config.json`; o resto, do JSON do Claude Code.
+    let config = shared::load_config(&paths);
+    let view = view_from(
+        &input,
+        &dir,
+        config.as_ref(),
+        email.as_deref(),
+        &home_dir(),
+        &Local,
+    );
+    let style = Style {
+        truecolor: statusline_view::truecolor(|key| std::env::var(key).ok()),
+        portuguese: ui_language::portuguese_ui(),
+        phase: Utc::now().timestamp().max(0) as u64,
+    };
+    let line = statusline_view::render(&view, &style);
     // `write!` e ignora erro: o Claude Code cancela o script no meio quando chega
     // um novo update, fechando o pipe — um panic aqui poluiria o terminal.
     let _ = writeln!(std::io::stdout(), "{line}");
@@ -129,54 +150,101 @@ fn window(limits: Option<&Map<String, Value>>, key: &str) -> (Option<f64>, Optio
     (pct, reset)
 }
 
-/// A linha colorida: `<label negrito>  5h <barra> N%  7d N%` — ou "sem uso ainda".
-fn render_line(email: Option<&str>, five: Option<f64>, seven: Option<f64>) -> String {
-    let mut parts: Vec<String> = Vec::new();
-    let label = email
-        .map(|e| e.split('@').next().unwrap_or(e))
-        .unwrap_or("?");
-    parts.push(format!("\x1b[1m{label}\x1b[0m"));
-    if let Some(f) = five {
-        parts.push(colored(
-            f,
-            &format!("5h {} {}%", bar(Some(f), 8), UsagePercent::value(f)),
-        ));
+/// Quem a linha nomeia: o grupo dono deste perfil (comparação de caminho sem
+/// caixa nem estilo de barra; o grupo padrão casa pelo `~\.claude`). Fora de
+/// um grupo, a conta — ou, sem conta, a pasta do perfil.
+fn label_for(config: Option<&RouterConfig>, dir: &ConfigDir, email: Option<&str>) -> Label {
+    let mine = paths::normalized(&dir.path());
+    let owner = config.and_then(|c| {
+        c.groups
+            .iter()
+            .enumerate()
+            .find(|(_, g)| paths::normalized(&g.config_dir.path()) == mine)
+    });
+    if let Some((index, group)) = owner {
+        return Label::Group {
+            name: group.name.clone(),
+            index,
+        };
     }
-    if let Some(s) = seven {
-        parts.push(colored(s, &format!("7d {}%", UsagePercent::value(s))));
-    }
-    if parts.len() == 1 {
-        parts.push("\x1b[90msem uso ainda\x1b[0m".to_string());
-    }
-    parts.join("  ")
+    Label::Account(match email {
+        Some(email) => email.split('@').next().unwrap_or(email).to_string(),
+        None => dir
+            .path()
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "?".to_string()),
+    })
 }
 
-/// Barra de 8 células: `min(8, round(f*8))` de `█`, resto `░`.
-fn bar(f: Option<f64>, width: usize) -> String {
-    match f {
-        None => "?".repeat(width),
-        Some(f) => {
-            let filled = ((f * width as f64).round() as i64).clamp(0, width as i64) as usize;
-            "█".repeat(filled) + &"░".repeat(width - filled)
-        }
-    }
-}
-
-/// Cor por severidade: ≥0,90 vermelho (31), ≥0,70 amarelo (33), senão verde (32).
-fn colored(f: f64, text: &str) -> String {
-    let code = if f >= 0.90 {
-        31
-    } else if f >= 0.70 {
-        33
-    } else {
-        32
+/// O que a linha mostra, tirado do JSON do Claude Code (esquema da doc oficial
+/// da status line: `model`, `effort.level`, `workspace`, `context_window`,
+/// `rate_limits`, `cost`). O que não veio fica `None`.
+fn view_from<Tz: TimeZone>(
+    input: &Value,
+    dir: &ConfigDir,
+    config: Option<&RouterConfig>,
+    email: Option<&str>,
+    home: &str,
+    tz: &Tz,
+) -> View {
+    let text = |pointer: &str| {
+        input
+            .pointer(pointer)
+            .and_then(Value::as_str)
+            .filter(|s| !s.is_empty())
+            .map(String::from)
     };
-    format!("\x1b[{code}m{text}\x1b[0m")
+    let count = |value: &Value, key: &str| value.get(key).and_then(Value::as_f64);
+    let limits = input.get("rate_limits").and_then(Value::as_object);
+    let window_of = |key: &str| {
+        let (fraction, reset) = window(limits, key);
+        fraction.map(|fraction| Window {
+            fraction,
+            resets_local: reset.map(|r| r.with_timezone(tz).naive_local()),
+        })
+    };
+    // A pasta da sessão; sem ela (o prazo do stdin venceu), a do processo, que
+    // o Claude Code abre na pasta da sessão.
+    let cwd = text("/workspace/current_dir")
+        .or_else(|| text("/workspace/project_dir"))
+        .or_else(|| text("/cwd"))
+        .or_else(|| {
+            std::env::current_dir()
+                .ok()
+                .map(|p| p.to_string_lossy().into_owned())
+        });
+    let context = input.get("context_window").and_then(|c| {
+        let size = count(c, "context_window_size").filter(|s| *s > 0.0)?;
+        Some(Context {
+            used_percent: count(c, "used_percentage").unwrap_or(0.0),
+            input_tokens: count(c, "total_input_tokens").unwrap_or(0.0) as u64,
+            window_size: size as u64,
+        })
+    });
+    View {
+        label: label_for(config, dir, email),
+        model: text("/model/display_name").or_else(|| text("/model/id")),
+        model_id: text("/model/id"),
+        effort: text("/effort/level"),
+        place: cwd.map(|cwd| {
+            statusline_view::git_branch(Path::new(&cwd))
+                .unwrap_or_else(|| statusline_view::shorten_path(&cwd, home))
+        }),
+        context,
+        five_hour: window_of("five_hour"),
+        seven_day: window_of("seven_day"),
+        cost_usd: input
+            .pointer("/cost/total_cost_usd")
+            .and_then(Value::as_f64),
+        email: email.map(String::from),
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use router_core::engine::group_model::AccountGroup;
     use serde_json::json;
 
     fn limits_of(v: &Value) -> Option<&Map<String, Value>> {
@@ -205,38 +273,105 @@ mod tests {
         assert_eq!(window(limits_of(&empty), "five_hour"), (None, None));
     }
 
-    #[test]
-    fn render_no_windows_says_ready() {
-        let line = render_line(Some("conta1@exemplo.com"), None, None);
-        assert!(line.contains("conta1"));
-        assert!(line.contains("sem uso ainda"));
-        assert!(!line.contains("5h"));
+    fn config_with(groups: &[(&str, ConfigDir)]) -> RouterConfig {
+        let mut config = RouterConfig::default();
+        for (name, dir) in groups {
+            config.groups.push(AccountGroup::new(*name, dir.clone()));
+        }
+        config
     }
 
     #[test]
-    fn render_colors_by_severity() {
-        // 0,95 → vermelho (31) na barra de 5h
-        assert!(render_line(Some("a@b"), Some(0.95), None).contains("\x1b[31m"));
-        // 0,80 → amarelo (33)
-        assert!(render_line(Some("a@b"), Some(0.80), None).contains("\x1b[33m"));
-        // 0,10 → verde (32)
-        assert!(render_line(Some("a@b"), Some(0.10), None).contains("\x1b[32m"));
+    fn the_label_is_the_group_that_owns_the_profile() {
+        let home = r"C:\Users\exemplo";
+        let base = r"C:\Users\exemplo\AppData\Local\com.synqo.falcao-router\groups";
+        let config = config_with(&[
+            ("Pessoal", ConfigDir::dedicated(format!(r"{base}\A"))),
+            ("Trabalho", ConfigDir::dedicated(format!(r"{base}\B"))),
+            ("Principal", ConfigDir::standard(home)),
+        ]);
+
+        // Caixa e barras diferentes: é o mesmo perfil.
+        let same = ConfigDir::dedicated(
+            "c:/users/exemplo/appdata/local/com.synqo.falcao-router/groups/b/",
+        );
+        assert!(matches!(
+            label_for(Some(&config), &same, Some("conta1@exemplo.com")),
+            Label::Group { ref name, index: 1 } if name == "Trabalho"
+        ));
+        // O grupo padrão roda no `~\.claude`, sem variável.
+        assert!(matches!(
+            label_for(Some(&config), &ConfigDir::standard(home), None),
+            Label::Group { index: 2, .. }
+        ));
+        // Fora de um grupo: a conta; sem conta, a pasta do perfil.
+        let other = ConfigDir::dedicated(r"D:\outro\perfil");
+        assert!(matches!(
+            label_for(Some(&config), &other, Some("conta1@exemplo.com")),
+            Label::Account(ref name) if name == "conta1"
+        ));
+        assert!(matches!(
+            label_for(None, &other, None),
+            Label::Account(ref name) if name == "perfil"
+        ));
     }
 
     #[test]
-    fn bar_fills_proportionally() {
-        assert_eq!(bar(Some(0.0), 8), "░░░░░░░░");
-        assert_eq!(bar(Some(1.0), 8), "████████");
-        // 0,5 * 8 = 4
-        assert_eq!(bar(Some(0.5), 8), "████░░░░");
-        // arredonda: 0,44 * 8 = 3,52 → 4
-        assert_eq!(bar(Some(0.44), 8), "████░░░░");
+    fn the_view_reads_what_claude_code_sends() {
+        let tmp = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(tmp.path().join(".git")).unwrap();
+        std::fs::write(
+            tmp.path().join(".git").join("HEAD"),
+            "ref: refs/heads/feat/x\n",
+        )
+        .unwrap();
+        let input = json!({
+            "model": {"id": "claude-opus-5-5", "display_name": "Opus 5.5 (1M context)"},
+            "effort": {"level": "max"},
+            "workspace": {"current_dir": tmp.path().to_string_lossy()},
+            // `used_percentage` pode vir null no começo da sessão (doc oficial).
+            "context_window": {
+                "total_input_tokens": 511000, "context_window_size": 1000000,
+                "used_percentage": null
+            },
+            "cost": {"total_cost_usd": 1.5},
+            "rate_limits": {"seven_day": {"used_percentage": 41, "resets_at": 1790500000}}
+        });
+        let dir = ConfigDir::dedicated(r"D:\outro\perfil");
+        let view = view_from(&input, &dir, None, Some("conta1@exemplo.com"), "", &Utc);
+
+        assert_eq!(view.model.as_deref(), Some("Opus 5.5 (1M context)"));
+        assert_eq!(view.model_id.as_deref(), Some("claude-opus-5-5"));
+        assert_eq!(view.effort.as_deref(), Some("max"));
+        assert_eq!(view.place.as_deref(), Some("feat/x"));
+        let context = view.context.expect("contexto");
+        assert_eq!(context.used_percent, 0.0);
+        assert_eq!(
+            (context.input_tokens, context.window_size),
+            (511_000, 1_000_000)
+        );
+        assert_eq!(view.cost_usd, Some(1.5));
+        assert!(view.five_hour.is_none());
+        let seven = view.seven_day.expect("7d");
+        assert_eq!(seven.fraction, 0.41);
+        assert_eq!(
+            seven.resets_local,
+            Utc.timestamp_opt(1790500000, 0)
+                .single()
+                .map(|d| d.naive_utc())
+        );
+        assert_eq!(view.email.as_deref(), Some("conta1@exemplo.com"));
     }
 
     #[test]
-    fn label_is_local_part_or_question_mark() {
-        assert!(render_line(Some("equipe1@exemplo.com"), None, None).contains("equipe1"));
-        assert!(render_line(None, None, None).contains('?'));
+    fn the_view_skips_what_did_not_come() {
+        // Sem tamanho de janela, não há medidor de contexto; sem nada, só o rótulo.
+        let input = json!({"context_window": {"used_percentage": 12}});
+        let dir = ConfigDir::dedicated(r"D:\outro\perfil");
+        let view = view_from(&input, &dir, None, None, "", &Utc);
+        assert!(view.context.is_none());
+        assert!(view.model.is_none() && view.effort.is_none() && view.cost_usd.is_none());
+        assert!(view.five_hour.is_none() && view.seven_day.is_none());
     }
 
     #[test]

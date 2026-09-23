@@ -102,16 +102,24 @@ The first line says which account serves the session — `→ work: conta1` — 
 Claude Code starts in the group's profile. Whatever follows the group name goes to
 Claude Code as usual: `claude work --resume`, `claude work -p "hi"`.
 
-The **status line** at the bottom shows the account and its two windows —
-`conta1  5h ██░░░░░░ 23%  7d 41%` — from the first answer on (before it, it says
-`sem uso ainda`: no usage yet). That line is the **sensor**: it hands the router the
-usage that Claude Code itself received.
+The **status line** at the bottom shows the group, the model and its effort level,
+the git branch (or the folder), the context window, both usage windows with the time
+they reset, the session's cost and the e-mail of the account serving you:
+
+```
+● work │ Opus 5.5 high │ main │ █████░░░░░ 51% 511k/1000k │ 5h █░░░░ 29% ↻ 14:05  7d ██░░░ 33% ↻ Mon (28) 9:00 │ $24.77 │ conta1@exemplo.com
+```
+
+The usage windows appear once the session has had its first answer. That line is
+also the **sensor**: it hands the router the usage that Claude Code itself received —
+so in a group, it takes the place of any status line you configured yourself (yours
+keeps working in your other profiles).
 
 ### 5. Watch the switch
 
 With the session still open, click **Use** on the second account in the app. Then
 send another message in the same session: the second account serves it, and the
-status line shows its name. No restart, no `--resume`.
+e-mail at the end of the status line changes to it. No restart, no `--resume`.
 
 The automatic switch is the same move. When the active account passes the group's
 **Switch at** threshold, the router activates the first account in your order that

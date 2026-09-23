@@ -14,3 +14,4 @@ pub mod process;
 pub mod process_times;
 pub mod profile_append;
 pub mod short_path;
+pub mod ui_language;
