@@ -47,8 +47,10 @@
   ou shell sem a linha — a política e o `.bash_profile` que ignora o `.bashrc` têm correção
   própria); `bash_login_file` nomeia o perfil de login do Git Bash. Testado (`view`).
 - `settings.rs` — ajustes do app em `<Roaming>\com.synqo.falcao-token-router\settings.json`
-  (`show_in_taskbar` e o último tamanho da janela; ilegível = padrão; `remember` muda só a
-  memória e `flush` grava se algo mudou — `update` grava tudo na hora); "abrir no login" pelo plugin de autostart, SEMPRE relido
+  (`show_in_taskbar`, o último tamanho da janela e o resumo das contas — `hidden_summary`, os
+  `SummaryItem` TIRADOS: de fábrica nada, item desconhecido ignorado sem derrubar o resto,
+  gravado sem repetidos na ordem da tela, comando `set_hidden_summary`; ilegível = padrão;
+  `remember` muda só a memória e `flush` grava se algo mudou — `update` grava tudo na hora); "abrir no login" pelo plugin de autostart, SEMPRE relido
   do sistema, com o motivo da recusa; `open_url` só para a lista (ms-settings:developers/taskbar,
   logout do claude.ai, hosts do login oficial — testado). `SettingsStore::at` para os testes.
 - `snapshot.rs` — o quadro que as janelas leem: grupos e contas na ordem do usuário, conta

@@ -2,18 +2,21 @@
   // Uma conta no cartão do grupo (≙ AccountRow de GroupsView.swift). A ordem é a
   // preferência de rotação: a alça arrasta, e com o foco nela as setas ↑/↓
   // movem — o reordenar do macOS (`onMove` fora de uma `List`) não funcionava.
-  // "Usar" fica exposto (é a ação frequente); o resto, no menu.
+  // "Usar" fica exposto (é a ação frequente); o resto, no menu. O que o resumo
+  // mostra (5h, 7d, os resets, o limite do modelo) é escolha do usuário nos
+  // Ajustes (`hidden`); o tooltip segue com tudo.
   import { clock } from "../lib/clock.svelte";
-  import { ageSeconds, severity, VERY_STALE_SECONDS } from "../lib/format";
+  import { ageSeconds, notStarted, severity, VERY_STALE_SECONDS } from "../lib/format";
   import Icon from "../lib/Icon.svelte";
   import { t } from "../lib/i18n";
   import Menu from "../lib/Menu.svelte";
-  import type { AccountView, Reading } from "../lib/types";
+  import type { AccountView, Reading, SummaryItem } from "../lib/types";
   import { accountHelp, staleHelp } from "../panel/accountHelp";
   import ModelBadge from "../panel/ModelBadge.svelte";
 
   let {
     account,
+    hidden,
     active,
     dragging,
     first,
@@ -27,6 +30,8 @@
     onDragEnd,
   }: {
     account: AccountView;
+    /** O que o resumo não mostra — a escolha do usuário nos Ajustes. */
+    hidden: SummaryItem[];
     active: boolean;
     dragging: boolean;
     first: boolean;
@@ -43,6 +48,17 @@
   const usage = $derived(account.usage);
   const veryStale = $derived(usage ? ageSeconds(usage.sampledAt, clock.now) > VERY_STALE_SECONDS : false);
   const help = $derived(accountHelp(usage, clock.now));
+
+  const shows = (item: SummaryItem) => !hidden.includes(item);
+  /** As janelas que o resumo mostra, cada uma com o item do reset dela. */
+  const windows = $derived(
+    usage
+      ? [
+          { key: "fiveHour" as const, reading: usage.fiveHour, reset: "fiveHourReset" as const },
+          { key: "sevenDay" as const, reading: usage.sevenDay, reset: "sevenDayReset" as const },
+        ].filter((window) => shows(window.key))
+      : [],
+  );
 
   function tone(reading: Reading, bound: boolean): string {
     return bound ? severity(reading.fraction) : "plain";
@@ -84,32 +100,48 @@
     {/if}
   </span>
 
-  {#if usage?.bound === "model" && usage.model}
-    <ModelBadge model={usage.model} />
+  {#if usage?.bound === "model" && usage.model && shows("model")}
+    <span class="model">
+      <ModelBadge model={usage.model} />
+      {#if shows("modelReset") && usage.model.reading.resetsLabel}
+        <span class="reset">↻ {usage.model.reading.resetsLabel}</span>
+      {/if}
+    </span>
   {/if}
   {#if veryStale && usage}
     <span class="clock" title={staleHelp(usage, clock.now)}><Icon name="clockAlert" size={12} /></span>
   {/if}
 
-  {#if usage}
+  {#if !usage}
+    <span class="unmeasured" title={help}>{t("groups.account.unmeasured")}</span>
+  {:else if windows.length > 0}
     <span class="readings" title={help}>
-      {#each [{ key: "fiveHour" as const, reading: usage.fiveHour }, { key: "sevenDay" as const, reading: usage.sevenDay }] as window (window.key)}
+      {#each windows as window (window.key)}
         <span class="reading">
-          <span class="window">
-            {window.key === "fiveHour" ? t("panel.accounts.window.fiveHour") : t("panel.accounts.window.sevenDay")}
-          </span>
-          {#if window.reading}
-            <span class="num {tone(window.reading, usage.bound === window.key)}" class:bound={usage.bound === window.key}>
-              {window.reading.text}
+          <span class="value">
+            <span class="window">
+              {window.key === "fiveHour" ? t("panel.accounts.window.fiveHour") : t("panel.accounts.window.sevenDay")}
             </span>
-          {:else}
-            <span class="num absent">{t("panel.accounts.window.absent")}</span>
+            {#if window.reading}
+              <span class="num {tone(window.reading, usage.bound === window.key)}" class:bound={usage.bound === window.key}>
+                {window.reading.text}
+              </span>
+            {:else}
+              <span class="num absent">{t("panel.accounts.window.absent")}</span>
+            {/if}
+          </span>
+          {#if shows(window.reset)}
+            {#if window.reading?.resetsLabel}
+              <!-- O reset embaixo do número, como a status line o escreve. -->
+              <span class="reset">↻ {window.reading.resetsLabel}</span>
+            {:else if window.key === "fiveHour" && notStarted(window.reading)}
+              <!-- Sem uso, a janela de 5h não começou: não há reset ainda. -->
+              <span class="reset">{t("panel.reset.notStarted")}</span>
+            {/if}
           {/if}
         </span>
       {/each}
     </span>
-  {:else}
-    <span class="unmeasured" title={help}>{t("groups.account.unmeasured")}</span>
   {/if}
 
   <span class="actions">
@@ -209,11 +241,32 @@
     display: flex;
     gap: 10px;
   }
+  /* Cada janela é uma coluna: o número em cima, o reset embaixo — na altura
+     que o nome e a organização já ocupam, então a linha não cresce. */
   .reading {
     display: inline-flex;
-    gap: 3px;
+    flex-direction: column;
+    align-items: flex-end;
     font-size: var(--font-small);
     font-variant-numeric: tabular-nums;
+  }
+  .value {
+    display: inline-flex;
+    gap: 3px;
+  }
+  /* O selo do limite do modelo com o reset dele embaixo, como as janelas. */
+  .model {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    font-size: var(--font-small);
+    font-variant-numeric: tabular-nums;
+  }
+  /* Terciário e sem peso: é o dado que se consulta, não o que se vigia. */
+  .reset {
+    color: var(--text-tertiary);
+    white-space: nowrap;
   }
   .window {
     color: var(--text-tertiary);

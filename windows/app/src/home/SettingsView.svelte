@@ -7,13 +7,15 @@
   // - "Mostrar na barra de tarefas" (≙ "Mostrar no Dock", pela mesma razão).
   // - a dica do ícone escondido no `^` do Windows 11, com o atalho para as
   //   Configurações onde se escolhe o que fica à vista.
-  // Antes delas, a status line das sessões dos grupos (`StatusLineSection`).
+  // Antes delas, a status line das sessões dos grupos (`StatusLineSection`) e o
+  // que o resumo de cada conta mostra na aba Grupos (`SummarySection`).
   import { onMount } from "svelte";
   import * as api from "../lib/api";
   import { t } from "../lib/i18n";
   import Switch from "../lib/Switch.svelte";
   import type { SettingsView } from "../lib/types";
   import StatusLineSection from "./StatusLineSection.svelte";
+  import SummarySection from "./SummarySection.svelte";
 
   let settings = $state<SettingsView | null>(null);
 
@@ -25,6 +27,7 @@
 {#if settings}
   <div class="settings">
     <StatusLineSection />
+    <SummarySection initial={settings.hiddenSummary} />
 
     <section>
       <h3>{t("settings.section.system")}</h3>

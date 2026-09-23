@@ -161,10 +161,15 @@ export type LoginView = LoginPhase & {
 };
 
 /** A aba Ajustes. "Abrir no login" vem SEMPRE do sistema. */
+/** Um item do resumo de cada conta na aba Grupos (≙ `SummaryItem` do Rust). */
+export type SummaryItem = "fiveHour" | "fiveHourReset" | "sevenDay" | "sevenDayReset" | "model" | "modelReset";
+
 export interface SettingsView {
   autostart: boolean;
   autostartFailure: string | null;
   showInTaskbar: boolean;
+  /** O que o resumo das contas NÃO mostra (de fábrica, nada). */
+  hiddenSummary: SummaryItem[];
   version: string;
 }
 

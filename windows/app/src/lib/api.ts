@@ -18,6 +18,7 @@ import type {
   StatusLineChoice,
   StatusLineTest,
   StatusLineView,
+  SummaryItem,
   TerminalView,
   View,
 } from "./types";
@@ -112,6 +113,8 @@ export const allowProfilesFor = (shell: ShellName) =>
 export const getSettings = () => call<SettingsView>("get_settings");
 export const setAutostart = (on: boolean) => call<SettingsView>("set_autostart", { on });
 export const setShowInTaskbar = (on: boolean) => call<SettingsView>("set_show_in_taskbar", { on });
+export const setHiddenSummary = (hidden: SummaryItem[]) =>
+  call<SettingsView>("set_hidden_summary", { hidden });
 /** Só os endereços da lista do backend (Configurações do Windows, logout, login). */
 export const openUrl = (url: string) => call<void>("open_url", { url });
 

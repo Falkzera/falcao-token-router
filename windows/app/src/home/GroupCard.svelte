@@ -10,7 +10,7 @@
   import { t } from "../lib/i18n";
   import Menu from "../lib/Menu.svelte";
   import Switch from "../lib/Switch.svelte";
-  import type { AccountView, GroupView, IntegrationState, Snapshot } from "../lib/types";
+  import type { AccountView, GroupView, IntegrationState, Snapshot, SummaryItem } from "../lib/types";
   import SessionsBadge from "../panel/SessionsBadge.svelte";
   import AccountItem from "./AccountItem.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
@@ -18,6 +18,7 @@
   let {
     group,
     integration,
+    hiddenSummary,
     measuringGroup,
     onSnapshot,
     onAddAccount,
@@ -26,6 +27,8 @@
     group: GroupView;
     /** O comando só funciona com a integração de pé — o aviso leva até ela. */
     integration: IntegrationState;
+    /** O que o resumo das contas não mostra (Ajustes). */
+    hiddenSummary: SummaryItem[];
     measuringGroup: string | null;
     onSnapshot: (snapshot: Snapshot) => void;
     onAddAccount: () => void;
@@ -241,6 +244,7 @@
       {#each ordered as account, index (account.id)}
         <AccountItem
           {account}
+          hidden={hiddenSummary}
           active={group.activeAccountId === account.id}
           dragging={dragging === account.id}
           first={index === 0}

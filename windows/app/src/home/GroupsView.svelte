@@ -6,7 +6,7 @@
   import * as api from "../lib/api";
   import Icon from "../lib/Icon.svelte";
   import { t } from "../lib/i18n";
-  import type { AccountView, IntegrationState, Snapshot, TerminalView } from "../lib/types";
+  import type { AccountView, IntegrationState, Snapshot, SummaryItem, TerminalView } from "../lib/types";
   import ErrorBanner from "./ErrorBanner.svelte";
   import GroupCard from "./GroupCard.svelte";
   import NewGroupDialog from "./NewGroupDialog.svelte";
@@ -57,8 +57,16 @@
         : "install",
   );
 
+  /** O que o resumo das contas não mostra (Ajustes → Resumo dos grupos). */
+  let hiddenSummary = $state<SummaryItem[]>([]);
+
   onMount(() => {
-    void api.getSnapshot().then((s) => (snapshot = s));
+    // O quadro e a escolha do resumo chegam juntos: as linhas nunca aparecem
+    // completas para, um instante depois, perder o que o usuário tirou.
+    void Promise.all([api.getSnapshot(), api.getSettings()]).then(([s, settings]) => {
+      hiddenSummary = settings.hiddenSummary;
+      snapshot = s;
+    });
     const unlisten = api.onSnapshotChanged(() => void api.getSnapshot().then((s) => (snapshot = s)));
     void checkTerminal();
     const onFocus = () => {
@@ -97,6 +105,7 @@
           <GroupCard
             {group}
             {integration}
+            {hiddenSummary}
             measuringGroup={snapshot.measuringGroup}
             onSnapshot={(next) => (snapshot = next)}
             onAddAccount={() => onAddAccount(group.id)}

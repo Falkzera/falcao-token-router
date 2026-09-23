@@ -8,6 +8,7 @@
 //   &terminal=ausente|ok|bloqueado|parcial|velha|semrouter  &devmode=1
 //   &install=falha (Ativar grava só parte)  &diretiva=1 (Permitir não vence a política)
 //   &autostart=falha (o Windows recusa o registro)  &taskbar=1
+//   &resumo=fiveHourReset,model (o que o resumo das contas NÃO mostra)
 // A status line (aba Ajustes):
 //   &statusline=itens|vazia|comando  &runner=powershell|nenhum
 //   &teste=ok|colorido|vazio|falha|prazo|naosubiu|semshell (o que o "Testar" responde)
@@ -33,6 +34,7 @@ import type {
   StatusLineItem,
   StatusLineTest,
   StatusLineView,
+  SummaryItem,
   TerminalView,
   UsageView,
 } from "./types";
@@ -285,6 +287,7 @@ const settings: SettingsView = {
   autostart: false,
   autostartFailure: null,
   showInTaskbar: param("taskbar") === "1",
+  hiddenSummary: (param("resumo")?.split(",").filter(Boolean) ?? []) as SummaryItem[],
   version: "0.1.0-mock",
 };
 
@@ -694,6 +697,13 @@ const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
   },
   set_show_in_taskbar: (args) => {
     settings.showInTaskbar = Boolean(args.on);
+    return { ...settings };
+  },
+  set_hidden_summary: (args) => {
+    // Como o Rust: sem repetidos e na ordem da tela.
+    const order: SummaryItem[] = ["fiveHour", "fiveHourReset", "sevenDay", "sevenDayReset", "model", "modelReset"];
+    const hidden = args.hidden as SummaryItem[];
+    settings.hiddenSummary = order.filter((item) => hidden.includes(item));
     return { ...settings };
   },
   open_url: (args) => {

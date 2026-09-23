@@ -225,6 +225,7 @@ pub fn run() {
             settings::get_settings,
             settings::set_autostart,
             settings::set_show_in_taskbar,
+            settings::set_hidden_summary,
             settings::open_url,
             status_line::get_status_line,
             status_line::set_status_line,

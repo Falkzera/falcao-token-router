@@ -26,9 +26,14 @@
   diretiva de grupo vencer), a linha do `.bashrc` com copiar para o `.bash_profile` que o ignora,
   a função `claude` do usuário encadeada (info), o app movido (scripts velhos) e a dica do Modo
   de Desenvolvedor (→ `ms-settings:developers`). "Instalada ✓" por 2 s só com `ok`.
-- `SettingsView.svelte` — a aba Ajustes: a status line (em cima), "Abrir no login" (do sistema,
-  com o motivo da recusa), "Mostrar na barra de tarefas" com a explicação, a dica do ícone
-  escondido no `^` (→ `ms-settings:taskbar`) e a versão.
+- `SettingsView.svelte` — a aba Ajustes: a status line (em cima), o resumo dos grupos, "Abrir no
+  login" (do sistema, com o motivo da recusa), "Mostrar na barra de tarefas" com a explicação, a
+  dica do ícone escondido no `^` (→ `ms-settings:taskbar`) e a versão.
+- `SummarySection.svelte` — "Resumo dos grupos" (pedido de 23/09/2026): o que cada conta mostra
+  na aba Grupos, em pares por janela (uso | reset: 5 h, 7 dias, limite do modelo); de fábrica,
+  tudo. O reset fica desligado sem a janela dele (o estado é guardado e volta com ela); "Mostrar
+  tudo" quando algo foi tirado. Estado local na hora do clique e gravação em FILA
+  (`set_hidden_summary`). O tooltip da linha não muda: é o detalhe completo.
 - `StatusLineSection.svelte` — a status line das sessões dos grupos: a chave "Usar a status line
   do app"; ligada, a PRÉVIA (vinda do backend, desenhada pelo código da CLI; num fundo de
   terminal escuro nos dois temas — as cores da linha são para ele) e os 10 itens, com
@@ -45,9 +50,13 @@
   recusa); tempo esgotado com "Conferir de novo" (o spinner eterno do macOS). Fechar e Esc
   cancelam; a limpeza do disco é do backend.
 - `AccountItem.svelte` — uma conta: alça (arrasta; com foco, ↑/↓ movem), ponto da ativa, rótulo e
-  organização, selo do modelo, relógio de amostra velha, 5h/7d rotulados (só a janela que manda
-  com peso e cor), "Usar" (na ativa o botão só some — o espaço fica e os números alinham) e o
-  menu ⋯ (mover, relogar, remover).
+  organização, selo do modelo (com o reset dele embaixo), relógio de amostra velha, 5h/7d
+  rotulados (só a janela que manda com peso e cor), cada janela com o reset embaixo (`↻ 22:30`,
+  `↻ seg (28) 9:00`; a de 5h sem uso, "não iniciada"; terciário — na altura que nome e
+  organização já ocupam, a linha não cresce), "Usar" (na ativa o botão só some — o espaço fica e
+  os números alinham) e o menu ⋯ (mover, relogar, remover). O que o resumo mostra é escolha do
+  usuário (`hidden`, de Ajustes → Resumo dos grupos; de fábrica, tudo); o tooltip segue com
+  tudo. (23/09/2026: os resets na linha nasceram como teste e ficaram, com a escolha.)
 - `NewGroupDialog.svelte` — nome e a escolha "usar como grupo padrão", DESMARCADA quando o
   `~\.claude` tem um login que o router não conhece — e, se marcada, o aviso de qual.
 - `ConfirmDialog.svelte` — confirmação destrutiva genérica; o texto diz o que de fato acontece.

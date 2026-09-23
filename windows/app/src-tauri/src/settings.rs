@@ -12,6 +12,8 @@
 //! - O último tamanho da janela Grupos/Ajustes (`home_window`): acompanhado na
 //!   memória a cada `Resized` (`remember`) e gravado ao fechar a janela e na
 //!   saída do app (`flush`).
+//! - O resumo das contas na aba Grupos (`SummaryItem`): o que cada linha
+//!   mostra, escolhido pelo usuário — de fábrica, tudo; guardam-se os TIRADOS.
 //! - `open_url` só abre o que está na lista: as páginas de Configurações que a
 //!   tela sugere, o logout do claude.ai e o login oficial.
 
@@ -20,12 +22,61 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
 use router_core::platform::atomic_write::{read_retrying, write_atomic};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use tauri::{AppHandle, Manager, State};
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_opener::OpenerExt;
 
 use crate::home_window::WindowSize;
+
+/// Um item do resumo de cada conta na aba Grupos — o usuário escolhe o que vê
+/// ali (pedido de 23/09/2026); de fábrica, tudo. O tooltip da linha não muda:
+/// é o detalhe completo.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SummaryItem {
+    FiveHour,
+    FiveHourReset,
+    SevenDay,
+    SevenDayReset,
+    Model,
+    ModelReset,
+}
+
+impl SummaryItem {
+    /// Na ordem da tela.
+    pub const ALL: [SummaryItem; 6] = [
+        SummaryItem::FiveHour,
+        SummaryItem::FiveHourReset,
+        SummaryItem::SevenDay,
+        SummaryItem::SevenDayReset,
+        SummaryItem::Model,
+        SummaryItem::ModelReset,
+    ];
+
+    /// Sem repetidos e na ordem da tela: o arquivo não depende da ordem dos
+    /// cliques.
+    pub fn normalized(items: &[SummaryItem]) -> Vec<SummaryItem> {
+        SummaryItem::ALL
+            .into_iter()
+            .filter(|item| items.contains(item))
+            .collect()
+    }
+}
+
+/// Guarda-se a lista dos TIRADOS (como na status line): de fábrica ela é
+/// vazia, e um item que uma versão nova acrescentar aparece sozinho. Leitura
+/// tolerante: item desconhecido (de uma versão mais nova) é ignorado, e uma
+/// lista ilegível vale vazia — nunca derruba as outras preferências do arquivo.
+fn known_items<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Vec<SummaryItem>, D::Error> {
+    Ok(match serde_json::Value::deserialize(deserializer)? {
+        serde_json::Value::Array(values) => values
+            .into_iter()
+            .filter_map(|value| serde_json::from_value(value).ok())
+            .collect(),
+        _ => Vec::new(),
+    })
+}
 
 #[derive(Clone, Default, PartialEq, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -35,6 +86,13 @@ pub struct AppSettings {
     /// O último tamanho da janela Grupos/Ajustes (ver `home_window`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub home_window: Option<WindowSize>,
+    /// O que o resumo das contas NÃO mostra (ver `SummaryItem`).
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        deserialize_with = "known_items"
+    )]
+    pub hidden_summary: Vec<SummaryItem>,
 }
 
 impl AppSettings {
@@ -143,14 +201,17 @@ pub struct SettingsView {
     pub autostart: bool,
     pub autostart_failure: Option<String>,
     pub show_in_taskbar: bool,
+    pub hidden_summary: Vec<SummaryItem>,
     pub version: String,
 }
 
 fn view(app: &AppHandle, store: &SettingsStore) -> SettingsView {
+    let settings = store.get();
     SettingsView {
         autostart: app.autolaunch().is_enabled().unwrap_or(false),
         autostart_failure: lock(&store.autostart_failure).clone(),
-        show_in_taskbar: store.get().show_in_taskbar,
+        show_in_taskbar: settings.show_in_taskbar,
+        hidden_summary: settings.hidden_summary,
         version: app.package_info().version.to_string(),
     }
 }
@@ -182,6 +243,19 @@ pub fn set_show_in_taskbar(
 ) -> Result<SettingsView, String> {
     store
         .update(|s| s.show_in_taskbar = on)
+        .map_err(|e| e.to_string())?;
+    Ok(view(&app, &store))
+}
+
+/// O que o resumo de cada conta deixa de mostrar na aba Grupos.
+#[tauri::command]
+pub fn set_hidden_summary(
+    app: AppHandle,
+    store: State<'_, SettingsStore>,
+    hidden: Vec<SummaryItem>,
+) -> Result<SettingsView, String> {
+    store
+        .update(|s| s.hidden_summary = SummaryItem::normalized(&hidden))
         .map_err(|e| e.to_string())?;
     Ok(view(&app, &store))
 }
@@ -278,6 +352,53 @@ mod tests {
         let reread = SettingsStore::at(Some(path)).get();
         assert!(reread.show_in_taskbar);
         assert_eq!(reread.home_window, Some(resized));
+    }
+
+    /// O resumo das contas mostra tudo de fábrica; o que se tira volta depois
+    /// de reiniciar, sem repetidos e na ordem da tela (não na dos cliques).
+    #[test]
+    fn the_groups_summary_shows_everything_until_something_is_taken_out() {
+        assert!(AppSettings::default().hidden_summary.is_empty());
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("settings.json");
+        let store = SettingsStore::at(Some(path.clone()));
+        let clicks = [
+            SummaryItem::ModelReset,
+            SummaryItem::FiveHourReset,
+            SummaryItem::ModelReset,
+        ];
+        store
+            .update(|s| s.hidden_summary = SummaryItem::normalized(&clicks))
+            .unwrap();
+        assert_eq!(
+            SettingsStore::at(Some(path)).get().hidden_summary,
+            [SummaryItem::FiveHourReset, SummaryItem::ModelReset]
+        );
+    }
+
+    /// Um item que o app não conhece (de uma versão mais nova) é ignorado, e
+    /// uma lista ilegível vale vazia — as outras preferências ficam.
+    #[test]
+    fn an_unknown_summary_item_never_costs_the_other_settings() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("settings.json");
+        std::fs::write(
+            &path,
+            br#"{"showInTaskbar": true, "hiddenSummary": ["fiveHour", "algoNovo"]}"#,
+        )
+        .unwrap();
+        let settings = SettingsStore::at(Some(path.clone())).get();
+        assert!(settings.show_in_taskbar);
+        assert_eq!(settings.hidden_summary, [SummaryItem::FiveHour]);
+
+        std::fs::write(
+            &path,
+            br#"{"showInTaskbar": true, "hiddenSummary": "tudo"}"#,
+        )
+        .unwrap();
+        let settings = SettingsStore::at(Some(path)).get();
+        assert!(settings.show_in_taskbar);
+        assert!(settings.hidden_summary.is_empty());
     }
 
     /// O `settings.json` de antes do tamanho guardado continua valendo.

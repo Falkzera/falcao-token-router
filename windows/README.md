@@ -153,8 +153,9 @@ that didn't, and the last line is `tudo certo.` (all good) or `há problemas aci
 - **Groups** has what the walkthrough used and, per group, the rotation order (drag,
   or ↑/↓), **Log in again…** for an account whose login expired, **Remove account**,
   **Measure accounts**, rename, default and delete.
-- **Settings**: the **Status line** (below), **Open at login** and **Show in
-  taskbar**.
+- **Settings**: the **Status line** (below), the **Groups summary** (what each
+  account row shows: the 5-hour and 7-day usage, the model limit, and when each
+  one resets — everything by default), **Open at login** and **Show in taskbar**.
 
 Resize or maximize the window as you like; it reopens at its last size. Closing it
 leaves the app running in the notification area; **Quit** ends it. The app follows your Windows language — English or Portuguese.
