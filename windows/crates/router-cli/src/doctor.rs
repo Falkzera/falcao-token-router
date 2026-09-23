@@ -12,12 +12,11 @@
 
 use std::collections::HashMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 use std::time::Duration;
 
 use chrono::Utc;
-use regex::Regex;
 
 use router_core::engine::group_usage::UsageOrigin;
 use router_core::engine::group_usage_reader::GroupUsageReader;
@@ -27,6 +26,10 @@ use router_core::engine::rotation_engine::RotationEngine;
 use router_core::engine::router_paths::RouterPaths;
 use router_core::engine::session_registry::{SessionRegistry, SessionStatus};
 use router_core::engine::shell_integration::{ShellIntegration, ShellTargets, StatusShell};
+use router_core::engine::terminal_report::{
+    bash_login_profile, defines_claude_function, effective_policy, policy_blocks_profiles,
+    powershell_editions, BashLogin, EditionEnv,
+};
 use router_core::platform::atomic_write::read_retrying;
 use router_core::platform::git_bash::{find_git_bash, GitBashEnv};
 use router_core::usage::claude_binary::ClaudeBinary;
@@ -173,7 +176,7 @@ fn check_profiles(
     with_bash: bool,
 ) {
     let ps_line = ShellIntegration::powershell_source_line(ps1);
-    let editions = powershell_editions();
+    let editions = powershell_editions(&EditionEnv::from_process());
     for profile in &targets.powershell_profiles {
         let folder = profile
             .parent()
@@ -215,8 +218,8 @@ fn check_profiles(
         // A política só importa onde a integração deveria rodar (e consultá-la
         // abre um PowerShell, que não é de graça).
         if has {
-            match effective_policy(&edition.exe, edition.default_policy) {
-                Some(policy) if blocks_profiles(&policy) => report.check(
+            match effective_policy(edition) {
+                Some(policy) if policy_blocks_profiles(&policy) => report.check(
                     false,
                     format!(
                         "política de execução do {label}: {policy} — o $PROFILE não roda e `claude <grupo>` cai no claude puro, na conta errada. Corrija: Set-ExecutionPolicy -Scope CurrentUser RemoteSigned"
@@ -248,122 +251,22 @@ fn check_profiles(
 
 /// O Git Bash só lê o `.bashrc` se um perfil de login o carregar.
 fn check_bash_profile(report: &mut Report, home: &Path) {
-    let logins: Vec<PathBuf> = [".bash_profile", ".bash_login", ".profile"]
-        .iter()
-        .map(|n| home.join(n))
-        .filter(|p| p.exists())
-        .collect();
-    let Some(first) = logins.first() else {
-        report.check(
+    match bash_login_profile(home) {
+        BashLogin::Missing => report.check(
             false,
             "sem ~/.bash_profile — o Git Bash não carrega o ~/.bashrc (e avisa em vermelho). Ativar a integração no app o cria",
-        );
-        return;
-    };
-    let loads = read_retrying(first).is_ok_and(|b| String::from_utf8_lossy(&b).contains(".bashrc"));
-    report.check(
-        loads,
-        if loads {
-            format!("{} carrega o ~/.bashrc", first.display())
-        } else {
+        ),
+        BashLogin::Loads(first) => {
+            report.check(true, format!("{} carrega o ~/.bashrc", first.display()))
+        }
+        BashLogin::Ignores(first) => report.check(
+            false,
             format!(
                 "{} não carrega o ~/.bashrc — acrescente: test -f ~/.bashrc && . ~/.bashrc",
                 first.display()
-            )
-        },
-    );
-}
-
-fn defines_claude_function(profile: &Path) -> bool {
-    let Ok(bytes) = read_retrying(profile) else {
-        return false;
-    };
-    let text = if bytes.starts_with(&[0xFF, 0xFE]) {
-        let units: Vec<u16> = bytes[2..]
-            .as_chunks::<2>()
-            .0
-            .iter()
-            .map(|pair| u16::from_le_bytes(*pair))
-            .collect();
-        String::from_utf16_lossy(&units)
-    } else {
-        String::from_utf8_lossy(&bytes).into_owned()
-    };
-    Regex::new(r"(?im)^\s*function\s+(global:)?claude\b")
-        .map(|re| re.is_match(&text))
-        .unwrap_or(false)
-}
-
-struct Edition {
-    exe: PathBuf,
-    /// A pasta do `$PROFILE` sob a Documentos.
-    profile_dir: &'static str,
-    /// A política quando nenhum escopo define uma.
-    default_policy: &'static str,
-}
-
-fn powershell_editions() -> Vec<Edition> {
-    let mut editions = Vec::new();
-    let windir = std::env::var_os("SystemRoot").map(PathBuf::from);
-    if let Some(ps51) = windir
-        .map(|w| w.join(r"System32\WindowsPowerShell\v1.0\powershell.exe"))
-        .filter(|p| p.is_file())
-    {
-        editions.push(Edition {
-            exe: ps51,
-            profile_dir: "WindowsPowerShell",
-            default_policy: "Restricted",
-        });
+            ),
+        ),
     }
-    let pwsh = std::env::var_os("ProgramFiles")
-        .map(|p| PathBuf::from(p).join(r"PowerShell\7\pwsh.exe"))
-        .filter(|p| p.is_file())
-        .or_else(|| {
-            std::env::var_os("PATH").and_then(|path| {
-                std::env::split_paths(&path)
-                    .map(|d| d.join("pwsh.exe"))
-                    .find(|p| p.is_file())
-            })
-        });
-    if let Some(pwsh) = pwsh {
-        editions.push(Edition {
-            exe: pwsh,
-            profile_dir: "PowerShell",
-            default_policy: "RemoteSigned",
-        });
-    }
-    editions
-}
-
-/// A política efetiva, IGNORANDO o escopo Process: o shell em que o `doctor`
-/// roda pode ter herdado `Bypass` (o do Claude Code herda), e o que decide se o
-/// `$PROFILE` roda num terminal novo são os outros escopos.
-fn effective_policy(exe: &Path, default: &str) -> Option<String> {
-    let mut command = Command::new(exe);
-    command.args([
-        "-NoProfile",
-        "-NonInteractive",
-        "-Command",
-        "Get-ExecutionPolicy -List | ForEach-Object { '{0}={1}' -f $_.Scope, $_.ExecutionPolicy }",
-    ]);
-    let (code, out) = shared::run_with_timeout(command, None, Duration::from_secs(30))?;
-    if code != Some(0) {
-        return None;
-    }
-    let scopes: HashMap<String, String> = out
-        .lines()
-        .filter_map(|l| l.trim().split_once('='))
-        .map(|(k, v)| (k.trim().to_string(), v.trim().to_string()))
-        .collect();
-    let defined = ["MachinePolicy", "UserPolicy", "CurrentUser", "LocalMachine"]
-        .iter()
-        .filter_map(|scope| scopes.get(*scope))
-        .find(|p| p.as_str() != "Undefined");
-    Some(defined.cloned().unwrap_or_else(|| default.to_string()))
-}
-
-fn blocks_profiles(policy: &str) -> bool {
-    matches!(policy, "Restricted" | "AllSigned")
 }
 
 /// O sensor de cada grupo: instalado com o comando certo — e rodando de verdade

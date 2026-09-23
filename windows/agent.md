@@ -19,10 +19,13 @@ um `.github/workflows/windows.yml` filtrado por caminho).
 - `app/` (fase 5, ainda não existe) — o app Tauri.
 
 ## Estado
-- **Fase 3 (sensor)** e **Fase 4 (núcleo + CLI)** feitas em TDD: 210 testes (os do router no
-  Swift portados — Engine, Store, Launcher, Probe, SessionRegistry — mais as regressões do
-  Windows), clippy `-D warnings` e fmt limpos.
-- Próximo: Fase 5 — o app Tauri (bandeja, janela Grupos/Ajustes, login por ConPTY, laço de 180 s).
+- **Fase 3 (sensor)** e **Fase 4 (núcleo + CLI)** feitas em TDD (os testes do router no Swift
+  portados — Engine, Store, Launcher, Probe, SessionRegistry — mais as regressões do Windows),
+  clippy `-D warnings` e fmt limpos.
+- **Fase 5 (app Tauri)** em fatias: 5.0 feita — o que o app pede ao núcleo (`terminal_report`,
+  grupo criado dedicado, login estranho no `~\.claude`, contas exclusivas, medição em três
+  passos, casa pendente descartada); 230 testes. Próximas: esqueleto Tauri + Svelte, bandeja,
+  flyout, janela Grupos/Ajustes, login por ConPTY.
 
 ## Regras (herdadas do repo + combinadas)
 - Comentários e `agent.md` em **pt-BR**; identificadores em inglês; docs/README em inglês.

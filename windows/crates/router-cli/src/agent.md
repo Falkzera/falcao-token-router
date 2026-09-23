@@ -7,7 +7,7 @@ desconhecido sai com 2.
 ## Arquivos
 - `main.rs` — despacho por argv: `statusline`, `launch`, `is-group`, `rotate`, `doctor`, `measure`.
 - `shared.rs` — base, home (`%USERPROFILE%`), `load_config`, credencial em arquivo COM a guarda
-  do perfil padrão, `fail`, o shell detectado, `run_with_timeout` (stdout por thread, prazo).
+  do perfil padrão, `fail`, o shell detectado; reexporta o `run_with_timeout` do núcleo.
 - `statusline.rs` — o **sensor**: lê `rate_limits` do stdin (thread + prazo de 250 ms, pega o 1º
   JSON sem esperar EOF), perfil = `CLAUDE_CONFIG_DIR` → `--profile` embutido → padrão; grava a
   amostra **só com e-mail e ao menos uma janela**, sob a trava (espera 100 ms); imprime a linha
@@ -29,6 +29,10 @@ desconhecido sai com 2.
 - 22/09/2026: a função do PowerShell engole o `--` do `$args` (medido nas duas edições) → o
   `launch` aceita as duas formas.
 - O `doctor` não escreve nada; a status line que ele roda recebe `{}` (sem janela = sem amostra).
+- 22/09/2026 (fase 5): edições do PowerShell, política efetiva, `function claude` do usuário e o
+  perfil de login do Git Bash foram para o núcleo (`engine::terminal_report`), que o app também
+  usa; o `run_with_timeout` foi para `platform::process`. Mensagens do `doctor` iguais. De
+  quebra, `function claude-gov` deixou de contar como função `claude` (o `\b` casava o `-`).
 
 ## Pendências
 - Ctrl+C durante `launch` só dá para conferir à mão (enviar Ctrl+C num teste atingiria o próprio

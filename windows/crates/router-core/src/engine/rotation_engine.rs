@@ -203,6 +203,12 @@ impl RotationEngine {
             .credential_location(&account.home)
     }
 
+    /// Onde mora a credencial de um perfil que ainda não é de conta nenhuma (a
+    /// casa de um login pendente) — pelo provedor da v1, o único.
+    pub fn credential_location_of(&self, dir: &ConfigDir) -> PathBuf {
+        self.adapter(Provider::Anthropic).credential_location(dir)
+    }
+
     /// Por qual perfil sondar esta conta — e **nunca** pela casa de uma conta
     /// ativa.
     ///

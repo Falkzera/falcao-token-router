@@ -56,6 +56,11 @@ Modelos, formato da amostra, leitor de uso, credencial, rotação e o store. Sem
   existia no perfil (marcador `falcao-router-shim` — no bash como comando `:`, porque o
   `declare -f` joga fora comentários); linhas de perfil ASCII guardadas por `Test-Path`/`[ -f ]`;
   `ShellTargets` (os dois `$PROFILE` sob a Documentos real, `.bashrc`); `ensure_bash_profile`.
+- `terminal_report.rs` — o estado da integração POR SHELL (novo, fase 5): edições do PowerShell
+  (5.1 do sistema; `pwsh` no `ProgramFiles` ou no PATH), política efetiva sem o escopo Process e
+  a correção consentida (`RemoteSigned` em CurrentUser), `function claude` do usuário (UTF-8 e
+  UTF-16LE), perfil de login do Git Bash, scripts atuais/obsoletos, e o `TerminalReport` que a
+  tela de Grupos mostra e o `doctor` confere.
 - `profile_sharing.rs` — ≙ `ProfileSharing`: pastas por junction; arquivos por symlink quando o
   Windows deixa, senão plano B (`CLAUDE.md`/`keybindings.json` copiados com mtime da origem e
   sincronizados — mais novo vence, backup do sobrescrito, só o que está no manifesto
@@ -86,3 +91,16 @@ Modelos, formato da amostra, leitor de uso, credencial, rotação e o store. Sem
 
 - 22/09/2026: `measure_accounts` do store é síncrono (o app o chama fora da thread da UI) e usa
   `probe_targets` — o perfil de cada conta decidido com o config na mão (ativa → grupo).
+
+- 22/09/2026 (fase 5, o que o app pede ao store):
+  - `add_group_with(nome, padrão?)`: o 1º grupo pode nascer DEDICADO. O `rotation_target` ativa a
+    primeira conta de um grupo sem ativa, então um grupo padrão trocaria o login do `~\.claude`
+    (com backup) em até 180 s depois da primeira conta — o app pergunta antes quando
+    `foreign_default_login` acha lá um login que o router não conhece.
+  - `exclusive_account_ids`: o número certo na confirmação de apagar grupo (o macOS contava a
+    compartilhada, que não é apagada).
+  - Medição em três passos (`measure_plan` → `MeasurePlan::run` → `finish_measure`): o app só
+    segura o store para planejar e publicar; a sonda leva segundos por conta.
+  - `discard_pending_home`: login cancelado ou duplicado apaga a casa reservada (pode ter
+    credencial de verdade) — nunca a de conta registrada (relogin usa a mesma casa), nunca fora
+    de `<base>\accounts\`.

@@ -67,6 +67,29 @@ pub struct MeasureSummary {
     pub failed: usize,
 }
 
+/// Uma medição planejada: as contas com o perfil de cada uma e onde gravar.
+/// Roda sem o store — a sonda leva segundos por conta.
+#[derive(Clone, Debug)]
+pub struct MeasurePlan {
+    pub targets: Vec<ProbeTarget>,
+    pub usage_dir: PathBuf,
+    pub base: PathBuf,
+}
+
+impl MeasurePlan {
+    /// Sonda as contas uma por vez, gravando cada amostra (origem `probe`).
+    pub fn run(&self, probe: &ClaudeUsageProbe) -> MeasureSummary {
+        let mut summary = MeasureSummary::default();
+        for target in &self.targets {
+            match probe.measure_into(target, &self.usage_dir, &self.base, Utc::now()) {
+                Ok(_) => summary.measured += 1,
+                Err(_) => summary.failed += 1,
+            }
+        }
+        summary
+    }
+}
+
 /// O resultado de checar um login pendente.
 #[derive(Clone, PartialEq, Debug)]
 pub enum LoginOutcome {
@@ -275,11 +298,45 @@ impl RouterConfigStore {
     /// perfil dedicado. Qual é o padrão pode ser mudado depois.
     pub fn add_group(&mut self, name: &str) -> AccountGroup {
         let is_first = self.config.groups.is_empty();
+        self.add_group_with(name, is_first)
+    }
+
+    /// Cria um grupo decidindo JÁ se ele usa o `~\.claude`. O app pergunta antes
+    /// quando o `~\.claude` tem um login que o router não conhece: um grupo que
+    /// nasce padrão teria esse login trocado (com backup) assim que a primeira
+    /// conta entrasse — o laço de rotação ativa a primeira conta de um grupo
+    /// sem ativa. Padrão novo tira o posto de quem o tinha (no máximo um).
+    pub fn add_group_with(&mut self, name: &str, as_default: bool) -> AccountGroup {
         let mut group = AccountGroup::new(name, ConfigDir::dedicated(String::new()));
-        group.config_dir = self.paths.group_config_dir(group.id, is_first, &self.home);
+        group.config_dir = self
+            .paths
+            .group_config_dir(group.id, as_default, &self.home);
+        if as_default {
+            for i in 0..self.config.groups.len() {
+                if self.config.groups[i].config_dir.is_default {
+                    let id = self.config.groups[i].id;
+                    self.config.groups[i].config_dir =
+                        self.paths.group_config_dir(id, false, &self.home);
+                }
+            }
+        }
         self.config.groups.push(group.clone());
         self.save();
         group
+    }
+
+    /// O login que o `~\.claude` tem hoje e que não é de nenhuma conta do
+    /// router — o que uma ativação num grupo padrão substituiria (a guarda faz
+    /// backup antes, mas o usuário tem de saber). `None` sem login lá (identidade
+    /// sem credencial é o que sobra de um logout) ou com login de conta conhecida.
+    pub fn foreign_default_login(&self) -> Option<String> {
+        let identity = self.login.login_result(&ConfigDir::standard(&self.home))?;
+        let known = self
+            .config
+            .accounts
+            .iter()
+            .any(|a| a.identity.email.eq_ignore_ascii_case(&identity.email));
+        (!known).then_some(identity.email)
     }
 
     pub fn rename_group(&mut self, id: Id, name: &str) {
@@ -334,24 +391,34 @@ impl RouterConfigStore {
         let Some(i) = self.group_index(id) else {
             return;
         };
-        let elsewhere: HashSet<Id> = self
-            .config
-            .groups
-            .iter()
-            .filter(|g| g.id != id)
-            .flat_map(|g| g.account_ids.iter().copied())
-            .collect();
-        let exclusive: Vec<Id> = self.config.groups[i]
-            .account_ids
-            .iter()
-            .copied()
-            .filter(|a| !elsewhere.contains(a))
-            .collect();
+        let exclusive = self.exclusive_account_ids(id);
         self.config.groups.remove(i);
         for account_id in exclusive {
             self.remove_account(account_id);
         }
         self.save();
+    }
+
+    /// As contas que só existem neste grupo — as que apagá-lo leva junto (com a
+    /// credencial). É o número que a confirmação da UI diz; o macOS mostrava o
+    /// total do grupo, contando também a compartilhada, que fica.
+    pub fn exclusive_account_ids(&self, group_id: Id) -> Vec<Id> {
+        let Some(i) = self.group_index(group_id) else {
+            return Vec::new();
+        };
+        let elsewhere: HashSet<Id> = self
+            .config
+            .groups
+            .iter()
+            .filter(|g| g.id != group_id)
+            .flat_map(|g| g.account_ids.iter().copied())
+            .collect();
+        self.config.groups[i]
+            .account_ids
+            .iter()
+            .copied()
+            .filter(|a| !elsewhere.contains(a))
+            .collect()
     }
 
     /// Tira o status de padrão de todos: nenhum grupo passa a usar o `~\.claude`,
@@ -389,6 +456,29 @@ impl RouterConfigStore {
         let home = self.paths.account_home(id);
         let _ = fs::create_dir_all(home.path());
         (home, id)
+    }
+
+    /// Apaga a casa reservada de um login que não virou conta (cancelado, ou que
+    /// voltou duplicado e será refeito numa casa nova): ela pode ter recebido uma
+    /// credencial de verdade, e ninguém mais a usaria. Nunca a casa de uma conta
+    /// registrada — o relogin usa a MESMA casa, e cancelar um relogin não pode
+    /// apagar a conta — nem pasta fora de `<base>\accounts\`. Devolve se apagou.
+    pub fn discard_pending_home(&self, home: &ConfigDir, account_id: Id) -> bool {
+        let registered = self
+            .config
+            .accounts
+            .iter()
+            .any(|a| a.id == account_id || a.home.raw.eq_ignore_ascii_case(&home.raw));
+        let dir = home.path();
+        if registered
+            || home.is_default
+            || !is_strictly_inside(&dir, &self.paths.base.join("accounts"))
+        {
+            return false;
+        }
+        self.credentials
+            .delete(&self.engine.credential_location_of(home));
+        fs::remove_dir_all(&dir).is_ok() || !dir.exists()
     }
 
     /// Confere se um login pendente terminou. Distingue "ainda não" de "veio a
@@ -551,20 +641,36 @@ impl RouterConfigStore {
         probe: Option<&ClaudeUsageProbe>,
     ) -> MeasureSummary {
         let Some(probe) = probe else {
-            self.last_error = Some(StoreError::ProbeUnavailable);
+            self.measure_unavailable();
             return MeasureSummary::default();
         };
-        let mut summary = MeasureSummary::default();
-        let usage_dir = self.paths.usage_dir();
-        for target in self.probe_targets(group) {
-            match probe.measure_into(&target, &usage_dir, &self.paths.base, Utc::now()) {
-                Ok(_) => summary.measured += 1,
-                Err(_) => summary.failed += 1,
-            }
+        let summary = self.measure_plan(group).run(probe);
+        self.finish_measure(summary);
+        summary
+    }
+
+    /// O que medir num grupo, decidido com o config na mão. É o primeiro dos
+    /// três passos que o app usa para não segurar o store enquanto a sonda roda
+    /// (segundos por conta): planejar (com o store) → `MeasurePlan::run` (sem ele)
+    /// → `finish_measure` (com ele).
+    pub fn measure_plan(&self, group: &AccountGroup) -> MeasurePlan {
+        MeasurePlan {
+            targets: self.probe_targets(group),
+            usage_dir: self.paths.usage_dir(),
+            base: self.paths.base.clone(),
         }
+    }
+
+    /// Publica o saldo de uma medição: o erro (contas que não responderam) e o
+    /// quadro relido com as amostras novas.
+    pub fn finish_measure(&mut self, summary: MeasureSummary) {
         self.last_error = (summary.failed > 0).then_some(StoreError::ProbeFailures(summary.failed));
         self.refresh_usage();
-        summary
+    }
+
+    /// Sem `claude` instalado não há sonda — um erro com nome, para a UI.
+    pub fn measure_unavailable(&mut self) {
+        self.last_error = Some(StoreError::ProbeUnavailable);
     }
 
     /// Relê o uso das amostras, a conta ativa e as sessões vivas de cada grupo, e

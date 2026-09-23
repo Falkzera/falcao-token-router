@@ -10,6 +10,7 @@ pub mod known_folders;
 pub mod links;
 pub mod named_mutex;
 pub mod paths;
+pub mod process;
 pub mod process_times;
 pub mod profile_append;
 pub mod short_path;

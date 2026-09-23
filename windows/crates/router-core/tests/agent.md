@@ -19,7 +19,11 @@ Credencial/adapter falsos em memória ou pastas temporárias — nada toca o sis
 - `rotation_tests.rs` — `RotationEngine`, um teste por regra (+ `probeConfigDir` e dois de ponta
   a ponta com arquivos reais).
 - `store_tests.rs` — os 16 do `StoreTests.swift` + regressões (config ilegível, reordenar, remoção
-  fora da base, sessões, integração, sonda).
+  fora da base, sessões, integração, sonda) + o que o app usa (grupo criado dedicado, login
+  estranho no `~\.claude`, contas exclusivas, medição em três passos, casa pendente descartada).
+- `terminal_report_tests.rs` — o quadro da integração por shell (edições, política sem o escopo
+  Process, `function claude` em UTF-8/UTF-16, `.bash_profile`, scripts atuais/obsoletos), numa
+  máquina de mentira: nenhum PowerShell de verdade é consultado.
 - `lock_tests.rs` — a trava entre processos (espera, dono morto, bases diferentes, nome estável).
 - `launcher_tests.rs`, `provider_env_tests.rs`, `claude_binary_tests.rs`,
   `session_registry_tests.rs`, `shell_integration_tests.rs`, `profile_sharing_tests.rs`,

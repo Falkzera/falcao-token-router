@@ -697,3 +697,203 @@ fn rotate_all_mirrors_then_rotates() {
         Some(b.id)
     );
 }
+
+// MARK: - O que o app precisa (fase 5)
+
+impl Env {
+    /// A home injetada (`<tmp>\home`), de onde sai o perfil padrão.
+    fn home(&self) -> String {
+        self.tmp.path().join("home").to_string_lossy().into_owned()
+    }
+}
+
+/// Nesta máquina (e na de muita gente) o `~\.claude` já tem um login que o
+/// router não conhece. Criar o 1º grupo como DEDICADO tem de ser possível já na
+/// criação — senão ele nasce padrão e o laço de rotação troca o login do
+/// `~\.claude` assim que a primeira conta entra.
+#[test]
+fn a_group_created_as_dedicated_is_never_the_default_even_when_first() {
+    let mut env = make_store();
+    let group = env.store.add_group_with("trabalho", false);
+
+    assert!(!group.config_dir.is_default);
+    assert!(env.store.config().default_group().is_none());
+}
+
+#[test]
+fn creating_a_group_as_default_takes_the_default_from_the_previous_one() {
+    let mut env = make_store();
+    let first = env.store.add_group("trabalho");
+    let second = env.store.add_group_with("pessoal", true);
+
+    assert!(env.group(second.id).config_dir.is_default);
+    assert!(!env.group(first.id).config_dir.is_default);
+    assert_eq!(
+        env.store.config().default_group().map(|g| g.id),
+        Some(second.id)
+    );
+}
+
+/// O que a confirmação da UI protege: um login no `~\.claude` que não é de
+/// nenhuma conta do router. Sem login, ou login de conta conhecida, nada a
+/// avisar.
+#[test]
+fn a_login_in_the_default_profile_that_the_router_does_not_know_is_foreign() {
+    let mut env = make_store();
+    assert_eq!(env.store.foreign_default_login(), None, "sem login lá");
+
+    let standard = ConfigDir::standard(&env.home());
+    env.seed_login("conta7@exemplo.com", &standard);
+    assert_eq!(
+        env.store.foreign_default_login().as_deref(),
+        Some("conta7@exemplo.com")
+    );
+
+    let group = env.store.add_group_with("g", false);
+    env.add_account("conta7@exemplo.com", group.id);
+    assert_eq!(
+        env.store.foreign_default_login(),
+        None,
+        "a conta agora é do router"
+    );
+}
+
+/// Só identidade, sem credencial, não é login (é o que sobra de um logout).
+#[test]
+fn an_identity_without_a_credential_is_not_a_foreign_login() {
+    let env = make_store();
+    let standard = ConfigDir::standard(&env.home());
+    env.adapter
+        .write_identity(&ident("conta7@exemplo.com"), &standard)
+        .unwrap();
+    assert_eq!(env.store.foreign_default_login(), None);
+}
+
+/// Grava um `config.json` à mão e reabre o store — o jeito de montar uma conta
+/// em DOIS grupos, que a UI não cria mas o formato permite.
+fn reopen_with(env: &mut Env, config: &router_core::RouterConfig) {
+    std::fs::create_dir_all(&env.paths.base).unwrap();
+    std::fs::write(env.paths.config_file(), serde_json::to_vec(config).unwrap()).unwrap();
+    env.store = open(env.tmp.path(), &env.creds, &env.adapter);
+}
+
+/// "Apagar grupo" diz quantas contas perdem o login: só as que existiam SÓ
+/// nele. O macOS mostrava o total do grupo — contava também a compartilhada,
+/// que não é apagada.
+#[test]
+fn exclusive_accounts_are_the_ones_only_in_that_group() {
+    let mut env = make_store();
+    let work = env.store.add_group("trabalho");
+    let personal = env.store.add_group("pessoal");
+    let only_work = env.add_account("conta1@exemplo.com", work.id);
+    let shared = env.add_account("conta2@exemplo.com", personal.id);
+
+    let mut config = env.store.config().clone();
+    config
+        .groups
+        .iter_mut()
+        .find(|g| g.id == work.id)
+        .unwrap()
+        .account_ids
+        .push(shared.id);
+    reopen_with(&mut env, &config);
+
+    assert_eq!(env.store.exclusive_account_ids(work.id), vec![only_work.id]);
+    assert!(env.store.exclusive_account_ids(personal.id).is_empty());
+
+    env.store.remove_group(work.id);
+    assert!(env.store.config().account(only_work.id).is_none());
+    assert!(
+        env.store.config().account(shared.id).is_some(),
+        "a compartilhada fica"
+    );
+}
+
+/// Medir em três passos: o app só segura o store para planejar e para
+/// publicar — a sonda (segundos por conta) roda sem ele, e a bandeja e a
+/// janela seguem respondendo.
+#[test]
+fn measuring_in_steps_needs_the_store_only_to_plan_and_publish() {
+    use router_core::engine::router_config_store::{MeasureSummary, StoreError};
+    use router_core::usage::claude_usage_probe::{ClaudeUsageProbe, ProbeOutput};
+
+    let mut env = make_store();
+    let group = env.store.add_group_with("pessoal", false);
+    let a = env.add_account("conta1@exemplo.com", group.id);
+    env.add_account("conta2@exemplo.com", group.id);
+    env.store.activate(&a, &env.group(group.id));
+
+    let plan = env.store.measure_plan(&env.group(group.id));
+    assert_eq!(plan.targets.len(), 2);
+    assert_eq!(
+        plan.targets
+            .iter()
+            .find(|t| t.account_id == a.id)
+            .map(|t| t.dir.raw.clone()),
+        Some(env.group(group.id).config_dir.raw),
+        "a ativa é sondada pelo grupo"
+    );
+
+    let probe = ClaudeUsageProbe::new(|_| {
+        Ok(ProbeOutput {
+            exit_code: Some(0),
+            stdout: "Current session: 10% used\r\nCurrent week (all models): 20% used\r\n"
+                .to_string(),
+        })
+    });
+    let summary = plan.run(&probe); // sem o store
+    assert_eq!(
+        summary,
+        MeasureSummary {
+            measured: 2,
+            failed: 0
+        }
+    );
+
+    env.store.finish_measure(summary);
+    assert_eq!(env.store.last_error(), None::<&StoreError>);
+    assert_eq!(env.store.usage_detail()[&a.id].fraction, 0.2);
+}
+
+/// Login cancelado (ou que voltou duplicado): a casa reservada sai do disco —
+/// ela pode ter recebido uma credencial de verdade, e ninguém a usaria.
+#[test]
+fn a_pending_home_that_never_became_an_account_is_discarded() {
+    let env = make_store();
+    let (home, id) = env.store.new_account_home();
+    env.seed_login("conta3@exemplo.com", &home);
+    let location = env.adapter.credential_location(&home);
+    assert!(home.path().exists());
+
+    assert!(env.store.discard_pending_home(&home, id));
+
+    assert!(!home.path().exists(), "a casa reservada ficou");
+    assert!(!env.creds.exists(&location), "a credencial ficou");
+}
+
+/// A casa de uma conta que EXISTE nunca é descartada: o relogin usa a mesma
+/// casa, e cancelar um relogin não pode apagar a conta.
+#[test]
+fn the_home_of_a_registered_account_is_never_discarded() {
+    let mut env = make_store();
+    let group = env.store.add_group_with("g", false);
+    let account = env.add_account("conta4@exemplo.com", group.id);
+
+    assert!(!env.store.discard_pending_home(&account.home, account.id));
+    assert!(account.home.path().exists());
+    assert!(env
+        .creds
+        .exists(&env.adapter.credential_location(&account.home)));
+}
+
+/// Nem pasta fora de `<base>\accounts\`, mesmo que a UI peça.
+#[test]
+fn a_home_outside_the_router_base_is_never_discarded() {
+    let env = make_store();
+    let outside_dir = env.tmp.path().join("fora");
+    std::fs::create_dir_all(&outside_dir).unwrap();
+    let outside = ConfigDir::dedicated(outside_dir.to_string_lossy());
+
+    assert!(!env.store.discard_pending_home(&outside, Id::new()));
+    assert!(outside_dir.exists());
+}

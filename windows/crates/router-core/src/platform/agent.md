@@ -29,6 +29,8 @@ Funções pequenas atrás das quais mora o que é da plataforma.
 - `profile_append.rs` — `append_block`: acrescenta ao perfil do shell **em bytes**, na
   codificação do BOM (UTF-16LE/BE, UTF-8; sem BOM o bloco é ASCII, igual em ANSI) e no fim de
   linha do arquivo; modo append (segue link, não troca o arquivo); arquivo ilegível = erro.
+- `process.rs` — `run_with_timeout`: comando curto com prazo (stdout por thread, mata ao
+  estourar), sem console (`CREATE_NO_WINDOW` — do app cada consulta piscaria uma janela).
 - `links.rs` — `junction` (pastas, sem privilégio), `symlink_file` (flag
   `ALLOW_UNPRIVILEGED_CREATE`; sem Developer Mode falha com 1314), `is_junction`/`is_symlink`,
   `developer_mode_enabled` (registro `AppModelUnlock`, só para dica na UI/`doctor`).
@@ -38,4 +40,5 @@ Funções pequenas atrás das quais mora o que é da plataforma.
   na poda de retenção (e pula link), e o hardlink divergiria em silêncio.
 
 ## Pendências (Fase 4+)
-- console (Ctrl+C no `launch`, na CLI); política de execução do PowerShell (no `doctor`).
+- console (Ctrl+C no `launch`, na CLI). A política de execução do PowerShell mora em
+  `engine::terminal_report` desde a fase 5.
