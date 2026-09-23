@@ -19,6 +19,13 @@ try {
     & $cargo clippy --workspace --all-targets -- -D warnings
     if ($LASTEXITCODE -ne 0) { throw "clippy falhou" }
 
+    # Os testes da CLI e do login do app rodam o `fake-claude` de verdade, e o
+    # `cargo test` não gera o .exe de um pacote sem testes de integração: numa
+    # máquina limpa (a CI) ele não existiria.
+    Write-Host "== build do fake-claude ==" -ForegroundColor Cyan
+    & $cargo build -p fake-claude
+    if ($LASTEXITCODE -ne 0) { throw "o fake-claude não compilou" }
+
     Write-Host "== test ==" -ForegroundColor Cyan
     & $cargo test --workspace
     if ($LASTEXITCODE -ne 0) { throw "os testes falharam" }

@@ -8,7 +8,8 @@ herdado (custo por JSONL, preços, alertas) **não** entra neste porte.
 ```powershell
 # o cargo pode não estar no PATH desta sessão; use o caminho completo se preciso:
 & "$env:USERPROFILE\.cargo\bin\cargo.exe" build --workspace
-& "$env:USERPROFILE\.cargo\bin\cargo.exe" test --workspace   # --workspace: compila o fake-claude
+& "$env:USERPROFILE\.cargo\bin\cargo.exe" build -p fake-claude  # os testes o rodam; `cargo test` não gera o .exe
+& "$env:USERPROFILE\.cargo\bin\cargo.exe" test --workspace
 .\scripts\test.ps1        # fmt + clippy -D warnings + test + svelte-check/check-strings (= CI)
 cd app; npm run dev       # front no navegador, com backend simulado
 cd app; $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"; npx tauri dev   # o app
@@ -46,3 +47,8 @@ cd app; $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"; npx tauri dev   # o
   sem linhas `Current`.
 - Função do PowerShell engole o `--` do `$args`; o perfil do usuário pode já ter uma
   `function claude` (a integração a encadeia, não a substitui).
+- Login (23/09/2026): `claude auth login` num ConPTY. O `portable-pty` cria o ConPTY com
+  `INHERIT_CURSOR` — ele abre pedindo a posição do cursor (`ESC[6n`) e espera a resposta; o
+  hyperlink OSC 8 do link é re-emitido pelo ConPTY; e o ambiente base do `portable-pty` vem
+  também do REGISTRO (`env_clear` antes do ambiente filtrado). Sucesso = `Login successful.`
+  e o processo sai sozinho; o desfecho vale só conferido no disco.

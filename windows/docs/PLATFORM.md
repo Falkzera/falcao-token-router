@@ -104,6 +104,43 @@ and `router doctor` reports it when set.
   `history.jsonl` by rewriting it when it is a regular file (and skips links), so a
   hardlink would silently diverge.
 
+## Signing in
+
+The app runs the official `claude auth login` in a **ConPTY** (through
+`portable-pty` 0.9), in the account's own profile, and only reads the output to
+find the link and to know when it ended; the outcome is then confirmed on disk
+(identity in `.claude.json` **and** a credential). macOS does the same with a pty
+(`docs/PORTING.md`: without a terminal the link doesn't come out in time).
+
+What `claude auth login` prints (read in the JS of 2.1.280): `Opening browser to
+sign in…`, then `If the browser didn't open, visit: <URL>` — the URL wrapped in an
+OSC 8 hyperlink when stdout is a terminal — and `Paste code here if prompted > `.
+It succeeds with `Login successful.` and **exits 0 by itself** (the "Press Enter to
+continue" belongs to the interactive `/login`); it fails with `Login failed:
+<reason>` on stderr and exit code 1. A pasted code must look like `code#state`;
+anything else prints `Invalid code. …` and the login keeps waiting. `--email`
+pre-fills the account, which the port passes when re-logging an existing account.
+
+What the ConPTY does, recorded on Windows 11 (2026-09-23) with a stand-in `claude`
+that prints the same text:
+
+- `portable-pty` creates the ConPTY with `PSEUDOCONSOLE_INHERIT_CURSOR`, so the very
+  first bytes are a cursor-position request, `ESC[6n`; with that flag the ConPTY
+  waits for the terminal's answer. The port answers `ESC[1;1R`, as a terminal would.
+- The ConPTY re-renders the output instead of passing the child's bytes through: a
+  window-title OSC, `ESC[?9001h` (win32-input-mode), focus reporting, colours — and
+  the OSC 8 hyperlink **re-emitted** as `ESC]8;id=<n>;<URL>ESC\`. The port strips
+  VT/ANSI as a stream (a sequence may be cut between two reads) and takes the link
+  from the hyperlink, or from the visible text only once it's complete, and only
+  for `https://claude.com/` and `https://platform.claude.com/`. The pseudo-console
+  is 2048 columns wide so the visible link doesn't wrap.
+- Plain text followed by `\r` still arrives as a typed line, despite the
+  win32-input-mode request.
+- `portable-pty` builds the child's base environment from the process **and the
+  registry** (user and system variables). The port clears it and passes only the
+  filtered environment (no proxies or alternative credentials, none of a
+  surrounding Claude Code session's variables, the account's `CLAUDE_CONFIG_DIR`).
+
 ## Mapping from macOS
 
 | Piece | macOS | Windows |
@@ -130,3 +167,21 @@ The port does not reproduce these macOS behaviours (each has a regression test):
 - no lock between the app and the CLI (the port uses a named mutex around every
   credential write);
 - reordering accounts dropping one that the requested order forgot.
+
+And these in the app (checked in the browser against the mocked backend, and in the
+app itself inside a sandbox):
+
+- "Installed ✓" shown even when writing the terminal integration failed;
+- reordering accounts in the Groups window doing nothing (`onMove` outside a `List`);
+- the threshold saved on every step of the slider, instead of when it's released;
+- the "delete group" confirmation counting accounts that other groups keep;
+- `lastError` written in Portuguese by the engine (the port returns facts with a
+  code, and the text comes from the UI's catalogs);
+- a login spinner that never stops when the account doesn't show up on disk (the
+  port shows a named state with "Check again");
+- a relogin that comes back as **another** account leaving that account's
+  credential in this account's home, where "Use" would serve the other account
+  under this one's name (the port removes it);
+- the rotation pass running during a sign-in, where mirroring an active account
+  (group → home) could overwrite the credential a relogin just wrote (the port
+  waits until the sign-in ends).
