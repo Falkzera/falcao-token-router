@@ -1,6 +1,21 @@
 {
+  "format.duration.hoursMinutes": "%1$dh %2$dm",
+  "format.duration.minutes": "%dm",
   "home.tab.groups": "Groups",
   "home.tab.settings": "Settings",
+  "home.title": "Falcão Token Router",
   "groups.subtitle": "Each group rotates its own accounts when they hit the threshold.",
-  "settings.version.format": "Version %@"
+  "panel.accounts.ready": "ready",
+  "panel.accounts.window.fiveHour": "5h",
+  "panel.accounts.window.sevenDay": "7d",
+  "panel.groups": "Groups",
+  "panel.quit": "Quit",
+  "panel.settings": "Settings",
+  "settings.version.format": "Version %@",
+  "tray.origin.probe": "probe",
+  "tray.origin.sensor": "sensor",
+  "tray.tooltip.empty": "Falcão Token Router — create a group to get started",
+  "tray.tooltip.noActive.format": "%@: no active account",
+  "tray.tooltip.ready.format": "%1$@: %2$@ · %3$@",
+  "tray.tooltip.usage.format": "%1$@: %2$@ · %3$@ %4$@ (%5$@, %6$@)"
 }

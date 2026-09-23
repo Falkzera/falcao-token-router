@@ -3,7 +3,11 @@
 
 export type Locale = "en" | "pt-BR";
 
+export type HomeTab = "groups" | "settings";
+
 export interface AppInfo {
   version: string;
   locale: Locale;
+  /** A aba com que a janela abre (a bandeja pode ter pedido Ajustes). */
+  initialTab: HomeTab;
 }

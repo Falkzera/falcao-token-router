@@ -1,6 +1,21 @@
 {
+  "format.duration.hoursMinutes": "%1$dh %2$dm",
+  "format.duration.minutes": "%dm",
   "home.tab.groups": "Grupos",
   "home.tab.settings": "Ajustes",
+  "home.title": "Falcão Token Router",
   "groups.subtitle": "Cada grupo rotaciona suas contas sozinho ao bater o limiar.",
-  "settings.version.format": "Versão %@"
+  "panel.accounts.ready": "pronta",
+  "panel.accounts.window.fiveHour": "5h",
+  "panel.accounts.window.sevenDay": "7d",
+  "panel.groups": "Grupos",
+  "panel.quit": "Sair",
+  "panel.settings": "Ajustes",
+  "settings.version.format": "Versão %@",
+  "tray.origin.probe": "sonda",
+  "tray.origin.sensor": "sensor",
+  "tray.tooltip.empty": "Falcão Token Router — crie um grupo para começar",
+  "tray.tooltip.noActive.format": "%@: nenhuma conta ativa",
+  "tray.tooltip.ready.format": "%1$@: %2$@ · %3$@",
+  "tray.tooltip.usage.format": "%1$@: %2$@ · %3$@ %4$@ (%5$@, %6$@)"
 }

@@ -36,14 +36,20 @@ function walk(dir, extensions, out = []) {
   return out;
 }
 
-const keyPattern = new RegExp(`["'\`]((?:${PREFIXES.join("|")})\\.[A-Za-z0-9.]+)["'\`]`, "g");
+const keyBody = `((?:${PREFIXES.join("|")})\\.[A-Za-z0-9.]+)`;
+// No front a chave pode vir entre aspas, apóstrofos ou crases (template
+// literal). Em Rust só aspas duplas são string — crase ali é comentário
+// (`` `tray.rs` `` num doc comment não é chave).
+const frontKey = new RegExp(`["'\`]${keyBody}["'\`]`, "g");
+const rustKey = new RegExp(`"${keyBody}"`, "g");
 const sources = [
   ...walk(join(ROOT, "src"), [".ts", ".svelte"]),
   ...walk(join(ROOT, "src-tauri", "src"), [".rs"]),
 ];
 const used = new Set();
 for (const file of sources) {
-  for (const match of readFileSync(file, "utf8").matchAll(keyPattern)) used.add(match[1]);
+  const pattern = file.endsWith(".rs") ? rustKey : frontKey;
+  for (const match of readFileSync(file, "utf8").matchAll(pattern)) used.add(match[1]);
 }
 
 const errors = [];

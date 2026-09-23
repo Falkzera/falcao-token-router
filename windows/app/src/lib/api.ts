@@ -4,8 +4,9 @@
 // é conferido no Chrome sem conta, sem disco e sem processo.
 
 import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { mockInvoke } from "./mock";
-import type { AppInfo } from "./types";
+import type { AppInfo, HomeTab } from "./types";
 
 /** Dentro do WebView do Tauri? (O Tauri injeta este objeto antes da página.) */
 export const insideTauri: boolean =
@@ -15,6 +16,17 @@ function call<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   return insideTauri ? invoke<T>(command, args) : mockInvoke<T>(command, args);
 }
 
+/** Ouve um evento do backend; no navegador não há backend para emitir. */
+async function on<T>(event: string, handler: (payload: T) => void): Promise<UnlistenFn> {
+  if (!insideTauri) return () => {};
+  return listen<T>(event, (e) => handler(e.payload));
+}
+
 export function appInfo(): Promise<AppInfo> {
   return call<AppInfo>("app_info");
+}
+
+/** A bandeja pediu outra aba com a janela já aberta. */
+export function onNavigate(handler: (tab: HomeTab) => void): Promise<UnlistenFn> {
+  return on<HomeTab>("navigate", handler);
 }

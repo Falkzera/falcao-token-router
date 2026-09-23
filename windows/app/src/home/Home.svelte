@@ -2,13 +2,23 @@
   // A janela única (≙ HomeWindow.swift): Grupos (o produto) e Ajustes, em abas.
   // Tamanho fixo — as abas têm alturas naturais diferentes e a janela pularia
   // de tamanho a cada troca.
+  import { onMount } from "svelte";
+  import { onNavigate } from "../lib/api";
   import { t } from "../lib/i18n";
-  import type { AppInfo } from "../lib/types";
+  import type { AppInfo, HomeTab } from "../lib/types";
 
   let { info }: { info: AppInfo } = $props();
 
-  type Tab = "groups" | "settings";
-  let tab = $state<Tab>("groups");
+  let tab = $state<HomeTab>("groups");
+
+  onMount(() => {
+    tab = info.initialTab;
+    // A bandeja pode pedir outra aba com a janela já aberta.
+    const unlisten = onNavigate((next) => (tab = next));
+    return () => {
+      void unlisten.then((stop) => stop());
+    };
+  });
 </script>
 
 <div class="home">
