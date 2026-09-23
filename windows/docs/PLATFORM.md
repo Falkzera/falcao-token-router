@@ -227,8 +227,11 @@ The port does not reproduce these macOS behaviours (each has a regression test):
   ends, and a silent fall-through when the `router` binary is gone;
 - three different searches for the `claude` binary;
 - the sensor ignoring `ROUTER_APP_SUPPORT`;
-- `ProviderEnv` not stripping `CLAUDE_SECURESTORAGE_CONFIG_DIR`, `CLAUDE_CODE_OAUTH_TOKEN`
-  and related overrides;
+- `ProviderEnv` letting through `ANTHROPIC_CONFIG_DIR`, `ANTHROPIC_IDENTITY_TOKEN(_FILE)`,
+  `ANTHROPIC_FEDERATION_RULE_ID`, `ANTHROPIC_ORGANIZATION_ID`, `CLAUDE_CODE_USE_FOUNDRY`,
+  `ANTHROPIC_FOUNDRY_*`, `ANTHROPIC_AWS_*` and `AWS_BEARER_TOKEN_BEDROCK` (all read in the
+  JS of 2.1.280). The token and credential-redirect variables — `CLAUDE_CODE_OAUTH_TOKEN`
+  and its variants, `CLAUDE_SECURESTORAGE_CONFIG_DIR` — are stripped on macOS too since #6;
 - no lock between the app and the CLI (the port uses a named mutex around every
   credential write);
 - reordering accounts dropping one that the requested order forgot.
