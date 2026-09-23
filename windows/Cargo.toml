@@ -26,6 +26,8 @@ windows-sys = { version = "0.61", features = [
     "Win32_UI_Shell",
 ] }
 junction = "2"
+regex = "1"
+chrono-tz = "0.10"
 
 [profile.release]
 lto = true

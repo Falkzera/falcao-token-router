@@ -84,5 +84,5 @@ Modelos, formato da amostra, leitor de uso, credencial, rotação e o store. Sem
 - 22/09/2026: a status line de grupo dedicado leva `--profile`; o sensor prefere o
   `CLAUDE_CONFIG_DIR` e cai no `--profile` quando a variável não chega (subprocesso raspado).
 
-## Pendências (Fase 4)
-- No store: `measure_accounts` (sonda).
+- 22/09/2026: `measure_accounts` do store é síncrono (o app o chama fora da thread da UI) e usa
+  `probe_targets` — o perfil de cada conta decidido com o config na mão (ativa → grupo).

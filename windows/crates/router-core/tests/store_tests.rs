@@ -594,6 +594,69 @@ fn a_moved_router_makes_the_integration_stale_and_healing_fixes_it() {
     assert!(script.contains(&*new.to_string_lossy()));
 }
 
+/// "Medir contas": a conta ATIVA é sondada pelo perfil do grupo (sondar a casa
+/// dela derrubaria a sessão viva), a ociosa pela casa; a amostra entra com
+/// origem `probe` e o limite por modelo passa a mandar no número.
+#[test]
+fn measuring_a_group_probes_the_active_account_through_the_group() {
+    use router_core::engine::router_config_store::{MeasureSummary, StoreError};
+    use router_core::usage::claude_usage_probe::{ClaudeUsageProbe, ProbeOutput};
+    use std::sync::Mutex;
+
+    let mut env = make_store();
+    let group = env.store.add_group("pessoal");
+    let a = env.add_account("conta1@exemplo.com", group.id);
+    let b = env.add_account("conta2@exemplo.com", group.id);
+    env.store.activate(&a, &env.group(group.id));
+
+    let asked: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+    let group_raw = env.group(group.id).config_dir.raw.clone();
+    let (seen, active_dir) = (asked.clone(), group_raw.clone());
+    let probe = ClaudeUsageProbe::new(move |dir| {
+        seen.lock().unwrap().push(dir.raw.clone());
+        let stdout = if dir.raw == active_dir {
+            "Current session: 30% used\r\nCurrent week (all models): 40% used\r\nCurrent week (Fable): 95% used\r\n"
+        } else {
+            "Total cost:            $0.0000\r\n" // a ociosa está deslogada
+        };
+        Ok(ProbeOutput {
+            exit_code: Some(0),
+            stdout: stdout.to_string(),
+        })
+    });
+
+    let summary = env
+        .store
+        .measure_accounts(&env.group(group.id), Some(&probe));
+
+    assert_eq!(
+        summary,
+        MeasureSummary {
+            measured: 1,
+            failed: 1
+        }
+    );
+    assert_eq!(env.store.last_error(), Some(&StoreError::ProbeFailures(1)));
+    let asked = asked.lock().unwrap();
+    assert!(asked.contains(&group_raw), "a ativa não foi pelo grupo");
+    assert!(asked.contains(&b.home.raw), "a ociosa devia ir pela casa");
+    assert!(!asked.contains(&a.home.raw), "sondou a casa da conta ATIVA");
+    let detail = &env.store.usage_detail()[&a.id];
+    assert_eq!(detail.origin, UsageOrigin::Probe);
+    assert_eq!(detail.fraction, 0.95);
+}
+
+#[test]
+fn measuring_without_claude_installed_is_a_named_error() {
+    use router_core::engine::router_config_store::{MeasureSummary, StoreError};
+
+    let mut env = make_store();
+    let group = env.store.add_group("g");
+    let summary = env.store.measure_accounts(&env.group(group.id), None);
+    assert_eq!(summary, MeasureSummary::default());
+    assert_eq!(env.store.last_error(), Some(&StoreError::ProbeUnavailable));
+}
+
 /// A volta de rotação: primeiro o espelho (a casa da ativa recebe o token vivo
 /// do grupo), depois a troca se a ativa passou do limiar.
 #[test]

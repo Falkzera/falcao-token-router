@@ -38,6 +38,7 @@ use crate::ids::Id;
 use crate::platform::atomic_write::{read_retrying, write_atomic};
 use crate::platform::paths::is_strictly_inside;
 use crate::platform::short_path::short_path;
+use crate::usage::claude_usage_probe::{ClaudeUsageProbe, ProbeTarget};
 
 /// Última falha de uma ação, para a UI mostrar (com o texto do catálogo dela).
 #[derive(Clone, PartialEq, Debug, thiserror::Error)]
@@ -52,6 +53,19 @@ pub enum StoreError {
     /// Alguma peça da integração de terminal não foi gravada.
     #[error("não foi possível instalar a integração: {0}")]
     IntegrationFailed(String),
+    /// Sem `claude` instalado não há sonda.
+    #[error("binário `claude` não encontrado — a sonda precisa dele")]
+    ProbeUnavailable,
+    /// Contas que não responderam à sonda (quase sempre: precisam de Relogar).
+    #[error("{0} conta(s) não responderam à sonda — veja se precisam de Relogar")]
+    ProbeFailures(usize),
+}
+
+/// O saldo de uma medição com a sonda.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub struct MeasureSummary {
+    pub measured: usize,
+    pub failed: usize,
 }
 
 /// O resultado de checar um login pendente.
@@ -508,6 +522,50 @@ impl RouterConfigStore {
             }
             Err(e) => self.last_error = Some(StoreError::ActivateFailed(e)),
         }
+    }
+
+    /// As contas de um grupo com o perfil por onde medir cada uma — decidido
+    /// AQUI, com o config na mão: conta ativa vai pelo perfil do grupo, nunca
+    /// pela casa (sondar a casa de uma conta ativa derruba a sessão viva).
+    pub fn probe_targets(&self, group: &AccountGroup) -> Vec<ProbeTarget> {
+        self.config
+            .accounts_in(group)
+            .into_iter()
+            .map(|account| ProbeTarget {
+                account_id: account.id,
+                label: account.label().to_string(),
+                email: account.identity.email.clone(),
+                dir: self.engine.probe_config_dir(account, &self.config),
+            })
+            .collect()
+    }
+
+    /// Mede as contas de um grupo com a **sonda ativa**, uma por vez, e publica.
+    ///
+    /// É o que o sensor passivo não consegue: conta ociosa nunca serviu mensagem
+    /// (sem amostra, "pronta") e o limite POR MODELO não chega no `rate_limits`.
+    /// Sob demanda, não no laço: cada conta custa um processo e uma requisição.
+    /// Síncrona: o app a chama fora da thread da interface.
+    pub fn measure_accounts(
+        &mut self,
+        group: &AccountGroup,
+        probe: Option<&ClaudeUsageProbe>,
+    ) -> MeasureSummary {
+        let Some(probe) = probe else {
+            self.last_error = Some(StoreError::ProbeUnavailable);
+            return MeasureSummary::default();
+        };
+        let mut summary = MeasureSummary::default();
+        let usage_dir = self.paths.usage_dir();
+        for target in self.probe_targets(group) {
+            match probe.measure_into(&target, &usage_dir, &self.paths.base, Utc::now()) {
+                Ok(_) => summary.measured += 1,
+                Err(_) => summary.failed += 1,
+            }
+        }
+        self.last_error = (summary.failed > 0).then_some(StoreError::ProbeFailures(summary.failed));
+        self.refresh_usage();
+        summary
     }
 
     /// Relê o uso das amostras, a conta ativa e as sessões vivas de cada grupo, e
