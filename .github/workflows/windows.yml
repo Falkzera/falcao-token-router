@@ -1,7 +1,8 @@
 name: Windows
 
-# O porte Windows (Rust) mora inteiro em `windows/`. Este workflow só roda quando
-# algo dali (ou ele mesmo) muda; o CI do macOS continua sendo o portão do resto.
+# O porte Windows (Rust + Tauri) mora inteiro em `windows/`. Este workflow só
+# roda quando algo dali (ou ele mesmo) muda; o CI do macOS continua sendo o
+# portão do resto.
 on:
   pull_request:
     paths:
@@ -23,7 +24,7 @@ permissions:
 jobs:
   test:
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: windows
@@ -46,9 +47,21 @@ jobs:
             windows/target
           key: windows-cargo-${{ hashFiles('windows/Cargo.lock') }}
 
-      # O mesmo script da máquina: fmt --check, clippy -D warnings e a suíte
-      # (que roda o shell.ps1 no Windows PowerShell 5.1 e o shell.sh no Git Bash
-      # de verdade — os dois existem no runner).
+      # O front do app (Svelte + Vite): o `test.ps1` roda o svelte-check e o
+      # verificador de strings, e precisa das dependências instaladas.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: windows/app/package-lock.json
+
+      - name: Dependências do front
+        working-directory: windows/app
+        run: npm ci --no-fund --no-audit
+
+      # O mesmo script da máquina: fmt --check, clippy -D warnings, a suíte
+      # (que roda o shell.ps1 no Windows PowerShell 5.1 e o shell.sh no Git
+      # Bash de verdade — os dois existem no runner) e as checagens do front.
       - name: Testes
         shell: pwsh
         run: ./scripts/test.ps1

@@ -1,0 +1,6 @@
+{
+  "home.tab.groups": "Groups",
+  "home.tab.settings": "Settings",
+  "groups.subtitle": "Each group rotates its own accounts when they hit the threshold.",
+  "settings.version.format": "Version %@"
+}

@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "O que as duas janelas do app pedem ao núcleo do Tauri: eventos (o quadro novo que o backend publica) e o básico da própria janela. Os comandos do app ficam fora da lista — o Tauri os libera para as janelas do próprio app.",
+  "windows": ["home", "flyout"],
+  "permissions": ["core:default"]
+}

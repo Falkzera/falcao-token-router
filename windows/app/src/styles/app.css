@@ -1,0 +1,64 @@
+/* Os tokens do app, num lugar só. O WebView2 segue o tema de apps do Windows
+   (claro/escuro) pelo `prefers-color-scheme`. As cores de uso são as do painel
+   do macOS (UsageColor) — as mesmas que a bandeja desenha. */
+
+:root {
+  color-scheme: light dark;
+
+  --font: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Cascadia Mono", Consolas, monospace;
+  --font-body: 14px;
+  --font-caption: 12px;
+  --font-small: 11px;
+
+  --bg: #f3f3f3;
+  --surface: #ffffff;
+  --surface-2: #f9f9f9;
+  --text: #1b1b1b;
+  --text-secondary: #5f5f5f;
+  --text-tertiary: #8a8a8a;
+  --border: rgba(0, 0, 0, 0.09);
+  --accent: #2f6b4f;
+  --accent-text: #ffffff;
+
+  --calm: #5c9e73;
+  --warning: #e0b840;
+  --critical: #d95247;
+
+  --radius: 8px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #202020;
+    --surface: #2b2b2b;
+    --surface-2: #323232;
+    --text: #ffffff;
+    --text-secondary: #c5c5c5;
+    --text-tertiary: #8f8f8f;
+    --border: rgba(255, 255, 255, 0.09);
+    --accent: #6bb385;
+    --accent-text: #0f2419;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+p {
+  margin: 0;
+}

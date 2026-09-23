@@ -9,13 +9,17 @@ herdado (custo por JSONL, preços, alertas) **não** entra neste porte.
 # o cargo pode não estar no PATH desta sessão; use o caminho completo se preciso:
 & "$env:USERPROFILE\.cargo\bin\cargo.exe" build --workspace
 & "$env:USERPROFILE\.cargo\bin\cargo.exe" test --workspace   # --workspace: compila o fake-claude
-.\scripts\test.ps1        # fmt --check + clippy -D warnings + test (igual à CI)
+.\scripts\test.ps1        # fmt + clippy -D warnings + test + svelte-check/check-strings (= CI)
+cd app; npm run dev       # front no navegador, com backend simulado
+cd app; $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"; npx tauri dev   # o app
 ```
 
 ## Mapa
 - `crates/router-core` = ≙ `Sources/CCUsageCore` (parte do router). Sem UI, sem rede.
 - `crates/router-cli`  = ≙ `Sources/router` → `router.exe`.
 - `crates/fake-claude` = `claude` de mentira dos testes de integração.
+- `crates/gauge-mark`  = o anel (bandeja + ícone do app), testado por pixel.
+- `app/`               = ≙ `Sources/FalcaoTokenRouter`: Tauri v2 (`src-tauri/`) + Svelte 5 (`src/`).
 - Fonte macOS portada: `Sources/CCUsageCore/{Engine,Usage}`, `Sources/router/main.swift`,
   `Tests/CCUsageCoreTests/*`. Fatos do Windows: `docs/PLATFORM.md`.
 
