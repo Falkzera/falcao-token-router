@@ -46,10 +46,14 @@ const sources = [
   ...walk(join(ROOT, "src"), [".ts", ".svelte"]),
   ...walk(join(ROOT, "src-tauri", "src"), [".rs"]),
 ];
+// Nome de arquivo não é chave: `"settings.json"` casa com o prefixo `settings.`.
+const fileName = /\.(json|ps1|sh|exe|md|toml|rs|ts|svelte|png|ico|log)$/;
 const used = new Set();
 for (const file of sources) {
   const pattern = file.endsWith(".rs") ? rustKey : frontKey;
-  for (const match of readFileSync(file, "utf8").matchAll(pattern)) used.add(match[1]);
+  for (const match of readFileSync(file, "utf8").matchAll(pattern)) {
+    if (!fileName.test(match[1])) used.add(match[1]);
+  }
 }
 
 const errors = [];

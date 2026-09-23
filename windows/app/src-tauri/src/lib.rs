@@ -10,9 +10,11 @@ mod flyout;
 mod i18n;
 mod locale;
 mod rotation_loop;
+mod settings;
 mod snapshot;
 mod state;
 mod system;
+mod terminal;
 mod tray;
 mod tray_text;
 
@@ -126,6 +128,11 @@ pub fn run() {
             show_home(app, HomeTab::Groups);
         }))
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ))
         .setup(|app| {
             let state = AppState::open();
             attach_router(&state);
@@ -133,6 +140,7 @@ pub fn run() {
             // ainda (1ª execução, nenhum grupo) — decidido uma vez, na subida.
             let first_run = state.store().config().groups.is_empty();
             app.manage(state);
+            app.manage(settings::SettingsStore::open(app.handle()));
             app.manage(flyout::FlyoutState::default());
             flyout::create(app.handle())?;
             tray::create(app.handle())?;
@@ -161,7 +169,14 @@ pub fn run() {
             commands::remove_account,
             commands::dismiss_error,
             commands::foreign_default_login,
-            commands::measure_group
+            commands::measure_group,
+            terminal::terminal_report,
+            terminal::install_integration,
+            terminal::allow_profiles_for,
+            settings::get_settings,
+            settings::set_autostart,
+            settings::set_show_in_taskbar,
+            settings::open_url
         ])
         .build(tauri::generate_context!())
         .expect("o app não conseguiu subir");

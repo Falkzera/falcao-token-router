@@ -23,6 +23,16 @@
   thread FORA da trava (planeja → roda → publica), uma medição por vez, com o spinner no quadro.
   Grupo novo com a escolha de padrão (`add_group_with`); login estranho no `~\.claude`
   (`foreign_default_login`); dispensar o erro. `copy_text` (plugin clipboard) mora no `lib.rs`.
+- `terminal.rs` — a integração de terminal na tela: o quadro POR SHELL (`terminal_report`, fora
+  da thread da interface — consulta a política de cada PowerShell), "Ativar/Reinstalar"
+  (`install_integration`, devolve `ok` de verdade: o "Instalada ✓" do macOS aparecia mesmo com
+  falha) e a correção consentida da política (`allow_profiles_for`: RemoteSigned em CurrentUser,
+  conferido de novo depois). Front ainda não usa (5.4b parte 2).
+- `settings.rs` — ajustes do app em `%APPDATA%\com.synqo.falcao-token-router\settings.json`
+  (`show_in_taskbar`); "abrir no login" pelo plugin de autostart, SEMPRE relido do sistema, com o
+  motivo da recusa; `open_url` só para a lista (ms-settings:developers/taskbar, logout do
+  claude.ai, hosts do login oficial — testado). Pendente: aplicar `show_in_taskbar` (abrir a
+  janela na subida e fechar = minimizar) e o front da aba Ajustes.
 - `snapshot.rs` — o quadro que as janelas leem: grupos e contas na ordem do usuário, conta
   ativa, uso com janela/origem/idade e os % PRONTOS (`UsagePercent` do núcleo), sessões (total
   e engajadas), contas exclusivas (para a confirmação de apagar grupo), o comando do terminal e
