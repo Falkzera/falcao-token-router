@@ -51,14 +51,17 @@ pub fn tray_icon_size() -> u32 {
     u32::try_from(size).ok().filter(|s| *s >= 16).unwrap_or(16)
 }
 
+/// O nome do router ao lado do app — o do sidecar do instalador.
+pub const ROUTER_EXE: &str = "router.exe";
+
 /// O `router.exe` irmão de um executável (≙ `RouterBinary.swift`).
 pub fn router_beside(exe: &Path) -> Option<PathBuf> {
-    let sibling = exe.parent()?.join("router.exe");
+    let sibling = exe.parent()?.join(ROUTER_EXE);
     sibling.is_file().then_some(sibling)
 }
 
 /// O `router.exe` que a integração e a status line citam: ao lado do app. No
-/// instalado, o sidecar do NSIS (onde ele cai é conferido na fase 6); em
+/// instalado, o sidecar que o NSIS põe na pasta da instalação; em
 /// desenvolvimento, `cargo build --workspace` põe os dois em `target\debug\`.
 pub fn router_path() -> Option<PathBuf> {
     router_beside(&std::env::current_exe().ok()?)
@@ -85,5 +88,52 @@ mod tests {
 
         std::fs::write(tmp.path().join("router.exe"), b"").unwrap();
         assert_eq!(router_beside(&exe), Some(tmp.path().join("router.exe")));
+    }
+
+    fn config(text: &str) -> serde_json::Value {
+        serde_json::from_str(text).unwrap()
+    }
+
+    /// O instalador põe cada `externalBin` ao lado do exe com o nome do
+    /// arquivo sem o sufixo do alvo (`binaries/router-x86_64-pc-windows-msvc.exe`
+    /// → `router.exe` — template NSIS do Tauri 2.11): é por esse nome que o app
+    /// o procura. Renomear só de um lado deixaria o app instalado sem router.
+    #[test]
+    fn the_installer_sidecar_is_the_router_the_app_looks_for() {
+        let installer = config(include_str!("../tauri.installer.conf.json"));
+        let names: Vec<String> = installer["bundle"]["externalBin"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|bin| {
+                let stem = Path::new(bin.as_str().unwrap()).file_name().unwrap();
+                format!("{}.exe", stem.to_str().unwrap())
+            })
+            .collect();
+        assert_eq!(names, [ROUTER_EXE]);
+    }
+
+    /// O `externalBin` não pode morar no `tauri.conf.json`: o `build.rs` do
+    /// Tauri copia o sidecar para `target\<perfil>\` em TODO `cargo build` do
+    /// app. Sem o arquivo (a CI, um clone novo) a compilação quebra; com ele,
+    /// o `router.exe` recém-compilado do workspace é trocado pela cópia do
+    /// último instalador — e é esse que os testes da CLI rodariam.
+    #[test]
+    fn only_the_installer_build_carries_the_sidecar() {
+        let base = config(include_str!("../tauri.conf.json"));
+        assert!(base["bundle"].get("externalBin").is_none());
+    }
+
+    /// O `productName` dá nome à pasta da instalação (`%LOCALAPPDATA%\<nome>`),
+    /// que a status line e a integração de terminal citam: sem espaço nem
+    /// acento, ele não acrescenta nada que peça aspas ou nome 8.3 ao caminho.
+    /// O exe instalado leva o mesmo nome (sem o `mainBinaryName` ele seria o
+    /// do cargo, `falcao-token-router.exe` — conferido no 1º build).
+    #[test]
+    fn the_install_folder_and_the_app_exe_share_a_plain_ascii_name() {
+        let base = config(include_str!("../tauri.conf.json"));
+        let name = base["productName"].as_str().unwrap();
+        assert!(name.chars().all(|c| c.is_ascii_alphanumeric()), "{name}");
+        assert_eq!(base["mainBinaryName"].as_str(), Some(name));
     }
 }

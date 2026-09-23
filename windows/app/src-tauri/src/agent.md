@@ -77,7 +77,9 @@
 - `i18n.rs` — os MESMOS catálogos do front (`include_str!`), com o mesmo preenchimento de
   placeholder (`%@`, `%d`, `%1$@`, `%%`); `t(idioma, chave, args)`.
 - `system.rs` — tema da BARRA de tarefas (`SystemUsesLightTheme`), tamanho do ícone pequeno na
-  escala do sistema, o `router.exe` ao lado do app, o shell da status line.
+  escala do sistema, o `router.exe` ao lado do app (`ROUTER_EXE`, o nome do sidecar do
+  instalador), o shell da status line. Os testes também fixam o contrato do empacotamento
+  (sidecar só no `tauri.installer.conf.json`, com esse nome; pasta e exe com nome ASCII).
 - `locale.rs` — o idioma da interface do Windows: qualquer português → pt-BR; o resto → en.
 
 ## Verificado à mão (22/09/2026, sandbox com contas @exemplo.com)
