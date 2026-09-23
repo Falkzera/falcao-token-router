@@ -39,10 +39,28 @@ public enum ProviderEnv {
     ///
     /// Removidas no login e no lançamento: nos dois casos a premissa do produto
     /// é que quem atende é a conta OAuth que o grupo ativou, e nada além dela.
+    ///
+    /// O segundo bloco veio do porte para Windows (issue #5, @viniventur), que
+    /// leu o JavaScript empacotado do Claude Code 2.1.280; cada nome foi
+    /// conferido aqui com `strings` no binário do macOS antes de entrar:
+    ///
+    /// - `CLAUDE_CODE_OAUTH_TOKEN` (e as variantes por descritor de arquivo,
+    ///   refresh e sessão) entregam um token pelo AMBIENTE. Com uma delas
+    ///   setada, a sessão é servida por esse token, não pela conta que o grupo
+    ///   ativou — o rodízio vira teatro.
+    /// - `CLAUDE_SECURESTORAGE_CONFIG_DIR` **tem precedência** sobre
+    ///   `CLAUDE_CONFIG_DIR` quando o Claude Code procura a credencial. Setada,
+    ///   o app escreveria o item do grupo enquanto o Claude Code lê outro.
+    /// - `CLAUDE_CODE_CUSTOM_OAUTH_URL` e `ANTHROPIC_PROFILE` trocam o servidor
+    ///   de autenticação e o perfil de conta, respectivamente.
     public static let credentialKeys = [
         "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_CUSTOM_HEADERS",
         "ANTHROPIC_BASE_URL", "ANTHROPIC_BEDROCK_BASE_URL", "ANTHROPIC_VERTEX_BASE_URL",
         "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX",
+        "CLAUDE_CODE_OAUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR",
+        "CLAUDE_CODE_OAUTH_REFRESH_TOKEN", "CLAUDE_CODE_API_KEY_FILE_DESCRIPTOR",
+        "CLAUDE_CODE_SESSION_ACCESS_TOKEN", "CLAUDE_CODE_CUSTOM_OAUTH_URL",
+        "CLAUDE_SECURESTORAGE_CONFIG_DIR", "ANTHROPIC_PROFILE",
     ]
 
     /// O ambiente sem nada que desvie a sessão da conta do grupo.

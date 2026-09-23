@@ -45,6 +45,8 @@ O motor do Falcão Router: contas, grupos, troca de credencial, medição passiv
 
 - 2026-09-19: a medida da conta passou a carregar **procedência** (`UsageOrigin`). O medidor já fazia isso (`UsageSnapshot.Provenance`: live/cached/derived); o roteador não, e depois da sonda a tela atribuía ao sensor um número que a sonda tinha buscado — com a frase "medido pela sessão da própria conta", falsa justamente nas contas ociosas, que sessão nenhuma serviu. Uma amostra pode carregar as DUAS procedências: 5h/7d do sensor e as por modelo da sonda, cada uma com seu carimbo.
 
+- 2026-09-23: `ProviderEnv.credentialKeys` ganhou oito nomes que o porte Windows (issue #5, @viniventur) achou no JavaScript do Claude Code e que eu confirmei com `strings` no binário do macOS. O grave é `CLAUDE_CODE_OAUTH_TOKEN`: exportada, a sessão é servida por esse token e não pela conta do grupo — o `router launch` deixava passar. `CLAUDE_SECURESTORAGE_CONFIG_DIR` tem precedência sobre `CLAUDE_CONFIG_DIR` para achar a credencial: setada, o app escreveria o item do grupo enquanto o Claude Code lê outro.
+
 ## Pendências conhecidas
 - `removeAccount`/`removeGroup` não apagam o item de chaveiro nem a pasta `accounts/<uuid>`: a credencial da conta removida continua viva no chaveiro do usuário. Deliberado por ora (ver comentário em `removeGroup`), mas num produto pago "remover a conta" que deixa o refresh token para trás é promessa quebrada.
 - `wrongAccount` no relogin deixa a credencial do intruso na casa até a próxima tentativa (inofensivo; a identidade do registro não muda).
