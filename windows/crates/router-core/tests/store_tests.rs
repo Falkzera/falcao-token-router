@@ -518,6 +518,82 @@ fn live_sessions_are_published_per_group() {
     assert_eq!(store.live_sessions()[&busy.id][0].label(), "app");
 }
 
+/// Ativar a integração: scripts, status line em cada perfil de grupo e a linha
+/// nos dois `$PROFILE` e no `.bashrc` — sem tocar em nada fora das pastas de
+/// teste (a home e a Documentos são injetadas).
+#[test]
+fn installing_the_integration_writes_scripts_status_lines_and_profile_lines() {
+    use router_core::engine::shell_integration::{ShellIntegration, ShellTargets, StatusShell};
+
+    let mut env = make_store();
+    let default_group = env.store.add_group("trabalho");
+    let dedicated = env.store.add_group("pessoal");
+    let router = env.tmp.path().join("app-instalado").join("router.exe");
+    std::fs::create_dir_all(router.parent().unwrap()).unwrap();
+    std::fs::write(&router, b"").unwrap();
+    env.store.set_router_path(Some(router.clone()));
+    let home = env.tmp.path().join("home");
+    let targets = ShellTargets::for_home(&home, Some(&env.tmp.path().join("Documentos")));
+
+    env.store
+        .install_shell_integration(&targets, StatusShell::Bash)
+        .unwrap();
+
+    assert!(env.store.powershell_script_path().exists());
+    assert!(env.store.bash_script_path().exists());
+    for group in [&default_group, &dedicated] {
+        let expected = env
+            .store
+            .expected_status_line(group, StatusShell::Bash)
+            .unwrap();
+        assert!(
+            !ShellIntegration::status_line_is_stale(&expected, &group.config_dir),
+            "status line faltando em {}",
+            group.name
+        );
+    }
+    let ps_line = ShellIntegration::powershell_source_line(&env.store.powershell_script_path());
+    for profile in &targets.powershell_profiles {
+        assert!(ShellIntegration::profile_has_line(profile, &ps_line));
+    }
+    let sh_line = ShellIntegration::bash_source_line(&env.store.bash_script_path());
+    assert!(ShellIntegration::profile_has_line(
+        &targets.bashrc,
+        &sh_line
+    ));
+    assert!(home.join(".bash_profile").exists());
+    assert!(!env.store.integration_is_stale(StatusShell::Bash));
+}
+
+/// O app reinstalado noutro lugar deixa script e status lines apontando para o
+/// caminho morto — e `claude trabalho` cairia no `claude` puro, em silêncio. A
+/// cura (na subida do app) reescreve tudo para o binário atual.
+#[test]
+fn a_moved_router_makes_the_integration_stale_and_healing_fixes_it() {
+    use router_core::engine::shell_integration::{ShellTargets, StatusShell};
+
+    let mut env = make_store();
+    env.store.add_group("pessoal");
+    let targets = ShellTargets::for_home(&env.tmp.path().join("home"), None);
+    let old = env.tmp.path().join("antigo").join("router.exe");
+    let new = env.tmp.path().join("novo").join("router.exe");
+    env.store.set_router_path(Some(old));
+    env.store
+        .install_shell_integration(&targets, StatusShell::PowerShell)
+        .unwrap();
+    assert!(!env.store.integration_is_stale(StatusShell::PowerShell));
+
+    env.store.set_router_path(Some(new.clone()));
+    assert!(env.store.integration_is_stale(StatusShell::PowerShell));
+
+    assert!(env
+        .store
+        .heal_shell_integration(&targets, StatusShell::PowerShell));
+    assert!(!env.store.integration_is_stale(StatusShell::PowerShell));
+    let script = std::fs::read_to_string(env.store.powershell_script_path()).unwrap();
+    assert!(script.contains(&*new.to_string_lossy()));
+}
+
 /// A volta de rotação: primeiro o espelho (a casa da ativa recebe o token vivo
 /// do grupo), depois a troca se a ativa passou do limiar.
 #[test]

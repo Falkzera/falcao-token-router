@@ -49,6 +49,18 @@ Modelos, formato da amostra, leitor de uso, credencial, rotação e o store. Sem
   primeiro.
 - `router_paths.rs` — base `%LOCALAPPDATA%\com.synqo.falcao-router` (override `ROUTER_APP_SUPPORT`).
 
+- `shell_integration.rs` — ≙ `ShellIntegration`: a `statusLine` (`/` e sem aspas; com espaço, 8.3;
+  sem 8.3, aspas do shell detectado — `&` no PowerShell; `--profile` nos grupos dedicados),
+  `install_status_line` cirúrgico, obsolescência por igualdade exata; `shell.ps1` (UTF-8 com BOM,
+  CRLF) e `shell.sh` (sem BOM, LF), ambos sem `exec` e **encadeando** uma função `claude` que já
+  existia no perfil (marcador `falcao-router-shim` — no bash como comando `:`, porque o
+  `declare -f` joga fora comentários); linhas de perfil ASCII guardadas por `Test-Path`/`[ -f ]`;
+  `ShellTargets` (os dois `$PROFILE` sob a Documentos real, `.bashrc`); `ensure_bash_profile`.
+- `profile_sharing.rs` — ≙ `ProfileSharing`: pastas por junction; arquivos por symlink quando o
+  Windows deixa, senão plano B (`CLAUDE.md`/`keybindings.json` copiados com mtime da origem e
+  sincronizados — mais novo vence, backup do sobrescrito, só o que está no manifesto
+  `.falcao-router-sync.json`; `history.jsonl` fica por grupo). Nunca troca item real do grupo.
+
 ## Decisões
 - 22/09/2026: portado 1:1 do Swift. Datas ISO-8601 **sem fração**; `origin` ausente = sensor.
 - 22/09/2026: `write_identity` é cirúrgico — troca só `oauthAccount`, põe
@@ -66,5 +78,11 @@ Modelos, formato da amostra, leitor de uso, credencial, rotação e o store. Sem
 - 22/09/2026: trava do motor é segurança a mais, não portão — sem ela no prazo (5 s), segue.
 - O item do GRUPO não é apagado ao remover conta nem grupo (paridade macOS): pode haver sessão viva.
 
+- 22/09/2026: a função `claude` do router ENCADEIA a que já existia no perfil (nesta máquina o
+  perfil do PowerShell define uma que escolhe a conta do `claude` puro) — sobrescrevê-la mudaria
+  em silêncio a conta do `claude` sem grupo. `claude <grupo>` vai para o router; o resto, para ela.
+- 22/09/2026: a status line de grupo dedicado leva `--profile`; o sensor prefere o
+  `CLAUDE_CONFIG_DIR` e cai no `--profile` quando a variável não chega (subprocesso raspado).
+
 ## Pendências (Fase 4)
-- `profile_sharing`, `shell_integration`; no store: `measure_accounts` e a integração de terminal.
+- No store: `measure_accounts` (sonda).

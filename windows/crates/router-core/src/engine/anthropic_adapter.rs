@@ -5,7 +5,6 @@
 //! um perfil dedicado não abrir o assistente de login. Nada disto está
 //! documentado; quando uma versão do Claude Code mudar algo, muda-se aqui.
 
-use std::io;
 use std::path::PathBuf;
 
 use serde_json::{Map, Value};
@@ -13,7 +12,8 @@ use serde_json::{Map, Value};
 use super::account_model::AccountIdentity;
 use super::config_dir::ConfigDir;
 use super::provider::{IdentityError, Provider, ProviderAdapter};
-use crate::platform::atomic_write::{read_retrying, write_atomic};
+use crate::platform::atomic_write::read_retrying;
+use crate::platform::json_file::{edit_object, JsonFileError};
 
 pub struct AnthropicAdapter;
 
@@ -62,20 +62,6 @@ impl AnthropicAdapter {
     }
 }
 
-/// O objeto raiz de um `.claude.json` existente, ou o motivo de ele não servir.
-fn parse_root(bytes: &[u8]) -> Result<Map<String, Value>, String> {
-    // Arquivo vazio (ou só espaço) não tem dado do usuário a perder: conta como
-    // ausente, em vez de travar a ativação num perfil com o arquivo truncado.
-    if bytes.iter().all(u8::is_ascii_whitespace) {
-        return Ok(Map::new());
-    }
-    match serde_json::from_slice::<Value>(bytes) {
-        Ok(Value::Object(map)) => Ok(map),
-        Ok(_) => Err("a raiz não é um objeto JSON".to_string()),
-        Err(e) => Err(e.to_string()),
-    }
-}
-
 impl ProviderAdapter for AnthropicAdapter {
     fn provider(&self) -> Provider {
         Provider::Anthropic
@@ -98,46 +84,20 @@ impl ProviderAdapter for AnthropicAdapter {
     /// troca só `oauthAccount`/`hasCompletedOnboarding`/`cachedUsageUtilization`
     /// e regrava preservando todas as outras chaves, na ordem em que estavam
     /// (inclusive as que só diferem em caixa, que o Windows tem). Um arquivo
-    /// existente e ilegível é **recusado**, nunca substituído. Depois de gravar,
-    /// relê para conferir.
+    /// existente e ilegível é **recusado**, nunca substituído; ausente ou vazio
+    /// vira um objeto novo (grupo dedicado que nunca foi ativado — a pasta do
+    /// perfil é criada). Depois de gravar, relê para conferir.
     fn write_identity(
         &self,
         identity: &AccountIdentity,
         dir: &ConfigDir,
     ) -> Result<(), IdentityError> {
         let path = dir.global_config_path();
-        let (mut root, trailing_newline) = match read_retrying(&path) {
-            Ok(bytes) => {
-                let root = parse_root(&bytes).map_err(|reason| IdentityError::Unreadable {
-                    path: path.clone(),
-                    reason,
-                })?;
-                (root, bytes.ends_with(b"\n"))
+        edit_object(&path, |root| Self::splice_identity(root, identity)).map_err(|e| match e {
+            JsonFileError::Unreadable { path, reason } => {
+                IdentityError::Unreadable { path, reason }
             }
-            // Ausente vira um objeto novo (grupo dedicado que nunca foi ativado).
-            Err(e) if e.kind() == io::ErrorKind::NotFound => (Map::new(), false),
-            // Existe e não deu para ler: recusa, pelo mesmo motivo do ilegível.
-            Err(e) => {
-                return Err(IdentityError::Unreadable {
-                    path,
-                    reason: e.to_string(),
-                })
-            }
-        };
-
-        Self::splice_identity(&mut root, identity);
-
-        // Recuo de 2 espaços, como o `JSON.stringify(…, null, 2)` do Claude Code.
-        let mut bytes = serde_json::to_vec_pretty(&Value::Object(root))
-            .expect("um serde_json::Value sempre serializa");
-        if trailing_newline {
-            bytes.push(b'\n');
-        }
-        // Cria a pasta do perfil se faltar: um grupo dedicado pode nunca ter
-        // existido no disco antes da primeira ativação.
-        write_atomic(&path, &bytes).map_err(|source| IdentityError::Io {
-            path: path.clone(),
-            source,
+            JsonFileError::Io { path, source } => IdentityError::Io { path, source },
         })?;
 
         match self.identity(dir) {

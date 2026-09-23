@@ -15,6 +15,7 @@
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
@@ -27,13 +28,16 @@ use super::credential_store::CredentialStore;
 use super::engine_lock::EngineLock;
 use super::group_model::{AccountGroup, RouterConfig};
 use super::group_usage_reader::{AccountUsage, GroupUsageReader};
+use super::profile_sharing::ProfileSharing;
 use super::provider::{Provider, ProviderAdapter};
 use super::rotation_engine::{RotationEngine, RotationError};
 use super::router_paths::RouterPaths;
 use super::session_registry::{LiveSession, SessionRegistry};
+use super::shell_integration::{ShellIntegration, ShellTargets, StatusShell};
 use crate::ids::Id;
 use crate::platform::atomic_write::{read_retrying, write_atomic};
 use crate::platform::paths::is_strictly_inside;
+use crate::platform::short_path::short_path;
 
 /// Última falha de uma ação, para a UI mostrar (com o texto do catálogo dela).
 #[derive(Clone, PartialEq, Debug, thiserror::Error)]
@@ -42,6 +46,12 @@ pub enum StoreError {
     SaveFailed(String),
     #[error("não foi possível trocar de conta: {0}")]
     ActivateFailed(RotationError),
+    /// O app não disse onde está o `router.exe`: sem ele não há integração.
+    #[error("não foi possível localizar o binário do router")]
+    RouterPathUnknown,
+    /// Alguma peça da integração de terminal não foi gravada.
+    #[error("não foi possível instalar a integração: {0}")]
+    IntegrationFailed(String),
 }
 
 /// O resultado de checar um login pendente.
@@ -101,6 +111,9 @@ pub struct RouterConfigStore {
     /// O `config.json` existia e não pôde ser lido: no primeiro `save` ele é
     /// guardado de lado, nunca sobrescrito.
     unreadable_on_disk: bool,
+    /// O `router.exe` que a integração e a status line apontam. Setado pelo app
+    /// ao iniciar; `None` fora dele.
+    router_path: Option<PathBuf>,
     paths: RouterPaths,
     /// A home do usuário (`%USERPROFILE%`), de onde sai o perfil padrão.
     home: String,
@@ -136,6 +149,7 @@ impl RouterConfigStore {
             session_reader: Box::new(SessionRegistry::live_sessions),
             last_error: None,
             unreadable_on_disk,
+            router_path: None,
             usage: GroupUsageReader::new(paths.usage_dir()),
             engine: RotationEngine::new(credentials.clone(), adapters),
             login: AccountLoginService::new(adapter, credentials.clone()),
@@ -546,5 +560,129 @@ impl RouterConfigStore {
             };
             self.activate(&target, group);
         }
+    }
+
+    // MARK: - Integração com o terminal
+
+    pub fn set_router_path(&mut self, path: Option<PathBuf>) {
+        self.router_path = path;
+    }
+
+    pub fn router_path(&self) -> Option<&Path> {
+        self.router_path.as_deref()
+    }
+
+    /// O `shell.ps1` que os perfis do PowerShell carregam.
+    pub fn powershell_script_path(&self) -> PathBuf {
+        self.paths.base.join("shell.ps1")
+    }
+
+    /// O `shell.sh` que o `~\.bashrc` do Git Bash carrega.
+    pub fn bash_script_path(&self) -> PathBuf {
+        self.paths.base.join("shell.sh")
+    }
+
+    /// A status line que o perfil de um grupo deve ter, para o shell que o
+    /// Claude Code vai usar. Cria a pasta do perfil antes: o nome 8.3 só existe
+    /// para o que existe, e sem ele o comando mudaria entre uma instalação e a
+    /// seguinte.
+    pub fn expected_status_line(&self, group: &AccountGroup, shell: StatusShell) -> Option<String> {
+        let router = self.router_path.as_deref()?;
+        let profile = (!group.config_dir.is_default).then(|| group.config_dir.path());
+        if let Some(dir) = &profile {
+            let _ = fs::create_dir_all(dir);
+        }
+        Some(ShellIntegration::status_line_command(
+            router,
+            profile.as_deref(),
+            shell,
+            &short_path,
+        ))
+    }
+
+    /// Escreve os scripts, planta a status line e o compartilhamento em cada
+    /// perfil de grupo, e acrescenta a linha nos perfis de shell. Idempotente.
+    /// A parte do Git Bash só entra quando há Git Bash (`shell == Bash`).
+    pub fn install_shell_integration(
+        &mut self,
+        targets: &ShellTargets,
+        shell: StatusShell,
+    ) -> Result<(), StoreError> {
+        let Some(router) = self.router_path.clone() else {
+            self.last_error = Some(StoreError::RouterPathUnknown);
+            return Err(StoreError::RouterPathUnknown);
+        };
+        let (ps1, sh) = (self.powershell_script_path(), self.bash_script_path());
+        let mut failures: Vec<String> = Vec::new();
+
+        if let Err(e) = ShellIntegration::write_scripts(&router, &ps1, &sh) {
+            failures.push(e.to_string());
+        }
+        let home = ConfigDir::standard(&self.home);
+        for group in &self.config.groups {
+            if let Some(command) = self.expected_status_line(group, shell) {
+                if let Err(e) = ShellIntegration::install_status_line(&command, &group.config_dir) {
+                    failures.push(e.to_string());
+                }
+            }
+            ProfileSharing::link(
+                &group.config_dir,
+                &home,
+                self.config.share_history,
+                &self.paths.base,
+            );
+        }
+        let ps_line = ShellIntegration::powershell_source_line(&ps1);
+        for profile in &targets.powershell_profiles {
+            if let Err(e) = ShellIntegration::ensure_in_profile(profile, &ps_line, "\r\n") {
+                failures.push(format!("{}: {e}", profile.display()));
+            }
+        }
+        if shell == StatusShell::Bash {
+            let sh_line = ShellIntegration::bash_source_line(&sh);
+            if let Err(e) = ShellIntegration::ensure_in_profile(&targets.bashrc, &sh_line, "\n") {
+                failures.push(format!("{}: {e}", targets.bashrc.display()));
+            }
+            if let Err(e) = ShellIntegration::ensure_bash_profile(targets) {
+                failures.push(e.to_string());
+            }
+        }
+
+        if failures.is_empty() {
+            self.last_error = None;
+            Ok(())
+        } else {
+            let error = StoreError::IntegrationFailed(failures.join("; "));
+            self.last_error = Some(error.clone());
+            Err(error)
+        }
+    }
+
+    /// A integração instalada aponta para um binário que não é mais este (app
+    /// movido ou reinstalado noutro lugar), ou algum perfil de grupo está sem a
+    /// status line certa. O modo de falha é silencioso — `claude trabalho` cai
+    /// no `claude` puro, na conta errada — por isso a cura é automática.
+    /// Não instalada não é obsoleta: é ausente.
+    pub fn integration_is_stale(&self, shell: StatusShell) -> bool {
+        let Some(router) = self.router_path.as_deref() else {
+            return false;
+        };
+        let ps1 = self.powershell_script_path();
+        let Ok(script) = read_retrying(&ps1) else {
+            return false;
+        };
+        let router_text = router.to_string_lossy().replace('\'', "''");
+        if !String::from_utf8_lossy(&script).contains(router_text.as_str()) {
+            return true;
+        }
+        self.config.groups.iter().any(|group| {
+            self.expected_status_line(group, shell)
+                .is_some_and(|cmd| ShellIntegration::status_line_is_stale(&cmd, &group.config_dir))
+        })
+    }
+
+    /// Reinstala quando ficou obsoleta. Devolve `true` se mexeu em algo.
+    pub fn heal_shell_integration(&mut self, targets: &ShellTargets, shell: StatusShell) -> bool {
+        self.integration_is_stale(shell) && self.install_shell_integration(targets, shell).is_ok()
     }
 }
