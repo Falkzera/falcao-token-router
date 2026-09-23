@@ -1,5 +1,9 @@
 <script lang="ts">
   // O interruptor do Windows 11 (liga/desliga), com o rótulo clicável.
+  // CONTROLADO: o clique só pede; a tela mostra o que o backend confirmar. Um
+  // "Abrir no login" que o Windows recusou volta a `false` — e, sem isto, o
+  // valor não mudaria, o Svelte não tocaria no DOM e o interruptor ficaria
+  // ligado sobre um registro que não existe.
   let {
     checked,
     label,
@@ -15,7 +19,11 @@
     role="switch"
     {checked}
     {disabled}
-    onchange={(event) => onChange(event.currentTarget.checked)}
+    onchange={(event) => {
+      const on = event.currentTarget.checked;
+      event.currentTarget.checked = checked;
+      onChange(on);
+    }}
   />
   <span class="track" aria-hidden="true"><span class="thumb"></span></span>
   <span class="label">{label}</span>

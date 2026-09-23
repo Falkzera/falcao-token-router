@@ -13,7 +13,9 @@
     | "copy"
     | "check"
     | "pencil"
-    | "plus";
+    | "plus"
+    | "warning"
+    | "info";
 </script>
 
 <script lang="ts">
@@ -67,6 +69,12 @@
     <path d="M10.75 2.75l2.5 2.5-7.5 7.5-3 .5.5-3z" />
   {:else if name === "plus"}
     <path d="M8 3v10M3 8h10" />
+  {:else if name === "warning"}
+    <path d="M8 2.2l6.3 11.1H1.7z" />
+    <path d="M8 6.5v3.2M8 11.6v.2" />
+  {:else if name === "info"}
+    <circle cx="8" cy="8" r="6.25" />
+    <path d="M8 7.25v4M8 4.9v.2" />
   {/if}
 </svg>
 

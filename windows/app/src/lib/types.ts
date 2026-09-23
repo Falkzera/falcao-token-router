@@ -86,6 +86,58 @@ export type ErrorView =
  *  router.exe, ou citando outro (app movido). */
 export type ScriptsState = "missing" | "current" | "stale";
 
+export type ShellName = "powerShell7" | "windowsPowerShell" | "gitBash";
+
+/** Quem o Git Bash lê ao abrir: nenhum perfil de login, um que carrega o
+ *  `.bashrc`, ou um que o ignora (a integração nunca roda). */
+export type BashLoginView = "missing" | "loads" | "ignores";
+
+/** Um shell presente na máquina e o que se sabe dele. */
+export interface ShellView {
+  shell: ShellName;
+  /** O arquivo que a integração edita. */
+  profile: string;
+  loadsIntegration: boolean;
+  /** A política de execução efetiva (só PowerShell, e só com a linha no perfil). */
+  policy: string | null;
+  policyBlocks: boolean;
+  /** O perfil já tinha uma função `claude`, que a integração encadeia. */
+  chainsUserFunction: boolean;
+  bashLogin: BashLoginView | null;
+  /** `.bash_profile`, `.bash_login` ou `.profile` (o que existir). */
+  bashLoginFile: string | null;
+}
+
+/** O quadro da integração de terminal, shell por shell (lento: pedido à parte). */
+export interface TerminalView {
+  routerFound: boolean;
+  scripts: ScriptsState;
+  shells: ShellView[];
+  developerMode: boolean;
+  fullyInstalled: boolean;
+  blockedByPolicy: boolean;
+  /** "Ativar" resolve algo (a política e o `.bash_profile` têm correção própria). */
+  needsInstall: boolean;
+}
+
+export interface InstallResult {
+  /** Tudo gravado — "Instalada ✓" só com isto. */
+  ok: boolean;
+  snapshot: Snapshot;
+  report: TerminalView;
+}
+
+/** O aviso do cartão de grupo sobre a integração. */
+export type IntegrationState = "ok" | "install" | "attention";
+
+/** A aba Ajustes. "Abrir no login" vem SEMPRE do sistema. */
+export interface SettingsView {
+  autostart: boolean;
+  autostartFailure: string | null;
+  showInTaskbar: boolean;
+  version: string;
+}
+
 export interface Snapshot {
   groups: GroupView[];
   measuringGroup: string | null;

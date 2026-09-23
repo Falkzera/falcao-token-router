@@ -27,6 +27,17 @@ pub struct AppSettings {
     pub show_in_taskbar: bool,
 }
 
+impl AppSettings {
+    /// A janela abre sozinha na subida (≙ `presentAtLaunch` do macOS)? Quando
+    /// não há o que mostrar na bandeja ainda (nenhum grupo) ou quando o usuário
+    /// pediu a barra de tarefas — aí ele espera um app comum, e app comum abre
+    /// janela (e o botão da barra só existe com ela). Decidido UMA vez, na
+    /// subida: reavaliar depois faria a janela reaparecer no meio do uso.
+    pub fn present_at_launch(&self, no_groups: bool) -> bool {
+        no_groups || self.show_in_taskbar
+    }
+}
+
 pub struct SettingsStore {
     path: Option<PathBuf>,
     value: Mutex<AppSettings>,
@@ -42,11 +53,18 @@ impl SettingsStore {
     /// `<%APPDATA%>\com.synqo.falcao-token-router\settings.json` — preferência
     /// de interface (pode viajar com o perfil; credencial nenhuma mora aqui).
     pub fn open(app: &AppHandle) -> Self {
-        let path = app
-            .path()
-            .app_config_dir()
-            .ok()
-            .map(|d| d.join("settings.json"));
+        Self::at(
+            app.path()
+                .app_config_dir()
+                .ok()
+                .map(|d| d.join("settings.json")),
+        )
+    }
+
+    /// Num arquivo dado (os testes usam um temporário). Sem caminho, vive só
+    /// em memória. Ilegível = o padrão: é preferência de interface, e o
+    /// arquivo é só nosso.
+    pub fn at(path: Option<PathBuf>) -> Self {
         let value = path
             .as_ref()
             .and_then(|p| read_retrying(p).ok())
@@ -153,6 +171,45 @@ pub fn open_url(app: AppHandle, url: String) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_settings_survive_a_restart() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp
+            .path()
+            .join("com.synqo.falcao-token-router")
+            .join("settings.json");
+        let store = SettingsStore::at(Some(path.clone()));
+        assert!(!store.get().show_in_taskbar, "desligado de fábrica");
+
+        store.update(|s| s.show_in_taskbar = true).unwrap();
+        assert!(SettingsStore::at(Some(path)).get().show_in_taskbar);
+    }
+
+    /// O arquivo é só nosso e guarda preferência de interface: ilegível (meio
+    /// escrito, editado à mão) volta ao padrão em vez de derrubar o app.
+    #[test]
+    fn an_unreadable_file_falls_back_to_the_defaults() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("settings.json");
+        std::fs::write(&path, b"{ nao e json").unwrap();
+        assert_eq!(SettingsStore::at(Some(path)).get(), AppSettings::default());
+    }
+
+    /// ≙ `presentAtLaunch` do macOS: a janela abre sozinha quando não há o que
+    /// mostrar na bandeja (nenhum grupo) ou quando o app deve estar na barra de
+    /// tarefas — e a decisão é da subida.
+    #[test]
+    fn the_window_opens_at_launch_without_groups_or_with_the_taskbar_option() {
+        let plain = AppSettings::default();
+        let taskbar = AppSettings {
+            show_in_taskbar: true,
+        };
+        assert!(plain.present_at_launch(true));
+        assert!(!plain.present_at_launch(false));
+        assert!(taskbar.present_at_launch(false));
+        assert!(taskbar.present_at_launch(true));
+    }
 
     #[test]
     fn only_the_listed_urls_open() {

@@ -4,9 +4,26 @@
 // aba e seleção vêm da URL:
 //   ?view=home|flyout  &state=uso|vazio|pronta|critico|erro  &lang=en|pt-BR
 //   &tab=groups|settings  &select=<conta>  &foreign=<e-mail>  &scripts=current|missing|stale
-// Dados só de exemplo (@exemplo.com, Acme).
+// A integração de terminal e os ajustes:
+//   &terminal=ausente|ok|bloqueado|parcial|velha|semrouter  &devmode=1
+//   &install=falha (Ativar grava só parte)  &diretiva=1 (Permitir não vence a política)
+//   &autostart=falha (o Windows recusa o registro)  &taskbar=1
+// Dados só de exemplo (@exemplo.com, Acme, C:\Users\exemplo).
 
-import type { AppInfo, GroupView, HomeTab, Locale, ScriptsState, Snapshot, UsageView } from "./types";
+import type {
+  AppInfo,
+  GroupView,
+  HomeTab,
+  InstallResult,
+  Locale,
+  ScriptsState,
+  SettingsView,
+  ShellName,
+  ShellView,
+  Snapshot,
+  TerminalView,
+  UsageView,
+} from "./types";
 
 function param(name: string): string | null {
   return new URLSearchParams(window.location.search).get(name);
@@ -132,12 +149,124 @@ const scenarios: Record<string, () => GroupView[]> = {
   erro: () => [work(), personal()],
 };
 
+// MARK: - Integração de terminal
+
+const PROFILES: Record<ShellName, string> = {
+  powerShell7: "C:\\Users\\exemplo\\Documents\\PowerShell\\Microsoft.PowerShell_profile.ps1",
+  windowsPowerShell: "C:\\Users\\exemplo\\Documents\\WindowsPowerShell\\Microsoft.PowerShell_profile.ps1",
+  gitBash: "C:\\Users\\exemplo\\.bashrc",
+};
+
+/** Um shell com a integração no lugar; o cenário estraga o que quiser. */
+function shellView(shell: ShellName, partial: Partial<ShellView> = {}): ShellView {
+  const bash = shell === "gitBash";
+  return {
+    shell,
+    profile: PROFILES[shell],
+    loadsIntegration: true,
+    policy: bash ? null : "RemoteSigned",
+    policyBlocks: false,
+    chainsUserFunction: false,
+    bashLogin: bash ? "loads" : null,
+    bashLoginFile: bash ? ".bash_profile" : null,
+    ...partial,
+  };
+}
+
+/** As mesmas contas do `view` do Rust (`terminal.rs`). */
+function terminalView(scripts: ScriptsState, shells: ShellView[], routerFound = true): TerminalView {
+  return {
+    routerFound,
+    scripts,
+    shells,
+    developerMode: param("devmode") === "1",
+    fullyInstalled:
+      routerFound &&
+      scripts === "current" &&
+      shells.every((s) => s.loadsIntegration && !s.policyBlocks && s.bashLogin !== "ignores"),
+    blockedByPolicy: shells.some((s) => s.policyBlocks),
+    needsInstall: scripts !== "current" || shells.some((s) => !s.loadsIntegration),
+  };
+}
+
+const notLoaded = { loadsIntegration: false, policy: null };
+
+const terminals: Record<string, () => TerminalView> = {
+  ausente: () =>
+    terminalView("missing", [
+      shellView("powerShell7", notLoaded),
+      shellView("windowsPowerShell", notLoaded),
+      shellView("gitBash", { loadsIntegration: false }),
+    ]),
+  ok: () =>
+    terminalView("current", [shellView("powerShell7"), shellView("windowsPowerShell"), shellView("gitBash")]),
+  bloqueado: () =>
+    terminalView("current", [
+      shellView("powerShell7", { chainsUserFunction: true }),
+      shellView("windowsPowerShell", { policy: "Restricted", policyBlocks: true }),
+      shellView("gitBash"),
+    ]),
+  parcial: () =>
+    terminalView("current", [
+      shellView("powerShell7"),
+      shellView("windowsPowerShell", notLoaded),
+      shellView("gitBash", { bashLogin: "ignores" }),
+    ]),
+  velha: () =>
+    terminalView("stale", [shellView("powerShell7"), shellView("windowsPowerShell"), shellView("gitBash")]),
+  semrouter: () =>
+    terminalView(
+      "missing",
+      [shellView("powerShell7", notLoaded), shellView("windowsPowerShell", notLoaded)],
+      false,
+    ),
+};
+
+const scriptsParam = param("scripts") as ScriptsState | null;
+const terminalScenario =
+  param("terminal") ?? { missing: "ausente", stale: "velha", current: "ok" }[scriptsParam ?? "current"];
+let terminal: TerminalView = (terminals[terminalScenario] ?? terminals.ok!)();
+
+/** "Ativar": scripts no lugar e a linha em todo perfil. A política do 5.1
+ *  continua a que era — no Windows 11 cliente, `Restricted` de fábrica —, e o
+ *  `.bash_profile` que ignora o `.bashrc` também: instalar não os resolve. */
+function installTerminal(): boolean {
+  if (!terminal.routerFound) return false;
+  const factoryPolicy: Record<ShellName, string | null> = {
+    powerShell7: "RemoteSigned",
+    windowsPowerShell: "Restricted",
+    gitBash: null,
+  };
+  const shells = terminal.shells.map((s) => {
+    // Sem a linha no perfil a política nem era consultada; agora é.
+    const policy = s.policy ?? factoryPolicy[s.shell];
+    return { ...s, loadsIntegration: true, policy, policyBlocks: policy === "Restricted" };
+  });
+  terminal = terminalView("current", shells, true);
+  return param("install") !== "falha";
+}
+
+// MARK: - Ajustes
+
+const settings: SettingsView = {
+  autostart: false,
+  autostartFailure: null,
+  showInTaskbar: param("taskbar") === "1",
+  version: "0.1.0-mock",
+};
+
+/** A mesma lista do `allowed_url` do Rust — endereço fora dela é defeito do front. */
+function allowedUrl(url: string): boolean {
+  const exact = ["ms-settings:developers", "ms-settings:taskbar", "https://claude.ai/logout"];
+  return exact.includes(url) || ["https://claude.com/", "https://platform.claude.com/"].some((p) => url.startsWith(p));
+}
+
 const scenario = param("state") ?? "uso";
 const state: Snapshot = {
   groups: (scenarios[scenario] ?? scenarios.uso!)(),
   measuringGroup: null,
   lastError: scenario === "erro" ? { code: "probeFailures", count: 2 } : null,
-  scripts: (param("scripts") as ScriptsState | null) ?? "current",
+  scripts: terminal.routerFound ? terminal.scripts : "missing",
 };
 
 // MARK: - Eventos (o `snapshot-changed` do backend)
@@ -236,6 +365,52 @@ const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
       changed();
     }, 2500);
     return changed();
+  },
+  // O quadro de verdade abre um PowerShell por edição: leva um instante.
+  terminal_report: async () => {
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    return structuredClone(terminal);
+  },
+  install_integration: async (): Promise<InstallResult> => {
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    const ok = installTerminal();
+    state.scripts = terminal.routerFound ? "current" : "missing";
+    state.lastError = !terminal.routerFound
+      ? { code: "routerPathUnknown" }
+      : ok
+        ? null
+        : { code: "integrationFailed", detail: `${PROFILES.windowsPowerShell}: Acesso negado. (os error 5)` };
+    return { ok, snapshot: changed(), report: structuredClone(terminal) };
+  },
+  allow_profiles_for: async (args) => {
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    if (param("diretiva") !== "1") {
+      const shells = terminal.shells.map((s) =>
+        s.shell === args.shell ? { ...s, policy: "RemoteSigned", policyBlocks: false } : s,
+      );
+      terminal = terminalView(terminal.scripts, shells, terminal.routerFound);
+    }
+    return structuredClone(terminal);
+  },
+  get_settings: () => ({ ...settings }),
+  set_autostart: (args) => {
+    if (args.on && param("autostart") === "falha") {
+      settings.autostart = false;
+      settings.autostartFailure = "Acesso negado. (os error 5)";
+    } else {
+      settings.autostart = Boolean(args.on);
+      settings.autostartFailure = null;
+    }
+    return { ...settings };
+  },
+  set_show_in_taskbar: (args) => {
+    settings.showInTaskbar = Boolean(args.on);
+    return { ...settings };
+  },
+  open_url: (args) => {
+    const url = String(args.url);
+    if (!allowedUrl(url)) throw new Error(`mock: endereço fora da lista: ${url}`);
+    console.info("mock: abrir", url);
   },
 };
 

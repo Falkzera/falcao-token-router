@@ -7,7 +7,16 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { mockInvoke, mockListen } from "./mock";
-import type { AppInfo, HomeTab, Snapshot, View } from "./types";
+import type {
+  AppInfo,
+  HomeTab,
+  InstallResult,
+  SettingsView,
+  ShellName,
+  Snapshot,
+  TerminalView,
+  View,
+} from "./types";
 
 /** Dentro do WebView do Tauri? (O Tauri injeta este objeto antes da página.) */
 export const insideTauri: boolean =
@@ -83,6 +92,24 @@ export const measureGroup = (groupId: string) => call<Snapshot>("measure_group",
 /** O login que o `~\.claude` tem e que o router não conhece (ou `null`). */
 export const foreignDefaultLogin = () => call<string | null>("foreign_default_login");
 export const copyText = (text: string) => call<void>("copy_text", { text });
+
+// MARK: - Integração de terminal
+
+/** O quadro por shell — lento (consulta a política de cada PowerShell). */
+export const terminalReport = () => call<TerminalView>("terminal_report");
+/** "Ativar"/"Reinstalar": idempotente; `ok` diz se tudo foi gravado. */
+export const installIntegration = () => call<InstallResult>("install_integration");
+/** RemoteSigned no escopo do usuário, na edição que bloqueava (com confirmação). */
+export const allowProfilesFor = (shell: ShellName) =>
+  call<TerminalView>("allow_profiles_for", { shell });
+
+// MARK: - Ajustes
+
+export const getSettings = () => call<SettingsView>("get_settings");
+export const setAutostart = (on: boolean) => call<SettingsView>("set_autostart", { on });
+export const setShowInTaskbar = (on: boolean) => call<SettingsView>("set_show_in_taskbar", { on });
+/** Só os endereços da lista do backend (Configurações do Windows, logout, login). */
+export const openUrl = (url: string) => call<void>("open_url", { url });
 
 /** A bandeja pediu outra aba com a janela já aberta. */
 export function onNavigate(handler: (tab: HomeTab) => void): Promise<UnlistenFn> {

@@ -55,6 +55,10 @@
   }
   .text {
     flex: 1;
+    /* Um caminho do Windows é uma "palavra" só: sem isto ele empurrava o
+       "Dispensar" para fora da janela. */
+    min-width: 0;
+    overflow-wrap: anywhere;
     color: var(--text);
   }
   .dismiss {

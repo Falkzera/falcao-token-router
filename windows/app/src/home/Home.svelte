@@ -7,13 +7,17 @@
   import { t } from "../lib/i18n";
   import type { AppInfo, HomeTab } from "../lib/types";
   import GroupsView from "./GroupsView.svelte";
+  import SettingsView from "./SettingsView.svelte";
 
   let { info }: { info: AppInfo } = $props();
 
-  let tab = $state<HomeTab>("groups");
+  // A aba da abertura (a bandeja pode ter pedido Ajustes) vale ANTES do
+  // primeiro desenho: montar Grupos por um instante pediria o quadro do
+  // terminal — um PowerShell por edição — à toa.
+  // svelte-ignore state_referenced_locally
+  let tab = $state<HomeTab>(info.initialTab);
 
   onMount(() => {
-    tab = info.initialTab;
     // A bandeja pode pedir outra aba com a janela já aberta.
     const unlisten = onNavigate((next) => (tab = next));
     return () => {
@@ -37,7 +41,7 @@
       <!-- O login (adicionar e relogar) entra na fatia 5.5. -->
       <GroupsView onAddAccount={() => {}} onRelogin={() => {}} />
     {:else}
-      <p class="caption">{t("settings.version.format", info.version)}</p>
+      <SettingsView />
     {/if}
   </section>
 </div>
@@ -71,10 +75,5 @@
   .page {
     flex: 1;
     min-height: 0;
-  }
-  .caption {
-    padding: 16px;
-    color: var(--text-secondary);
-    font-size: var(--font-caption);
   }
 </style>

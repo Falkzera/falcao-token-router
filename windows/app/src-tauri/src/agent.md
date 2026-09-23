@@ -2,10 +2,13 @@
 
 ## Arquivos
 - `main.rs` — só chama `run()`. Sem console em release (o app vive na bandeja).
-- `lib.rs` — o `Builder`: instância única (1º plugin; a 2ª execução abre a janela), o estado, a
-  cura da integração na subida (`attach_router`), a bandeja, o laço, a janela `home` (520×620
-  fixa; abre sozinha só na 1ª execução, sem grupo) e os comandos (`app_info`). Fechar a janela
-  não encerra o app — só o "Sair" (saída com código).
+- `lib.rs` — o `Builder`: instância única (1º plugin; a 2ª execução abre a janela, e a restaura
+  se estiver minimizada), o estado, a cura da integração na subida (`attach_router`), a bandeja,
+  o laço, a janela `home` (520×620 fixa; abre sozinha na subida sem grupo nenhum OU com "Mostrar
+  na barra de tarefas" — `AppSettings::present_at_launch`, ≙ `presentAtLaunch` do macOS) e os
+  comandos (`app_info`). Fechar a janela não encerra o app — só o "Sair" (saída com código); com
+  "Mostrar na barra de tarefas", fechar só MINIMIZA (`CloseRequested` → `prevent_close`), e a
+  preferência é lida na hora do fechar.
 - `state.rs` — `AppState`: o `RouterConfigStore` (montado como na CLI: credencial em arquivo com a
   guarda do perfil padrão) atrás de um `Mutex` que sobrevive a envenenamento, o idioma, a home e
   a aba pedida para a próxima abertura da janela.
@@ -27,12 +30,13 @@
   da thread da interface — consulta a política de cada PowerShell), "Ativar/Reinstalar"
   (`install_integration`, devolve `ok` de verdade: o "Instalada ✓" do macOS aparecia mesmo com
   falha) e a correção consentida da política (`allow_profiles_for`: RemoteSigned em CurrentUser,
-  conferido de novo depois). Front ainda não usa (5.4b parte 2).
-- `settings.rs` — ajustes do app em `%APPDATA%\com.synqo.falcao-token-router\settings.json`
-  (`show_in_taskbar`); "abrir no login" pelo plugin de autostart, SEMPRE relido do sistema, com o
-  motivo da recusa; `open_url` só para a lista (ms-settings:developers/taskbar, logout do
-  claude.ai, hosts do login oficial — testado). Pendente: aplicar `show_in_taskbar` (abrir a
-  janela na subida e fechar = minimizar) e o front da aba Ajustes.
+  conferido de novo depois). `needs_install` diz se "Ativar" resolve algo (scripts ausentes/velhos
+  ou shell sem a linha — a política e o `.bash_profile` que ignora o `.bashrc` têm correção
+  própria); `bash_login_file` nomeia o perfil de login do Git Bash. Testado (`view`).
+- `settings.rs` — ajustes do app em `<Roaming>\com.synqo.falcao-token-router\settings.json`
+  (`show_in_taskbar`; ilegível = padrão); "abrir no login" pelo plugin de autostart, SEMPRE relido
+  do sistema, com o motivo da recusa; `open_url` só para a lista (ms-settings:developers/taskbar,
+  logout do claude.ai, hosts do login oficial — testado). `SettingsStore::at` para os testes.
 - `snapshot.rs` — o quadro que as janelas leem: grupos e contas na ordem do usuário, conta
   ativa, uso com janela/origem/idade e os % PRONTOS (`UsagePercent` do núcleo), sessões (total
   e engajadas), contas exclusivas (para a confirmação de apagar grupo), o comando do terminal e
@@ -57,8 +61,17 @@
 - 2ª execução sai com 0 e abre a janela na 1ª; fechar a janela deixa o app vivo.
 - Ícone novo cai no excedente (`^`) da bandeja — daí a dica de fixar e a opção da barra de tarefas.
 
+## Verificado à mão (23/09/2026, sandbox)
+- "Mostrar na barra de tarefas" ligado: a janela abre na subida mesmo com grupos; `WM_CLOSE` (o X)
+  a deixa minimizada e o processo vivo; a 2ª execução a restaura. Desligado: nada abre na subida
+  (há grupos), a 2ª execução abre, `WM_CLOSE` a destrói e o app segue na bandeja.
+- O `USERPROFILE` falso do sandbox ISOLA a Roaming/Local (o registro as guarda como
+  `%USERPROFILE%\AppData\…`, expandido com o ambiente do processo): o `settings.json` do app de
+  teste mora na home falsa. NÃO isola a Documentos redirecionada ao OneDrive (caminho absoluto —
+  os `$PROFILE` são os reais) nem o HKCU (o autostart escreve no `Run` real).
+
 ## Pendências (próximas fatias)
-- 5.4 comandos da janela (grupos, contas, integração, ajustes); 5.5 login por ConPTY.
+- 5.5 login por ConPTY.
 - Conferir à mão o flyout no clique real da bandeja (posição com a barra embaixo e no excedente
   do Windows 11, sumir ao perder o foco, clique que fecha não reabre) — o clique no ícone não
   se automatiza sem mover o mouse do usuário.

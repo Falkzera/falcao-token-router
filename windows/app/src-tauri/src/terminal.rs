@@ -60,6 +60,10 @@ pub struct ShellView {
     pub policy_blocks: bool,
     pub chains_user_function: bool,
     pub bash_login: Option<BashLoginView>,
+    /// O nome do perfil de login do Git Bash (`.bash_profile`, `.bash_login`
+    /// ou `.profile`) — quando ele ignora o `.bashrc`, é nele que o usuário
+    /// acrescenta a linha, e a tela precisa dizer qual.
+    pub bash_login_file: Option<String>,
 }
 
 #[derive(Clone, PartialEq, Debug, Serialize)]
@@ -72,6 +76,21 @@ pub struct TerminalView {
     pub developer_mode: bool,
     pub fully_installed: bool,
     pub blocked_by_policy: bool,
+    /// "Ativar" resolve algo: scripts ausentes ou citando outro router, ou um
+    /// shell sem a linha no perfil. A política que bloqueia e o `.bash_profile`
+    /// que ignora o `.bashrc` NÃO se resolvem instalando — têm correção
+    /// própria, e o botão não pode prometer o que não faz.
+    pub needs_install: bool,
+}
+
+/// O nome do arquivo de login do Git Bash que existe (o que ele lê ao abrir).
+fn login_file_name(login: &BashLogin) -> Option<String> {
+    match login {
+        BashLogin::Missing => None,
+        BashLogin::Loads(path) | BashLogin::Ignores(path) => path
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned()),
+    }
 }
 
 fn view(report: &TerminalReport, router_found: bool) -> TerminalView {
@@ -97,11 +116,14 @@ fn view(report: &TerminalReport, router_found: bool) -> TerminalView {
                     BashLogin::Loads(_) => BashLoginView::Loads,
                     BashLogin::Ignores(_) => BashLoginView::Ignores,
                 }),
+                bash_login_file: s.bash_login.as_ref().and_then(login_file_name),
             })
             .collect(),
         developer_mode: report.developer_mode,
         fully_installed: router_found && report.fully_installed(),
         blocked_by_policy: report.blocked_by_policy(),
+        needs_install: report.scripts != ScriptsState::Current
+            || report.shells.iter().any(|s| !s.loads_integration),
     }
 }
 
@@ -196,4 +218,114 @@ pub async fn allow_profiles_for(app: AppHandle, shell: ShellName) -> Result<Term
     })
     .await
     .map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    use router_core::engine::terminal_report::ShellReport;
+
+    fn shell(kind: ShellKind, loads: bool) -> ShellReport {
+        ShellReport {
+            kind,
+            profile: PathBuf::from(
+                r"C:\Users\exemplo\Documents\PowerShell\Microsoft.PowerShell_profile.ps1",
+            ),
+            loads_integration: loads,
+            policy: None,
+            policy_blocks: false,
+            chains_user_function: false,
+            bash_login: None,
+        }
+    }
+
+    fn report(scripts: ScriptsState, shells: Vec<ShellReport>) -> TerminalReport {
+        TerminalReport {
+            scripts,
+            shells,
+            developer_mode: false,
+        }
+    }
+
+    fn both_powershells(loads: bool) -> Vec<ShellReport> {
+        vec![
+            shell(ShellKind::PowerShell7, loads),
+            shell(ShellKind::WindowsPowerShell, loads),
+        ]
+    }
+
+    /// "Ativar" só é oferecido quando instalar resolve algo: scripts ausentes
+    /// ou citando outro router, ou um shell sem a linha no perfil.
+    #[test]
+    fn activate_is_offered_when_installing_fixes_something() {
+        assert!(
+            view(
+                &report(ScriptsState::Missing, both_powershells(false)),
+                true
+            )
+            .needs_install
+        );
+        assert!(view(&report(ScriptsState::Stale, both_powershells(true)), true).needs_install);
+        let one_missing = vec![
+            shell(ShellKind::PowerShell7, true),
+            shell(ShellKind::WindowsPowerShell, false),
+        ];
+        assert!(view(&report(ScriptsState::Current, one_missing), true).needs_install);
+
+        let installed = view(&report(ScriptsState::Current, both_powershells(true)), true);
+        assert!(!installed.needs_install);
+        assert!(installed.fully_installed);
+    }
+
+    /// A política que bloqueia o perfil tem correção própria ("Permitir"):
+    /// reinstalar não a resolve, e a integração não está pronta.
+    #[test]
+    fn a_blocking_policy_is_not_fixed_by_installing() {
+        let mut shells = both_powershells(true);
+        shells[1].policy = Some("Restricted".to_string());
+        shells[1].policy_blocks = true;
+        let v = view(&report(ScriptsState::Current, shells), true);
+        assert!(!v.needs_install);
+        assert!(!v.fully_installed);
+        assert!(v.blocked_by_policy);
+        assert_eq!(v.shells[1].policy.as_deref(), Some("Restricted"));
+    }
+
+    /// Git Bash cujo perfil de login ignora o `.bashrc`: a tela diz QUAL
+    /// arquivo precisa da linha (pode ser `.bash_profile`, `.bash_login` ou
+    /// `.profile`), e não conta como pronto.
+    #[test]
+    fn the_bash_login_file_is_named() {
+        let mut bash = shell(ShellKind::GitBash, true);
+        bash.profile = PathBuf::from(r"C:\Users\exemplo\.bashrc");
+        bash.bash_login = Some(BashLogin::Ignores(PathBuf::from(
+            r"C:\Users\exemplo\.bash_login",
+        )));
+        let v = view(&report(ScriptsState::Current, vec![bash.clone()]), true);
+        assert_eq!(v.shells[0].bash_login, Some(BashLoginView::Ignores));
+        assert_eq!(v.shells[0].bash_login_file.as_deref(), Some(".bash_login"));
+        assert!(!v.fully_installed);
+        assert!(!v.needs_install, "a linha no .bash_login é do usuário");
+
+        // Sem perfil de login o próprio Git Bash cria um que carrega o
+        // `.bashrc` (com um aviso) — funciona; não há o que nomear.
+        bash.bash_login = Some(BashLogin::Missing);
+        let v = view(&report(ScriptsState::Current, vec![bash]), true);
+        assert_eq!(v.shells[0].bash_login_file, None);
+        assert!(v.fully_installed);
+    }
+
+    /// Sem saber onde está o `router.exe` não há integração, diga o disco o que
+    /// disser.
+    #[test]
+    fn without_the_router_nothing_counts_as_installed() {
+        let v = view(
+            &report(ScriptsState::Current, both_powershells(true)),
+            false,
+        );
+        assert!(!v.router_found);
+        assert!(!v.fully_installed);
+    }
 }

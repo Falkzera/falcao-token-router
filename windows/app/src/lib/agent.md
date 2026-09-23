@@ -2,12 +2,18 @@
 
 ## Arquivos
 - `api.ts` — as chamadas ao backend (`app_info`, `get_snapshot`, `fit_flyout`, `open_home`,
-  `quit_app`) e os eventos (`navigate`, `snapshot-changed`). Dentro do Tauri, `invoke`/`listen`;
-  no navegador, o backend simulado. `currentView()` pelo rótulo da janela (ou `?view=`);
-  `initialSelection()` abre o cartão de uma conta só no navegador (`?select=`).
+  `quit_app`, as ações de grupos e contas, a integração de terminal — `terminal_report`,
+  `install_integration`, `allow_profiles_for` — e os ajustes — `get_settings`, `set_autostart`,
+  `set_show_in_taskbar`, `open_url`) e os eventos (`navigate`, `snapshot-changed`). Dentro do
+  Tauri, `invoke`/`listen`; no navegador, o backend simulado. `currentView()` pelo rótulo da
+  janela (ou `?view=`); `initialSelection()` abre o cartão de uma conta só no navegador
+  (`?select=`).
 - `mock.ts` — o backend simulado: os mesmos comandos, com cenário, idioma, aba e seleção pela
-  URL (`?view=flyout&state=uso|vazio|pronta|critico|erro&lang=pt-BR&select=A2`). Dados só de
-  exemplo (`@exemplo.com`, Acme).
+  URL (`?view=flyout&state=uso|vazio|pronta|critico|erro&lang=pt-BR&select=A2`), a integração
+  (`&terminal=ausente|ok|bloqueado|parcial|velha|semrouter&devmode=1&install=falha&diretiva=1`,
+  com as mesmas contas do `view` do Rust e o 5.1 em `Restricted` de fábrica depois do Ativar) e
+  os ajustes (`&autostart=falha&taskbar=1`; `open_url` recusa o que o Rust recusa). Dados só de
+  exemplo (`@exemplo.com`, Acme, `C:\Users\exemplo`).
 - `types.ts` — espelho dos `#[derive(Serialize)]` do Rust (camelCase), inclusive o `Snapshot`.
 - `i18n.ts` — `t(chave, …args)`, `format` (`%@`, `%d`, `%1$@`, `%%`, como no macOS),
   `setLocale` (uma vez, na subida).
@@ -15,11 +21,13 @@
   (0,66/0,90) e os limiares de idade (1 h esmaece, 12 h relógio).
 - `clock.svelte.ts` — o relógio da tela, andando a cada 30 s (idades não congelam na tela aberta).
 - `Icon.svelte` — os ícones do app em SVG (grupos, ajustes, fechar, relógio, sensor, sonda,
-  terminal, copiar, ✓, lápis, +).
+  terminal, copiar, ✓, lápis, +, aviso, informação).
 - `Modal.svelte` — o `<dialog>` nativo (`showModal`): foco preso, Esc fecha, clicar fora NÃO fecha
   (confirmação destrutiva não pode sumir por clique errado).
 - `Menu.svelte` — o menu ⋯ (fecha ao escolher, ao clicar fora e no Esc; itens destrutivos em
   vermelho, desabilitados em cinza).
-- `Switch.svelte` — o interruptor do Windows 11. `Rich.svelte` — crase do catálogo vira `<code>`.
+- `Switch.svelte` — o interruptor do Windows 11, CONTROLADO: mostra o que o backend confirmar,
+  não o clique (um "Abrir no login" recusado volta a desligado). `Rich.svelte` — crase do
+  catálogo vira `<code>`.
 - O backend simulado registra as chamadas em `window.__mockCalls` (para a conferência contar,
   por exemplo, que o limiar grava UMA vez).

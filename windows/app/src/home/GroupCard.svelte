@@ -10,21 +10,22 @@
   import { t } from "../lib/i18n";
   import Menu from "../lib/Menu.svelte";
   import Switch from "../lib/Switch.svelte";
-  import type { AccountView, GroupView, ScriptsState, Snapshot } from "../lib/types";
+  import type { AccountView, GroupView, IntegrationState, Snapshot } from "../lib/types";
   import SessionsBadge from "../panel/SessionsBadge.svelte";
   import AccountItem from "./AccountItem.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
 
   let {
     group,
-    scripts,
+    integration,
     measuringGroup,
     onSnapshot,
     onAddAccount,
     onRelogin,
   }: {
     group: GroupView;
-    scripts: ScriptsState;
+    /** O comando só funciona com a integração de pé — o aviso leva até ela. */
+    integration: IntegrationState;
     measuringGroup: string | null;
     onSnapshot: (snapshot: Snapshot) => void;
     onAddAccount: () => void;
@@ -196,8 +197,15 @@
     <button class="icon" title={t("groups.command.copy.help")} aria-label={t("groups.command.copy.help")} onclick={copyCommand}>
       <Icon name={copied ? "check" : "copy"} size={13} />
     </button>
-    {#if scripts !== "current"}
-      <span class="needs-install">{t("groups.command.needsInstall")}</span>
+    {#if integration !== "ok"}
+      <!-- A seta cumpre o que promete: leva à seção, no fim da aba. -->
+      <button
+        class="needs-install"
+        onclick={() =>
+          document.getElementById("terminal-integration")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+      >
+        {integration === "install" ? t("groups.command.needsInstall") : t("groups.command.needsAttention")}
+      </button>
     {/if}
   </div>
 
@@ -365,8 +373,16 @@
     user-select: text;
   }
   .needs-install {
+    padding: 0;
+    border: none;
+    background: none;
+    font: inherit;
     font-size: var(--font-small);
     color: var(--warning-text);
+    cursor: pointer;
+  }
+  .needs-install:hover {
+    text-decoration: underline;
   }
   .controls {
     display: flex;

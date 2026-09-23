@@ -22,8 +22,11 @@ use std::path::Path;
 
 use router_core::engine::shell_integration::ShellTargets;
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, RunEvent, State, WebviewUrl, WebviewWindowBuilder};
+use tauri::{
+    AppHandle, Emitter, Manager, RunEvent, State, WebviewUrl, WebviewWindowBuilder, WindowEvent,
+};
 
+use settings::SettingsStore;
 use state::{AppState, HomeTab};
 
 /// O rótulo da janela única (Grupos / Ajustes), num lugar só: é escrito aqui e
@@ -105,6 +108,19 @@ pub fn show_home(app: &AppHandle, tab: HomeTab) {
         .maximizable(false)
         .build();
     if let Ok(window) = built {
+        let handle = window.clone();
+        window.on_window_event(move |event| {
+            // Com "Mostrar na barra de tarefas", a janela É a porta do app
+            // (≙ o ícone do Dock): fechar só a minimiza, e o botão da barra
+            // fica — dá para fixá-lo. A preferência é lida na hora do fechar,
+            // então ligar/desligar vale sem reabrir a janela.
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                if handle.state::<SettingsStore>().get().show_in_taskbar {
+                    api.prevent_close();
+                    let _ = handle.minimize();
+                }
+            }
+        });
         let _ = window.set_focus();
     }
 }
@@ -136,16 +152,19 @@ pub fn run() {
         .setup(|app| {
             let state = AppState::open();
             attach_router(&state);
-            // A janela abre sozinha só quando não há o que mostrar na bandeja
-            // ainda (1ª execução, nenhum grupo) — decidido uma vez, na subida.
-            let first_run = state.store().config().groups.is_empty();
+            let settings = SettingsStore::open(app.handle());
+            // Decidido uma vez, na subida: sem grupo nenhum (a bandeja não tem
+            // o que mostrar) ou com o app na barra de tarefas.
+            let present = settings
+                .get()
+                .present_at_launch(state.store().config().groups.is_empty());
             app.manage(state);
-            app.manage(settings::SettingsStore::open(app.handle()));
+            app.manage(settings);
             app.manage(flyout::FlyoutState::default());
             flyout::create(app.handle())?;
             tray::create(app.handle())?;
             rotation_loop::start(app.handle().clone());
-            if first_run {
+            if present {
                 show_home(app.handle(), HomeTab::Groups);
             }
             Ok(())
