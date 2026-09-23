@@ -11,8 +11,12 @@ use chrono::{DateTime, SecondsFormat, Utc};
 use router_core::engine::group_usage::UsageOrigin;
 use router_core::engine::rotation_engine::RotationError;
 use router_core::engine::router_config_store::{RouterConfigStore, StoreError};
+use router_core::engine::shell_integration::StatusShell;
+use router_core::engine::terminal_report::{scripts_state, ScriptsState};
 use router_core::{AccountGroup, AccountUsage, Id, UsagePercent, UsageWindow};
 use serde::Serialize;
+
+use crate::system;
 
 fn iso(date: DateTime<Utc>) -> String {
     date.to_rfc3339_opts(SecondsFormat::Secs, true)
@@ -148,6 +152,17 @@ pub enum ErrorView {
     ProbeFailures { count: usize },
 }
 
+/// Os scripts `claude` da integração de terminal — o estado BARATO (dois
+/// arquivos lidos); o quadro por shell, que consulta a política de execução de
+/// cada PowerShell, é pedido à parte.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Scripts {
+    Missing,
+    Current,
+    Stale,
+}
+
 #[derive(Clone, PartialEq, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Snapshot {
@@ -155,6 +170,25 @@ pub struct Snapshot {
     /// O grupo que está sendo medido pela sonda agora (spinner no botão).
     pub measuring_group: Option<String>,
     pub last_error: Option<ErrorView>,
+    pub scripts: Scripts,
+}
+
+/// Os scripts citam o `router.exe` deste app? Sem saber onde ele está, é
+/// como se não houvesse integração.
+fn scripts(store: &RouterConfigStore, with_bash: bool) -> Scripts {
+    let Some(router) = store.router_path() else {
+        return Scripts::Missing;
+    };
+    match scripts_state(
+        &store.powershell_script_path(),
+        &store.bash_script_path(),
+        router,
+        with_bash,
+    ) {
+        ScriptsState::Missing => Scripts::Missing,
+        ScriptsState::Current => Scripts::Current,
+        ScriptsState::Stale => Scripts::Stale,
+    }
 }
 
 /// `claude trabalho`, ou `claude "Meu Grupo"` com espaço (a função casa sem
@@ -241,6 +275,19 @@ fn group_view(store: &RouterConfigStore, group: &AccountGroup) -> GroupView {
 }
 
 pub fn build(store: &RouterConfigStore, measuring_group: Option<Id>) -> Snapshot {
+    build_with(
+        store,
+        measuring_group,
+        system::status_shell() == StatusShell::Bash,
+    )
+}
+
+/// O mesmo, dizendo se há Git Bash (o `shell.sh` só conta com ele).
+pub fn build_with(
+    store: &RouterConfigStore,
+    measuring_group: Option<Id>,
+    with_bash: bool,
+) -> Snapshot {
     Snapshot {
         groups: store
             .config()
@@ -250,6 +297,7 @@ pub fn build(store: &RouterConfigStore, measuring_group: Option<Id>) -> Snapshot
             .collect(),
         measuring_group: measuring_group.map(|id| id.to_string()),
         last_error: store.last_error().map(|e| error_view(e, store)),
+        scripts: scripts(store, with_bash),
     }
 }
 
@@ -329,7 +377,7 @@ mod tests {
     #[test]
     fn groups_and_accounts_keep_the_user_order_with_the_active_one_marked() {
         let tmp = tempfile::tempdir().unwrap();
-        let snapshot = build(&sandbox(tmp.path()), None);
+        let snapshot = build_with(&sandbox(tmp.path()), None, false);
 
         let names: Vec<&str> = snapshot.groups.iter().map(|g| g.name.as_str()).collect();
         assert_eq!(names, ["Trabalho", "Meu Pessoal"]);
@@ -349,7 +397,7 @@ mod tests {
     #[test]
     fn percentages_come_ready_from_the_core() {
         let tmp = tempfile::tempdir().unwrap();
-        let snapshot = build(&sandbox(tmp.path()), None);
+        let snapshot = build_with(&sandbox(tmp.path()), None, false);
         let usage = snapshot.groups[0].accounts[1].usage.as_ref().unwrap();
 
         assert_eq!(usage.bound, Bound::SevenDay);
@@ -368,9 +416,35 @@ mod tests {
     #[test]
     fn the_delete_count_is_of_exclusive_accounts() {
         let tmp = tempfile::tempdir().unwrap();
-        let snapshot = build(&sandbox(tmp.path()), None);
+        let snapshot = build_with(&sandbox(tmp.path()), None, false);
         assert_eq!(snapshot.groups[0].exclusive_count, 1, "equipe-2");
         assert_eq!(snapshot.groups[1].exclusive_count, 1, "conta1");
+    }
+
+    /// A integração no quadro: sem scripts, `missing`; citando este router,
+    /// `current`; citando outro (app movido), `stale`.
+    #[test]
+    fn the_snapshot_says_whether_the_scripts_point_to_this_router() {
+        use router_core::engine::shell_integration::ShellIntegration;
+
+        let tmp = tempfile::tempdir().unwrap();
+        let mut store = sandbox(tmp.path());
+        assert_eq!(build_with(&store, None, false).scripts, Scripts::Missing);
+
+        let router = tmp.path().join("instalado").join("router.exe");
+        store.set_router_path(Some(router.clone()));
+        assert_eq!(build_with(&store, None, false).scripts, Scripts::Missing);
+
+        ShellIntegration::write_scripts(
+            &router,
+            &store.powershell_script_path(),
+            &store.bash_script_path(),
+        )
+        .unwrap();
+        assert_eq!(build_with(&store, None, false).scripts, Scripts::Current);
+
+        store.set_router_path(Some(tmp.path().join("movido").join("router.exe")));
+        assert_eq!(build_with(&store, None, false).scripts, Scripts::Stale);
     }
 
     #[test]
@@ -385,14 +459,14 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let mut store = sandbox(tmp.path());
         store.measure_unavailable();
-        let json = serde_json::to_value(build(&store, None)).unwrap();
+        let json = serde_json::to_value(build_with(&store, None, false)).unwrap();
         assert_eq!(json["lastError"], json!({"code": "probeUnavailable"}));
 
         store.finish_measure(router_core::engine::router_config_store::MeasureSummary {
             measured: 1,
             failed: 2,
         });
-        let json = serde_json::to_value(build(&store, None)).unwrap();
+        let json = serde_json::to_value(build_with(&store, None, false)).unwrap();
         assert_eq!(
             json["lastError"],
             json!({"code": "probeFailures", "count": 2})

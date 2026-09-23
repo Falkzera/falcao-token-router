@@ -18,6 +18,11 @@
   barra embaixo, abaixo dela em cima, ao lado nas laterais, acima do clique quando o ícone está
   no excedente, sempre dentro da área útil do monitor; a altura segue o conteúdo. Abrir relê o
   quadro (como o painel do macOS).
+- `commands.rs` — os comandos da janela de Grupos: cada ação muda o store (sob a trava), redesenha
+  a bandeja, emite `snapshot-changed` e devolve o quadro novo. "Medir contas" roda a sonda numa
+  thread FORA da trava (planeja → roda → publica), uma medição por vez, com o spinner no quadro.
+  Grupo novo com a escolha de padrão (`add_group_with`); login estranho no `~\.claude`
+  (`foreign_default_login`); dispensar o erro. `copy_text` (plugin clipboard) mora no `lib.rs`.
 - `snapshot.rs` — o quadro que as janelas leem: grupos e contas na ordem do usuário, conta
   ativa, uso com janela/origem/idade e os % PRONTOS (`UsagePercent` do núcleo), sessões (total
   e engajadas), contas exclusivas (para a confirmação de apagar grupo), o comando do terminal e

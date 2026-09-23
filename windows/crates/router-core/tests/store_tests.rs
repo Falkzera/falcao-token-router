@@ -897,3 +897,17 @@ fn a_home_outside_the_router_base_is_never_discarded() {
     assert!(!env.store.discard_pending_home(&outside, Id::new()));
     assert!(outside_dir.exists());
 }
+
+/// O aviso de erro da tela pode ser dispensado: o erro some do store, e só
+/// volta com uma nova falha.
+#[test]
+fn the_last_error_can_be_dismissed() {
+    use router_core::engine::router_config_store::StoreError;
+
+    let mut env = make_store();
+    env.store.measure_unavailable();
+    assert_eq!(env.store.last_error(), Some(&StoreError::ProbeUnavailable));
+
+    env.store.clear_last_error();
+    assert_eq!(env.store.last_error(), None);
+}

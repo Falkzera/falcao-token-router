@@ -6,6 +6,7 @@
   import { onNavigate } from "../lib/api";
   import { t } from "../lib/i18n";
   import type { AppInfo, HomeTab } from "../lib/types";
+  import GroupsView from "./GroupsView.svelte";
 
   let { info }: { info: AppInfo } = $props();
 
@@ -33,7 +34,8 @@
 
   <section class="page" role="tabpanel">
     {#if tab === "groups"}
-      <p class="caption">{t("groups.subtitle")}</p>
+      <!-- O login (adicionar e relogar) entra na fatia 5.5. -->
+      <GroupsView onAddAccount={() => {}} onRelogin={() => {}} />
     {:else}
       <p class="caption">{t("settings.version.format", info.version)}</p>
     {/if}
@@ -49,7 +51,7 @@
   .tabs {
     display: flex;
     gap: 4px;
-    padding: 12px 16px 0;
+    padding: 8px 16px 0;
     border-bottom: 1px solid var(--border);
   }
   .tabs button {
@@ -68,10 +70,10 @@
   }
   .page {
     flex: 1;
-    overflow: auto;
-    padding: 16px;
+    min-height: 0;
   }
   .caption {
+    padding: 16px;
     color: var(--text-secondary);
     font-size: var(--font-caption);
   }

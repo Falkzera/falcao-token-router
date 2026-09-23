@@ -2,7 +2,18 @@
   // Os ícones do app, desenhados aqui (traço de 1,25 em 16×16, `currentColor`)
   // — os SF Symbols do macOS não existem no Windows e uma fonte de ícones
   // inteira seria dependência para meia dúzia de desenhos.
-  export type IconName = "stack" | "gear" | "close" | "clockAlert" | "sensor" | "probe";
+  export type IconName =
+    | "stack"
+    | "gear"
+    | "close"
+    | "clockAlert"
+    | "sensor"
+    | "probe"
+    | "terminal"
+    | "copy"
+    | "check"
+    | "pencil"
+    | "plus";
 </script>
 
 <script lang="ts">
@@ -44,6 +55,18 @@
     <path d="M2.5 11.5a5.5 5.5 0 1 1 11 0" />
     <path d="M8 11.5l2.4-3.4" />
     <circle cx="8" cy="11.5" r="1" fill="currentColor" stroke="none" />
+  {:else if name === "terminal"}
+    <rect x="1.75" y="2.75" width="12.5" height="10.5" rx="1.5" />
+    <path d="M4.5 6.25l2 1.75-2 1.75M8 10h3" />
+  {:else if name === "copy"}
+    <rect x="5.25" y="5.25" width="8" height="8.5" rx="1.25" />
+    <path d="M10.75 5.25V3.5a1.25 1.25 0 0 0-1.25-1.25H4a1.25 1.25 0 0 0-1.25 1.25v6.25A1.25 1.25 0 0 0 4 11h1.25" />
+  {:else if name === "check"}
+    <path d="M3 8.5l3.25 3.25L13 5" />
+  {:else if name === "pencil"}
+    <path d="M10.75 2.75l2.5 2.5-7.5 7.5-3 .5.5-3z" />
+  {:else if name === "plus"}
+    <path d="M8 3v10M3 8h10" />
   {/if}
 </svg>
 

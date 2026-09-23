@@ -14,4 +14,12 @@
 - `format.ts` — duração ("1h 12m"), hora do reset, "reseta 13:20 · em 4h 6m", semáforo
   (0,66/0,90) e os limiares de idade (1 h esmaece, 12 h relógio).
 - `clock.svelte.ts` — o relógio da tela, andando a cada 30 s (idades não congelam na tela aberta).
-- `Icon.svelte` — os ícones do app em SVG (grupos, ajustes, fechar, relógio, sensor, sonda).
+- `Icon.svelte` — os ícones do app em SVG (grupos, ajustes, fechar, relógio, sensor, sonda,
+  terminal, copiar, ✓, lápis, +).
+- `Modal.svelte` — o `<dialog>` nativo (`showModal`): foco preso, Esc fecha, clicar fora NÃO fecha
+  (confirmação destrutiva não pode sumir por clique errado).
+- `Menu.svelte` — o menu ⋯ (fecha ao escolher, ao clicar fora e no Esc; itens destrutivos em
+  vermelho, desabilitados em cinza).
+- `Switch.svelte` — o interruptor do Windows 11. `Rich.svelte` — crase do catálogo vira `<code>`.
+- O backend simulado registra as chamadas em `window.__mockCalls` (para a conferência contar,
+  por exemplo, que o limiar grava UMA vez).

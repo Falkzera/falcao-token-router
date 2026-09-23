@@ -5,6 +5,7 @@
 //! flyout da bandeja e a janela de Grupos/Ajustes), o laço de rotação, o login
 //! por ConPTY e a ponte de comandos com o front em Svelte.
 
+mod commands;
 mod flyout;
 mod i18n;
 mod locale;
@@ -73,6 +74,14 @@ fn quit_app(app: AppHandle) {
     app.exit(0);
 }
 
+/// Copia um texto (o comando do grupo, o link do login) para a área de
+/// transferência do Windows.
+#[tauri::command]
+fn copy_text(app: AppHandle, text: String) -> Result<(), String> {
+    use tauri_plugin_clipboard_manager::ClipboardExt;
+    app.clipboard().write_text(text).map_err(|e| e.to_string())
+}
+
 /// Mostra a janela de Grupos/Ajustes na aba pedida, criando-a se preciso, e a
 /// traz para a frente — o app vive na bandeja e não se ativa sozinho.
 pub fn show_home(app: &AppHandle, tab: HomeTab) {
@@ -116,6 +125,7 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             show_home(app, HomeTab::Groups);
         }))
+        .plugin(tauri_plugin_clipboard_manager::init())
         .setup(|app| {
             let state = AppState::open();
             attach_router(&state);
@@ -137,7 +147,21 @@ pub fn run() {
             get_snapshot,
             fit_flyout,
             open_home,
-            quit_app
+            quit_app,
+            copy_text,
+            commands::add_group,
+            commands::rename_group,
+            commands::set_auto_rotate,
+            commands::set_threshold,
+            commands::reorder_accounts,
+            commands::remove_group,
+            commands::make_default,
+            commands::clear_default,
+            commands::activate_account,
+            commands::remove_account,
+            commands::dismiss_error,
+            commands::foreign_default_login,
+            commands::measure_group
         ])
         .build(tauri::generate_context!())
         .expect("o app não conseguiu subir");

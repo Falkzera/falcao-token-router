@@ -20,6 +20,7 @@
   --text-tertiary: #8a8a8a;
   --text-quaternary: #b8b8b8;
   --border: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.16);
   --track: rgba(0, 0, 0, 0.1);
   --row-hover: rgba(0, 0, 0, 0.04);
   --row-active: rgba(0, 0, 0, 0.055);
@@ -48,6 +49,7 @@
     --text-tertiary: #8f8f8f;
     --text-quaternary: #5e5e5e;
     --border: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.16);
     --track: rgba(255, 255, 255, 0.12);
     --row-hover: rgba(255, 255, 255, 0.05);
     --row-active: rgba(255, 255, 255, 0.07);
@@ -83,12 +85,79 @@ html[data-view="flyout"] body {
   overflow: hidden;
 }
 
-/* A largura da janela do flyout — no navegador (backend simulado) a página
-   inteira seria larga demais para conferir o layout. */
+/* A largura de cada janela — no navegador (backend simulado) a página inteira
+   seria larga demais para conferir o layout. No app, a janela já tem esse tamanho. */
 html[data-view="flyout"] body {
   max-width: 330px;
+}
+html[data-view="home"] body {
+  max-width: 520px;
+  height: 620px;
+  outline: 1px solid var(--border);
 }
 
 p {
   margin: 0;
+}
+
+/* Botões e campo no estilo do Windows 11 (os mesmos em todas as telas). */
+button.primary,
+button.secondary,
+button.danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font: inherit;
+  font-size: var(--font-caption);
+  cursor: pointer;
+}
+button.small {
+  min-height: 24px;
+  padding: 2px 10px;
+}
+button.primary {
+  border: 1px solid transparent;
+  background: var(--accent);
+  color: var(--accent-text);
+}
+button.secondary {
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+}
+button.secondary:hover {
+  background: var(--row-hover);
+}
+button.danger {
+  border: 1px solid transparent;
+  background: var(--critical);
+  color: #ffffff;
+}
+button.primary:disabled,
+button.secondary:disabled,
+button.danger:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+input.field {
+  min-height: 30px;
+  padding: 4px 10px;
+  border: 1px solid var(--border-strong);
+  border-bottom-color: var(--text-tertiary);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+input.field:focus {
+  outline: none;
+  border-bottom: 2px solid var(--accent);
 }

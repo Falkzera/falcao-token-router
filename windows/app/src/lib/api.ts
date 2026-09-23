@@ -6,7 +6,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { mockInvoke } from "./mock";
+import { mockInvoke, mockListen } from "./mock";
 import type { AppInfo, HomeTab, Snapshot, View } from "./types";
 
 /** Dentro do WebView do Tauri? (O Tauri injeta este objeto antes da página.) */
@@ -59,12 +59,39 @@ export function quitApp(): Promise<void> {
   return call<void>("quit_app");
 }
 
+// MARK: - Grupos e contas (cada ação devolve o quadro novo)
+
+export const addGroup = (name: string, asDefault: boolean) =>
+  call<Snapshot>("add_group", { name, asDefault });
+export const renameGroup = (groupId: string, name: string) =>
+  call<Snapshot>("rename_group", { groupId, name });
+export const setAutoRotate = (groupId: string, on: boolean) =>
+  call<Snapshot>("set_auto_rotate", { groupId, on });
+/** Só ao SOLTAR o controle — o macOS gravava a cada passo do arrasto. */
+export const setThreshold = (groupId: string, percent: number) =>
+  call<Snapshot>("set_threshold", { groupId, percent });
+export const reorderAccounts = (groupId: string, accountIds: string[]) =>
+  call<Snapshot>("reorder_accounts", { groupId, accountIds });
+export const removeGroup = (groupId: string) => call<Snapshot>("remove_group", { groupId });
+export const makeDefault = (groupId: string) => call<Snapshot>("make_default", { groupId });
+export const clearDefault = () => call<Snapshot>("clear_default");
+export const activateAccount = (accountId: string, groupId: string) =>
+  call<Snapshot>("activate_account", { accountId, groupId });
+export const removeAccount = (accountId: string) => call<Snapshot>("remove_account", { accountId });
+export const dismissError = () => call<Snapshot>("dismiss_error");
+export const measureGroup = (groupId: string) => call<Snapshot>("measure_group", { groupId });
+/** O login que o `~\.claude` tem e que o router não conhece (ou `null`). */
+export const foreignDefaultLogin = () => call<string | null>("foreign_default_login");
+export const copyText = (text: string) => call<void>("copy_text", { text });
+
 /** A bandeja pediu outra aba com a janela já aberta. */
 export function onNavigate(handler: (tab: HomeTab) => void): Promise<UnlistenFn> {
   return on<HomeTab>("navigate", handler);
 }
 
-/** O backend releu o quadro (laço de 30 s, ou uma ação mudou algo). */
-export function onSnapshotChanged(handler: () => void): Promise<UnlistenFn> {
+/** O backend releu o quadro (laço de 30 s, ou uma ação mudou algo). No
+ *  navegador, o backend simulado avisa quando o quadro dele muda. */
+export async function onSnapshotChanged(handler: () => void): Promise<UnlistenFn> {
+  if (!insideTauri) return mockListen(handler);
   return on<null>("snapshot-changed", () => handler());
 }

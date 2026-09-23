@@ -82,8 +82,14 @@ export type ErrorView =
   | { code: "probeUnavailable" }
   | { code: "probeFailures"; count: number };
 
+/** Os scripts da integração de terminal: nunca instalados, citando ESTE
+ *  router.exe, ou citando outro (app movido). */
+export type ScriptsState = "missing" | "current" | "stale";
+
 export interface Snapshot {
   groups: GroupView[];
   measuringGroup: string | null;
   lastError: ErrorView | null;
+  /** O estado barato da integração (o quadro por shell é pedido à parte). */
+  scripts: ScriptsState;
 }

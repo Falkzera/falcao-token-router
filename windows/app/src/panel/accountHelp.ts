@@ -34,7 +34,8 @@ export function accountHelp(usage: UsageView | null, now: number): string {
       ),
     );
   }
-  return lines.join("\n\n");
+  // Tooltip nativo não formata nada: a crase do catálogo (código) sai.
+  return lines.join("\n\n").replaceAll("`", "");
 }
 
 /** O tooltip do relógio de amostra muito velha. */

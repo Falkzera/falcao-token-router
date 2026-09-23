@@ -70,6 +70,10 @@ impl AppState {
         *lock(&self.measuring)
     }
 
+    pub fn set_measuring(&self, group: Option<Id>) {
+        *lock(&self.measuring) = group;
+    }
+
     pub fn store(&self) -> MutexGuard<'_, RouterConfigStore> {
         lock(&self.store)
     }

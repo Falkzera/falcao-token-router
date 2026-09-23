@@ -229,6 +229,11 @@ impl RouterConfigStore {
         self.last_error.as_ref()
     }
 
+    /// O usuário dispensou o aviso: o erro só volta com uma nova falha.
+    pub fn clear_last_error(&mut self) {
+        self.last_error = None;
+    }
+
     pub fn live_sessions(&self) -> &HashMap<Id, Vec<LiveSession>> {
         &self.live_sessions
     }
