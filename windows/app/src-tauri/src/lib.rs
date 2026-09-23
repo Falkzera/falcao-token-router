@@ -113,26 +113,19 @@ pub fn show_home(app: &AppHandle, tab: HomeTab) {
         .build();
     if let Ok(window) = built {
         let handle = window.clone();
+        // O X fecha a janela de verdade, com ou sem "Mostrar na barra de
+        // tarefas": o botão sai da barra e o app segue na bandeja, como os
+        // apps do excedente (`^`); minimizar fica o do Windows. Até
+        // 23/09/2026, com a opção, o X só minimizava (≙ o ícone do Dock, que
+        // sobrevive à janela) — mas no Windows o botão da barra é da janela,
+        // e quem fecha um app de bandeja espera vê-lo sumir de lá.
         window.on_window_event(move |event| {
-            // Com "Mostrar na barra de tarefas", a janela É a porta do app
-            // (≙ o ícone do Dock): fechar só a minimiza, e o botão da barra
-            // fica — dá para fixá-lo. A preferência é lida na hora do fechar,
-            // então ligar/desligar vale sem reabrir a janela.
-            match event {
-                WindowEvent::CloseRequested { api, .. } => {
-                    if handle.state::<SettingsStore>().get().show_in_taskbar {
-                        api.prevent_close();
-                        let _ = handle.minimize();
-                    }
-                }
-                // A tela do login mora na janela: sem ela, ninguém veria o
-                // desfecho — o `claude` é encerrado e a casa reservada limpa
-                // (espera o processo sair: fora da thread da interface).
-                WindowEvent::Destroyed => {
-                    let app = handle.app_handle().clone();
-                    std::thread::spawn(move || login::close_quietly(&app));
-                }
-                _ => {}
+            // A tela do login mora na janela: sem ela, ninguém veria o
+            // desfecho — o `claude` é encerrado e a casa reservada limpa
+            // (espera o processo sair: fora da thread da interface).
+            if let WindowEvent::Destroyed = event {
+                let app = handle.app_handle().clone();
+                std::thread::spawn(move || login::close_quietly(&app));
             }
         });
         let _ = window.set_focus();

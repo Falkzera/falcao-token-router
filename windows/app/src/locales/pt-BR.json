@@ -144,7 +144,7 @@
   "settings.system.loginItem": "Abrir no login",
   "settings.system.loginItem.failure.format": "O Windows não aceitou o registro: %@",
   "settings.system.taskbar": "Mostrar na barra de tarefas",
-  "settings.system.taskbar.detail": "O app mora na bandeja, e o Windows 11 esconde ícone novo atrás do ^ sem avisar — aí não há por onde abrir o app. Com isto ligado, a janela abre junto com o app e fechar só a minimiza: o botão na barra de tarefas fica, e dá para fixá-lo.",
+  "settings.system.taskbar.detail": "O app mora na bandeja, e o Windows 11 esconde ícone novo atrás do ^ sem avisar — aí não há por onde abrir o app. Com isto ligado, a janela abre junto com o app, e dá para fixar o botão dela na barra de tarefas. Fechar a janela devolve o app à bandeja, ainda rodando.",
   "settings.tray.hidden": "O Windows 11 esconde ícones novos atrás do ^ da barra de tarefas. Para deixar o anel à vista, arraste-o de lá para a barra — ou ligue-o em Configurações → Personalização → Barra de tarefas → Outros ícones da bandeja do sistema.",
   "settings.tray.open": "Abrir as configurações da barra de tarefas",
   "settings.version.format": "Versão %@",

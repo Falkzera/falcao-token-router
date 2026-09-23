@@ -6,9 +6,10 @@
   se estiver minimizada), o estado, a cura da integração na subida (`attach_router`), a bandeja,
   o laço, a janela `home` (520×620 fixa; abre sozinha na subida sem grupo nenhum OU com "Mostrar
   na barra de tarefas" — `AppSettings::present_at_launch`, ≙ `presentAtLaunch` do macOS) e os
-  comandos (`app_info`). Fechar a janela não encerra o app — só o "Sair" (saída com código); com
-  "Mostrar na barra de tarefas", fechar só MINIMIZA (`CloseRequested` → `prevent_close`), e a
-  preferência é lida na hora do fechar. A janela destruída encerra o login que estivesse nela
+  comandos (`app_info`). Fechar a janela não encerra o app — só o "Sair" (saída com código): o X
+  a DESTRÓI nos dois modos (o botão sai da barra de tarefas, o app fica na bandeja; minimizar é
+  o do Windows). Até 23/09/2026, com "Mostrar na barra de tarefas", o X só minimizava — o usuário
+  quis o X que tira o app da barra. A janela destruída encerra o login que estivesse nela
   (ninguém veria o desfecho).
 - `state.rs` — `AppState`: o `RouterConfigStore` (montado como na CLI: credencial em arquivo com a
   guarda do perfil padrão) atrás de um `Mutex` que sobrevive a envenenamento, o idioma, a home e
@@ -99,9 +100,12 @@
 - Ícone novo cai no excedente (`^`) da bandeja — daí a dica de fixar e a opção da barra de tarefas.
 
 ## Verificado à mão (23/09/2026, sandbox)
-- "Mostrar na barra de tarefas" ligado: a janela abre na subida mesmo com grupos; `WM_CLOSE` (o X)
-  a deixa minimizada e o processo vivo; a 2ª execução a restaura. Desligado: nada abre na subida
-  (há grupos), a 2ª execução abre, `WM_CLOSE` a destrói e o app segue na bandeja.
+- "Mostrar na barra de tarefas" ligado: a janela abre na subida mesmo com grupos. Desligado: nada
+  abre na subida (há grupos), a 2ª execução abre, `WM_CLOSE` (o X) a destrói e o app segue na
+  bandeja.
+- Depois do X que fecha nos dois modos (opção LIGADA): `SC_MINIMIZE` (o _) a deixa minimizada e
+  existindo; a 2ª execução a restaura; `WM_CLOSE` a destrói e o processo segue vivo; a 2ª
+  execução a recria.
 - O `USERPROFILE` falso do sandbox ISOLA a Roaming/Local (o registro as guarda como
   `%USERPROFILE%\AppData\…`, expandido com o ambiente do processo): o `settings.json` do app de
   teste mora na home falsa. NÃO isola a Documentos redirecionada ao OneDrive (caminho absoluto —

@@ -47,7 +47,8 @@ On its first run the app opens its window. After that it lives in the
 **notification area** — and Windows 11 hides every new icon behind the **^** on
 the taskbar. Drag the ring from there onto the taskbar, or turn it on in
 **Settings → Personalization → Taskbar → Other system tray icons**. If you'd
-rather have a regular window, the app's **Settings → Show in taskbar** keeps one.
+rather have a taskbar button, turn on the app's **Settings → Show in taskbar**: the
+window opens with the app, and you can pin its button.
 
 ## Two accounts that take turns
 

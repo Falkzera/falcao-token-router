@@ -6,8 +6,9 @@
 //!   um checkbox marcado sobre um registro que falhou é pior que nenhum.
 //! - "Mostrar na barra de tarefas" (≙ "Mostrar no Dock", pela mesma razão: o
 //!   Windows 11 esconde ícone novo da bandeja no excedente `^`, e aí não há por
-//!   onde abrir o app): com ele, a janela abre na subida e fechar a MINIMIZA —
-//!   o botão da barra de tarefas fica, e dá para fixá-lo.
+//!   onde abrir o app): com ele, a janela abre na subida, e dá para fixar o
+//!   botão dela na barra de tarefas. O X não depende dele: fecha a janela e o
+//!   app fica na bandeja (até 23/09/2026, com ele ligado, o X só minimizava).
 //! - `open_url` só abre o que está na lista: as páginas de Configurações que a
 //!   tela sugere, o logout do claude.ai e o login oficial.
 

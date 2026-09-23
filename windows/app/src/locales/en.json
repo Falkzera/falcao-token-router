@@ -144,7 +144,7 @@
   "settings.system.loginItem": "Open at login",
   "settings.system.loginItem.failure.format": "Windows didn't accept the registration: %@",
   "settings.system.taskbar": "Show in taskbar",
-  "settings.system.taskbar.detail": "The app lives in the notification area, and Windows 11 tucks new icons away behind the ^ without saying so — then there is no way in. With this on, the window opens with the app and closing it only minimizes it: its taskbar button stays, and you can pin it.",
+  "settings.system.taskbar.detail": "The app lives in the notification area, and Windows 11 tucks new icons away behind the ^ without saying so — then there is no way in. With this on, the window opens with the app, and you can pin its taskbar button. Closing the window sends the app back to the notification area, still running.",
   "settings.tray.hidden": "Windows 11 hides new icons behind the ^ on the taskbar. To keep the ring in sight, drag it from there onto the taskbar — or turn it on under Settings → Personalization → Taskbar → Other system tray icons.",
   "settings.tray.open": "Open taskbar settings",
   "settings.version.format": "Version %@",
