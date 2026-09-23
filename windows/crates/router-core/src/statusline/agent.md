@@ -27,7 +27,9 @@ sessão. O sensor (a amostra) não passa por aqui.
   e-mail`. Cor por grupo (posição na lista), Fable em vermelho, as cores do seletor do `/effort`
   (brilho no `xhigh`, arco-íris no `max`, pela fase do relógio), cinza explícito com truecolor,
   dias do reset no idioma do Windows, branch pelo `.git/HEAD` (com teto para os testes), caminho
-  encurtado a partir da home. O que não veio no JSON fica de fora, sem marcador.
+  encurtado a partir da home. O que não veio no JSON fica de fora, sem marcador. `reset_when`
+  (pública, 23/09/2026) escreve o "quando" do reset — 5h `09:05`, semanal `seg (28) 9:00` — e a
+  janela de Grupos do app escreve o reset com ELA: a tela e a sessão nunca discordam.
 
 ## Padrões
 - Puro: relógio (fase), idioma e suporte a cor entram como `Style`; o que a linha mostra entra

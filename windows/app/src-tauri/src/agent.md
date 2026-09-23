@@ -52,9 +52,11 @@
   do sistema, com o motivo da recusa; `open_url` só para a lista (ms-settings:developers/taskbar,
   logout do claude.ai, hosts do login oficial — testado). `SettingsStore::at` para os testes.
 - `snapshot.rs` — o quadro que as janelas leem: grupos e contas na ordem do usuário, conta
-  ativa, uso com janela/origem/idade e os % PRONTOS (`UsagePercent` do núcleo), sessões (total
-  e engajadas), contas exclusivas (para a confirmação de apagar grupo), o comando do terminal e
-  o erro da última ação como fato com código (`ErrorView`).
+  ativa, uso com janela/origem/idade e os % PRONTOS (`UsagePercent` do núcleo), o reset de cada
+  janela ESCRITO (`resetsLabel`: `reset_when` do núcleo, o da status line, no fuso do Windows e
+  no idioma do app — 5h só a hora, 7d e a do modelo com o dia), sessões (total e engajadas),
+  contas exclusivas (para a confirmação de apagar grupo), o comando do terminal e o erro da
+  última ação como fato com código (`ErrorView`). `build` recebe o idioma do app.
 - `tray_text.rs` — o que a bandeja diz, lógica pura: o anel segue a conta do grupo PADRÃO (sem
   ativa nele, o primeiro grupo com ativa); uma linha por grupo com **janela, origem e idade**
   (`Trabalho: equipe-2 · 7d 81% (sensor, 3m)`); janela por modelo diz "sonda" e a idade da

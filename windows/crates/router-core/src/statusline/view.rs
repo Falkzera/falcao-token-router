@@ -181,12 +181,7 @@ pub fn render(view: &View, style: &Style) -> String {
             UsagePercent::value(window.fraction)
         );
         if let Some(at) = window.resets_local {
-            // 5h: só a hora, o reset cai nas próximas horas; 7d: o dia também.
-            let when = if with_day {
-                day_and_time(at, style.portuguese)
-            } else {
-                format!("{:02}:{:02}", at.hour(), at.minute())
-            };
+            let when = reset_when(at, with_day, style.portuguese);
             text.push_str(&format!(" {gray}↻ {when}{RESET}"));
         }
         Some(text)
@@ -301,6 +296,17 @@ fn tokens(n: u64) -> String {
         format!("{}k", (n as f64 / 1_000.0).round() as u64)
     } else {
         n.to_string()
+    }
+}
+
+/// O "quando" de um reset, como a linha o escreve: 5h só a hora, o reset cai
+/// nas próximas horas ("14:05"); 7d o dia também ("seg (28) 9:00"). Pública: a
+/// janela de Grupos do app escreve o reset com ela.
+pub fn reset_when(at: NaiveDateTime, with_day: bool, portuguese: bool) -> String {
+    if with_day {
+        day_and_time(at, portuguese)
+    } else {
+        format!("{:02}:{:02}", at.hour(), at.minute())
     }
 }
 
@@ -529,6 +535,23 @@ mod tests {
     fn the_seven_day_reset_speaks_the_windows_language() {
         let line = plain(&render(&full(), &style(false, false)));
         assert!(line.contains("↻ Mon (28) 9:00"), "{line}");
+    }
+
+    /// O "quando" do reset sai de uma função só, pública: a janela de Grupos
+    /// do app escreve o reset com ELA — a tela e a status line nunca
+    /// discordam. 5h: a hora com zero à esquerda; 7d: o dia, sem o zero.
+    #[test]
+    fn the_reset_time_is_written_by_one_function() {
+        assert_eq!(reset_when(at(2026, 9, 23, 9, 5), false, true), "09:05");
+        assert_eq!(reset_when(at(2026, 9, 23, 22, 30), false, false), "22:30");
+        assert_eq!(
+            reset_when(at(2026, 9, 28, 9, 0), true, true),
+            "seg (28) 9:00"
+        );
+        assert_eq!(
+            reset_when(at(2026, 9, 26, 21, 45), true, false),
+            "Sat (26) 21:45"
+        );
     }
 
     #[test]

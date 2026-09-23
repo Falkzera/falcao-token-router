@@ -24,7 +24,7 @@ fn id(text: &str) -> Result<Id, String> {
 /// Republica o quadro: bandeja, janelas, e a resposta.
 pub fn publish(app: &AppHandle) -> Snapshot {
     let state = app.state::<AppState>();
-    let snapshot = snapshot::build(&state.store(), state.measuring());
+    let snapshot = snapshot::build(&state.store(), state.measuring(), state.locale);
     tray::refresh(app);
     let _ = app.emit(SNAPSHOT_CHANGED, ());
     snapshot
@@ -167,7 +167,7 @@ pub fn measure_group(app: AppHandle, group_id: String) -> Result<Snapshot, Strin
     let plan = {
         let store = state.store();
         let Some(found) = store.config().groups.iter().find(|g| g.id == group) else {
-            return Ok(snapshot::build(&store, state.measuring()));
+            return Ok(snapshot::build(&store, state.measuring(), state.locale));
         };
         store.measure_plan(found)
     };

@@ -13,13 +13,15 @@ tocada e o rodapé. Sem as seções do medidor (sessão local, valor): o porte �
 - `AccountRow.svelte` — a linha inteira é alvo do clique e dona do tooltip; ponto cheio na
   ativa; só a janela que MANDA tem peso e cor; >1 h esmaece; >12 h relógio com a idade.
 - `AccountDetail.svelte` + `Gauge.svelte` — o cartão da conta: 5h e 7d com barra e reset
-  ("reseta 13:20 · em 4h 6m", contado de AGORA), quem mediu (antena = sensor, medidor = sonda) e
+  ("reseta 13:20 · em 4h 6m", "reseta seg (28) 9:00 · em 4d 13h" — o "quando" escrito pelo núcleo,
+  o que falta contado de AGORA), quem mediu (antena = sensor, medidor = sonda) e
   a janela por modelo embaixo com carimbo próprio. Janela vencida = "sem medida válida".
 - `MiniBar.svelte` (a barra desenha a de 5h, a coluna vizinha; sem medida a trilha fica vazia),
   `ModelBadge.svelte` (quando quem manda é a janela por modelo), `SessionsBadge.svelte` (ponto
   cheio se alguma sessão trabalha ou espera o usuário).
-- `accountHelp.ts` — o tooltip da linha (≙ AccountHelp): janelas, idade, QUEM mediu, e o limite
-  por modelo com a idade da sonda.
+- `accountHelp.ts` — o tooltip da linha (≙ AccountHelp): janelas, idade, quando cada janela
+  reseta (uma por linha, "5h reseta 22:30 · em 1h 12m", a do modelo também — pedido de
+  23/09/2026), QUEM mediu, e o limite por modelo com a idade da sonda.
 
 ## Padrões
 - **Número sem procedência não vai para a tela.** O % chega pronto do backend (`UsagePercent`

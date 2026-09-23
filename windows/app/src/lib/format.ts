@@ -3,6 +3,7 @@
 // `UsagePercent` do núcleo, para as telas nunca discordarem por arredondamento.
 
 import { locale, t } from "./i18n";
+import type { Reading } from "./types";
 
 /** Acima disto o número esmaece: pode já descrever outra realidade. */
 export const STALE_SECONDS = 3600;
@@ -32,14 +33,25 @@ export function clockTime(iso: string): string {
   );
 }
 
-/** "reseta 13:20 · em 4h 6m" — o tempo restante contado de agora: a amostra
- *  pode ser de horas atrás, mas o RESET é uma hora do relógio e não envelhece
- *  junto com ela. */
-export function resetText(resetsAt: string | null, now: number): string {
-  if (!resetsAt) return "";
-  const base = t("panel.reset.format", clockTime(resetsAt));
-  const remaining = (Date.parse(resetsAt) - now) / 1000;
-  return remaining > 0 ? t("panel.reset.remaining.format", base, duration(remaining)) : base;
+/** Quanto falta: "1h 12m" / "3m", e "4d 13h" a partir de um dia — o reset
+ *  semanal contado só em horas ("109h 12m") não se lê. */
+export function untilText(seconds: number): string {
+  const total = Math.max(0, Math.floor(seconds));
+  const days = Math.floor(total / 86400);
+  return days > 0
+    ? t("format.duration.daysHours", days, Math.floor((total % 86400) / 3600))
+    : duration(total);
+}
+
+/** "reseta 22:30 · em 1h 12m" / "reseta seg (28) 9:00 · em 4d 13h". O
+ *  "quando" vem escrito do núcleo (o da status line); o que falta é contado de
+ *  agora: a amostra pode ser de horas atrás, mas o RESET é uma hora do relógio
+ *  e não envelhece junto com ela. */
+export function resetText(reading: Reading, now: number): string {
+  if (!reading.resetsAt) return "";
+  const base = t("panel.reset.format", reading.resetsLabel ?? clockTime(reading.resetsAt));
+  const remaining = (Date.parse(reading.resetsAt) - now) / 1000;
+  return remaining > 0 ? t("panel.reset.remaining.format", base, untilText(remaining)) : base;
 }
 
 /** O semáforo (≙ `UsageColor.bar`): os mesmos limiares da bandeja. */

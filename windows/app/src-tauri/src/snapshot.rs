@@ -7,15 +7,17 @@
 
 use std::collections::HashSet;
 
-use chrono::{DateTime, SecondsFormat, Utc};
+use chrono::{DateTime, Local, SecondsFormat, Utc};
 use router_core::engine::group_usage::UsageOrigin;
 use router_core::engine::rotation_engine::RotationError;
 use router_core::engine::router_config_store::{RouterConfigStore, StoreError};
 use router_core::engine::shell_integration::StatusShell;
 use router_core::engine::terminal_report::{scripts_state, ScriptsState};
+use router_core::statusline::view::reset_when;
 use router_core::{AccountGroup, AccountUsage, Id, UsagePercent, UsageWindow};
 use serde::Serialize;
 
+use crate::locale::Locale;
 use crate::system;
 
 fn iso(date: DateTime<Utc>) -> String {
@@ -29,14 +31,31 @@ pub struct Reading {
     pub fraction: f64,
     pub text: String,
     pub resets_at: Option<String>,
+    /// O reset ESCRITO como a status line o escreve ("22:30", "seg (28) 9:00"):
+    /// pela função dela, no fuso do Windows e no idioma do app — a janela e a
+    /// sessão nunca discordam.
+    pub resets_label: Option<String>,
 }
 
 impl Reading {
-    fn new(fraction: f64, resets_at: Option<DateTime<Utc>>) -> Self {
+    /// `with_day`: a janela é semanal (7d, a do modelo), e o reset leva o dia.
+    fn new(
+        fraction: f64,
+        resets_at: Option<DateTime<Utc>>,
+        with_day: bool,
+        locale: Locale,
+    ) -> Self {
         Reading {
             fraction,
             text: UsagePercent::text(fraction),
             resets_at: resets_at.map(iso),
+            resets_label: resets_at.map(|at| {
+                reset_when(
+                    at.with_timezone(&Local).naive_local(),
+                    with_day,
+                    locale == Locale::PtBr,
+                )
+            }),
         }
     }
 }
@@ -73,8 +92,8 @@ pub struct UsageView {
     pub sampled_at: String,
 }
 
-impl From<&AccountUsage> for UsageView {
-    fn from(usage: &AccountUsage) -> Self {
+impl UsageView {
+    fn of(usage: &AccountUsage, locale: Locale) -> Self {
         UsageView {
             fraction: usage.fraction,
             text: UsagePercent::text(usage.fraction),
@@ -85,13 +104,14 @@ impl From<&AccountUsage> for UsageView {
             },
             five_hour: usage
                 .five_hour
-                .map(|f| Reading::new(f, usage.five_hour_resets_at)),
+                .map(|f| Reading::new(f, usage.five_hour_resets_at, false, locale)),
             seven_day: usage
                 .seven_day
-                .map(|f| Reading::new(f, usage.seven_day_resets_at)),
+                .map(|f| Reading::new(f, usage.seven_day_resets_at, true, locale)),
+            // O limite por modelo também é semanal (o "Current week" do `/usage`).
             model: usage.model.as_ref().map(|m| ModelReading {
                 name: m.name.clone(),
-                reading: Reading::new(m.percent, m.resets_at),
+                reading: Reading::new(m.percent, m.resets_at, true, locale),
                 sampled_at: usage.model_sampled_at.map(iso),
             }),
             origin: usage.origin,
@@ -235,7 +255,7 @@ fn error_view(error: &StoreError, store: &RouterConfigStore) -> ErrorView {
     }
 }
 
-fn group_view(store: &RouterConfigStore, group: &AccountGroup) -> GroupView {
+fn group_view(store: &RouterConfigStore, group: &AccountGroup, locale: Locale) -> GroupView {
     let config = store.config();
     let exclusive: HashSet<Id> = store.exclusive_account_ids(group.id).into_iter().collect();
     let sessions = store
@@ -268,17 +288,22 @@ fn group_view(store: &RouterConfigStore, group: &AccountGroup) -> GroupView {
                     .organization_name
                     .clone()
                     .filter(|o| !o.is_empty()),
-                usage: store.usage_detail().get(&account.id).map(UsageView::from),
+                usage: store
+                    .usage_detail()
+                    .get(&account.id)
+                    .map(|usage| UsageView::of(usage, locale)),
             })
             .collect(),
     }
 }
 
-pub fn build(store: &RouterConfigStore, measuring_group: Option<Id>) -> Snapshot {
+/// O quadro no idioma do app (o do reset escrito).
+pub fn build(store: &RouterConfigStore, measuring_group: Option<Id>, locale: Locale) -> Snapshot {
     build_with(
         store,
         measuring_group,
         system::status_shell() == StatusShell::Bash,
+        locale,
     )
 }
 
@@ -287,13 +312,14 @@ pub fn build_with(
     store: &RouterConfigStore,
     measuring_group: Option<Id>,
     with_bash: bool,
+    locale: Locale,
 ) -> Snapshot {
     Snapshot {
         groups: store
             .config()
             .groups
             .iter()
-            .map(|g| group_view(store, g))
+            .map(|g| group_view(store, g, locale))
             .collect(),
         measuring_group: measuring_group.map(|id| id.to_string()),
         last_error: store.last_error().map(|e| error_view(e, store)),
@@ -377,7 +403,7 @@ mod tests {
     #[test]
     fn groups_and_accounts_keep_the_user_order_with_the_active_one_marked() {
         let tmp = tempfile::tempdir().unwrap();
-        let snapshot = build_with(&sandbox(tmp.path()), None, false);
+        let snapshot = build_with(&sandbox(tmp.path()), None, false, Locale::PtBr);
 
         let names: Vec<&str> = snapshot.groups.iter().map(|g| g.name.as_str()).collect();
         assert_eq!(names, ["Trabalho", "Meu Pessoal"]);
@@ -397,7 +423,7 @@ mod tests {
     #[test]
     fn percentages_come_ready_from_the_core() {
         let tmp = tempfile::tempdir().unwrap();
-        let snapshot = build_with(&sandbox(tmp.path()), None, false);
+        let snapshot = build_with(&sandbox(tmp.path()), None, false, Locale::PtBr);
         let usage = snapshot.groups[0].accounts[1].usage.as_ref().unwrap();
 
         assert_eq!(usage.bound, Bound::SevenDay);
@@ -411,12 +437,63 @@ mod tests {
         );
     }
 
+    /// O reset vem ESCRITO pelo núcleo, pela função da status line, no fuso do
+    /// Windows e no idioma do app: 5h só a hora, 7d com o dia.
+    #[test]
+    fn the_reset_comes_written_like_the_status_line() {
+        let tmp = tempfile::tempdir().unwrap();
+        let store = sandbox(tmp.path());
+        let usage = |locale| {
+            build_with(&store, None, false, locale).groups[0].accounts[1]
+                .usage
+                .clone()
+                .unwrap()
+        };
+        let label = |reading: &Option<Reading>| {
+            reading
+                .as_ref()
+                .and_then(|r| r.resets_label.clone())
+                .expect("com reset")
+        };
+        let matches =
+            |pattern: &str, text: &str| regex::Regex::new(pattern).unwrap().is_match(text);
+        let (pt, en) = (usage(Locale::PtBr), usage(Locale::En));
+
+        let five = label(&pt.five_hour);
+        let at = DateTime::parse_from_rfc3339(
+            pt.five_hour.as_ref().unwrap().resets_at.as_deref().unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            five,
+            reset_when(at.with_timezone(&Local).naive_local(), false, true),
+            "a hora local do reset, como na status line"
+        );
+        assert!(matches(r"^\d\d:\d\d$", &five), "{five}");
+        let seven = label(&pt.seven_day);
+        assert!(
+            matches(
+                r"^(dom|seg|ter|qua|qui|sex|sáb) \(\d{1,2}\) \d{1,2}:\d\d$",
+                &seven
+            ),
+            "{seven}"
+        );
+        let seven = label(&en.seven_day);
+        assert!(
+            matches(
+                r"^(Sun|Mon|Tue|Wed|Thu|Fri|Sat) \(\d{1,2}\) \d{1,2}:\d\d$",
+                &seven
+            ),
+            "{seven}"
+        );
+    }
+
     /// A conta que está em DOIS grupos não conta para a confirmação de apagar
     /// nenhum deles — ela fica.
     #[test]
     fn the_delete_count_is_of_exclusive_accounts() {
         let tmp = tempfile::tempdir().unwrap();
-        let snapshot = build_with(&sandbox(tmp.path()), None, false);
+        let snapshot = build_with(&sandbox(tmp.path()), None, false, Locale::PtBr);
         assert_eq!(snapshot.groups[0].exclusive_count, 1, "equipe-2");
         assert_eq!(snapshot.groups[1].exclusive_count, 1, "conta1");
     }
@@ -429,11 +506,17 @@ mod tests {
 
         let tmp = tempfile::tempdir().unwrap();
         let mut store = sandbox(tmp.path());
-        assert_eq!(build_with(&store, None, false).scripts, Scripts::Missing);
+        assert_eq!(
+            build_with(&store, None, false, Locale::PtBr).scripts,
+            Scripts::Missing
+        );
 
         let router = tmp.path().join("instalado").join("router.exe");
         store.set_router_path(Some(router.clone()));
-        assert_eq!(build_with(&store, None, false).scripts, Scripts::Missing);
+        assert_eq!(
+            build_with(&store, None, false, Locale::PtBr).scripts,
+            Scripts::Missing
+        );
 
         ShellIntegration::write_scripts(
             &router,
@@ -441,10 +524,16 @@ mod tests {
             &store.bash_script_path(),
         )
         .unwrap();
-        assert_eq!(build_with(&store, None, false).scripts, Scripts::Current);
+        assert_eq!(
+            build_with(&store, None, false, Locale::PtBr).scripts,
+            Scripts::Current
+        );
 
         store.set_router_path(Some(tmp.path().join("movido").join("router.exe")));
-        assert_eq!(build_with(&store, None, false).scripts, Scripts::Stale);
+        assert_eq!(
+            build_with(&store, None, false, Locale::PtBr).scripts,
+            Scripts::Stale
+        );
     }
 
     #[test]
@@ -459,14 +548,14 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let mut store = sandbox(tmp.path());
         store.measure_unavailable();
-        let json = serde_json::to_value(build_with(&store, None, false)).unwrap();
+        let json = serde_json::to_value(build_with(&store, None, false, Locale::PtBr)).unwrap();
         assert_eq!(json["lastError"], json!({"code": "probeUnavailable"}));
 
         store.finish_measure(router_core::engine::router_config_store::MeasureSummary {
             measured: 1,
             failed: 2,
         });
-        let json = serde_json::to_value(build_with(&store, None, false)).unwrap();
+        let json = serde_json::to_value(build_with(&store, None, false, Locale::PtBr)).unwrap();
         assert_eq!(
             json["lastError"],
             json!({"code": "probeFailures", "count": 2})

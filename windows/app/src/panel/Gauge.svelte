@@ -28,7 +28,7 @@
     {/if}
   </span>
   <span class="caption">
-    {reading ? resetText(reading.resetsAt, clock.now) : t("panel.account.window.expired")}
+    {reading ? resetText(reading, clock.now) : t("panel.account.window.expired")}
   </span>
 </div>
 

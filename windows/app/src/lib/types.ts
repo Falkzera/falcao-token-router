@@ -20,6 +20,9 @@ export interface Reading {
   fraction: number;
   text: string;
   resetsAt: string | null;
+  /** O reset escrito pelo núcleo como a status line o escreve ("22:30",
+   *  "seg (28) 9:00"), no fuso do Windows e no idioma do app. */
+  resetsLabel: string | null;
 }
 
 /** A janela POR MODELO — só a sonda a vê, com carimbo próprio. */

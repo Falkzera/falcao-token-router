@@ -55,8 +55,22 @@ const inHours = (h: number) => new Date(Date.now() + h * 3_600_000).toISOString(
 /** O % do núcleo (meio para longe do zero), para o mock mostrar o mesmo texto. */
 const pct = (f: number) => `${Math.round(f * 100)}%`;
 
-function reading(fraction: number, resetsInHours: number) {
-  return { fraction, text: pct(fraction), resetsAt: inHours(resetsInHours) };
+/** O "quando" do reset como o núcleo o escreve (`reset_when`, o da status
+ *  line): a janela de 5h só a hora; a semanal, o dia também. */
+function resetWhen(at: Date, withDay: boolean): string {
+  const days =
+    mockLocale() === "pt-BR"
+      ? ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"]
+      : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const minutes = String(at.getMinutes()).padStart(2, "0");
+  return withDay
+    ? `${days[at.getDay()]} (${at.getDate()}) ${at.getHours()}:${minutes}`
+    : `${String(at.getHours()).padStart(2, "0")}:${minutes}`;
+}
+
+function reading(fraction: number, resetsInHours: number, withDay: boolean) {
+  const resetsAt = inHours(resetsInHours);
+  return { fraction, text: pct(fraction), resetsAt, resetsLabel: resetWhen(new Date(resetsAt), withDay) };
 }
 
 function usage(
@@ -76,10 +90,10 @@ function usage(
     fraction,
     text: pct(fraction),
     bound,
-    fiveHour: five === null ? null : reading(five, 3),
-    sevenDay: seven === null ? null : reading(seven, 50),
+    fiveHour: five === null ? null : reading(five, 3, false),
+    sevenDay: seven === null ? null : reading(seven, 50, true),
     model: model
-      ? { name: model.name, reading: reading(model.fraction, 30), sampledAt: minutesAgo(model.ageMinutes) }
+      ? { name: model.name, reading: reading(model.fraction, 30, true), sampledAt: minutesAgo(model.ageMinutes) }
       : null,
     origin,
     sampledAt: minutesAgo(ageMinutes),
@@ -316,11 +330,6 @@ function mockPreview(choice: StatusLineChoice): Span[] {
   const now = Date.now();
   const five = new Date(now + (2 * 60 + 13) * 60_000);
   const seven = new Date(now + (4 * 24 + 5) * 3_600_000);
-  const days = portuguese
-    ? ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"]
-    : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  const hhmm = (d: Date) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-  const dayTime = (d: Date) => `${days[d.getDay()]} (${d.getDate()}) ${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
 
   const segments: Span[][] = [];
   if (shows("group")) {
@@ -335,12 +344,12 @@ function mockPreview(choice: StatusLineChoice): Span[] {
   const windows: Span[] = [];
   if (shows("fiveHour")) {
     windows.push(s("5h", GRAY), s(" "), s("█░░░░ 29%", GREEN));
-    if (shows("resets")) windows.push(s(" "), s(`↻ ${hhmm(five)}`, GRAY));
+    if (shows("resets")) windows.push(s(" "), s(`↻ ${resetWhen(five, false)}`, GRAY));
   }
   if (shows("sevenDay")) {
     if (windows.length) windows.push(s("  "));
     windows.push(s("7d", GRAY), s(" "), s("██░░░ 33%", GREEN));
-    if (shows("resets")) windows.push(s(" "), s(`↻ ${dayTime(seven)}`, GRAY));
+    if (shows("resets")) windows.push(s(" "), s(`↻ ${resetWhen(seven, true)}`, GRAY));
   }
   if (windows.length) segments.push(windows);
   if (shows("cost")) segments.push([s("$1.87", GRAY)]);

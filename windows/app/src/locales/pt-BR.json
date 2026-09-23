@@ -1,4 +1,5 @@
 {
+  "format.duration.daysHours": "%1$dd %2$dh",
   "format.duration.hoursMinutes": "%1$dh %2$dm",
   "format.duration.minutes": "%dm",
   "groups.account.add": "Adicionar conta",
@@ -124,6 +125,7 @@
   "panel.accounts.origin.sensor": "Medido pelo sensor: o `rate_limits` da requisição que esta conta atendeu. É o gasto dela como ela mesma viu — em conta compartilhada, o que os colegas gastaram depois não aparece.",
   "panel.accounts.ready": "pronta",
   "panel.accounts.ready.help.probe": "Sem uso registrado ainda — o sensor só lê quando a conta serve uma mensagem. Use “Medir contas” para saber agora, sem esperar ela entrar no rodízio.",
+  "panel.accounts.reset.help.format": "%1$@ %2$@",
   "panel.accounts.stale.help.probe.format": "Sondado há %@. Era uma consulta de um instante, e o que foi gasto depois não está aqui. “Medir contas” atualiza agora.",
   "panel.accounts.stale.help.sensor.format": "Sem medir há %@. O sensor só lê quando a conta serve uma mensagem — em conta compartilhada, este número pode estar otimista. “Medir contas” atualiza agora.",
   "panel.accounts.usage.help.format": "5h %1$@ · 7d %2$@ — medido há %3$@. O painel mostra o maior dos dois, que é o que dispara a troca.",

@@ -63,7 +63,7 @@ fn app_info(app: AppHandle, state: State<'_, AppState>) -> AppInfo {
 /// O quadro atual (grupos, contas, uso com procedência, sessões, erro).
 #[tauri::command]
 fn get_snapshot(state: State<'_, AppState>) -> snapshot::Snapshot {
-    snapshot::build(&state.store(), state.measuring())
+    snapshot::build(&state.store(), state.measuring(), state.locale)
 }
 
 /// O front mediu o conteúdo do flyout: a janela acompanha a altura.

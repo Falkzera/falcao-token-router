@@ -1,4 +1,5 @@
 {
+  "format.duration.daysHours": "%1$dd %2$dh",
   "format.duration.hoursMinutes": "%1$dh %2$dm",
   "format.duration.minutes": "%dm",
   "groups.account.add": "Add account",
@@ -124,6 +125,7 @@
   "panel.accounts.origin.sensor": "Measured by the sensor: the `rate_limits` of a request this account actually served. It is the account's spend as it saw it — on a shared account, what colleagues spent afterwards is not in it.",
   "panel.accounts.ready": "ready",
   "panel.accounts.ready.help.probe": "No usage recorded yet — the sensor only reads when the account serves a message. Use “Measure accounts” to find out now, without waiting for it to enter the rotation.",
+  "panel.accounts.reset.help.format": "%1$@ %2$@",
   "panel.accounts.stale.help.probe.format": "Probed %@ ago. That was a point-in-time query, and whatever was spent since is not in it. “Measure accounts” refreshes it now.",
   "panel.accounts.stale.help.sensor.format": "Not measured for %@. The sensor only reads when the account serves a message — on a shared account this number may be optimistic. “Measure accounts” refreshes it now.",
   "panel.accounts.usage.help.format": "5h %1$@ · 7d %2$@ — measured %3$@ ago. The panel shows the higher of the two, which is what triggers the switch.",
