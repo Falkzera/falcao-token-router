@@ -156,8 +156,8 @@ that didn't, and the last line is `tudo certo.` (all good) or `há problemas aci
 - **Settings**: the **Status line** (below), **Open at login** and **Show in
   taskbar**.
 
-Closing the window leaves the app running in the notification area; **Quit** ends
-it. The app follows your Windows language — English or Portuguese.
+Resize or maximize the window as you like; it reopens at its last size. Closing it
+leaves the app running in the notification area; **Quit** ends it. The app follows your Windows language — English or Portuguese.
 
 ### Status line
 

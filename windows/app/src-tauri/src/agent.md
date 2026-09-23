@@ -4,7 +4,8 @@
 - `main.rs` — só chama `run()`. Sem console em release (o app vive na bandeja).
 - `lib.rs` — o `Builder`: instância única (1º plugin; a 2ª execução abre a janela, e a restaura
   se estiver minimizada), o estado, a cura da integração na subida (`attach_router`), a bandeja,
-  o laço, a janela `home` (520×620 fixa; abre sozinha na subida sem grupo nenhum OU com "Mostrar
+  o laço, a janela `home` (no último tamanho — 520×620 na 1ª vez —, redimensionável e
+  maximizável, ver `home_window.rs`; abre sozinha na subida sem grupo nenhum OU com "Mostrar
   na barra de tarefas" — `AppSettings::present_at_launch`, ≙ `presentAtLaunch` do macOS) e os
   comandos (`app_info`). Fechar a janela não encerra o app — só o "Sair" (saída com código): o X
   a DESTRÓI nos dois modos (o botão sai da barra de tarefas, o app fica na bandeja; minimizar é
@@ -23,6 +24,16 @@
   barra embaixo, abaixo dela em cima, ao lado nas laterais, acima do clique quando o ícone está
   no excedente, sempre dentro da área útil do monitor; a altura segue o conteúdo. Abrir relê o
   quadro (como o painel do macOS).
+- `home_window.rs` — o tamanho da janela `home` (23/09/2026, pedido do usuário; antes era fixa):
+  abre no último tamanho guardado no `settings.json` (1ª vez: 520×620, o de sempre), com
+  mínimo de 520 de largura (o layout foi desenhado nela) e 420 de altura (as páginas rolam),
+  maximizada se estava; centralizada na área útil do monitor principal e encolhida para caber
+  nela com 32 px de folga (`center` + `prevent_overflow_with_margin` do Tauri, que conta a
+  barra de título; sem folga ela encostava na área e parecia maximizada, com a borda de 1 px
+  para fora) — a POSIÇÃO não é guardada. Tudo em pixels lógicos. `opening` e `after_resize` são puras e testadas
+  (maximizar guarda só o "estava maximizada": o tamanho para onde volta fica); `track` segue
+  cada `Resized` na memória (minimizada = 0×0, ignorado); o disco é gravado no
+  `CloseRequested` e no `RunEvent::Exit` (o "Sair" com a janela aberta).
 - `commands.rs` — os comandos da janela de Grupos: cada ação muda o store (sob a trava), redesenha
   a bandeja, emite `snapshot-changed` e devolve o quadro novo. "Medir contas" roda a sonda numa
   thread FORA da trava (planeja → roda → publica), uma medição por vez, com o spinner no quadro.
@@ -36,7 +47,8 @@
   ou shell sem a linha — a política e o `.bash_profile` que ignora o `.bashrc` têm correção
   própria); `bash_login_file` nomeia o perfil de login do Git Bash. Testado (`view`).
 - `settings.rs` — ajustes do app em `<Roaming>\com.synqo.falcao-token-router\settings.json`
-  (`show_in_taskbar`; ilegível = padrão); "abrir no login" pelo plugin de autostart, SEMPRE relido
+  (`show_in_taskbar` e o último tamanho da janela; ilegível = padrão; `remember` muda só a
+  memória e `flush` grava se algo mudou — `update` grava tudo na hora); "abrir no login" pelo plugin de autostart, SEMPRE relido
   do sistema, com o motivo da recusa; `open_url` só para a lista (ms-settings:developers/taskbar,
   logout do claude.ai, hosts do login oficial — testado). `SettingsStore::at` para os testes.
 - `snapshot.rs` — o quadro que as janelas leem: grupos e contas na ordem do usuário, conta
@@ -106,6 +118,15 @@
 - Depois do X que fecha nos dois modos (opção LIGADA): `SC_MINIMIZE` (o _) a deixa minimizada e
   existindo; a 2ª execução a restaura; `WM_CLOSE` a destrói e o processo segue vivo; a 2ª
   execução a recria.
+- Janela redimensionável (escala 100%, área útil 1920×1032): a 1ª abertura sai em 520×620,
+  exatamente centrada, com borda de redimensionar e botão maximizar; em 900×800 o conteúdo
+  acompanha, e maximizada a coluna para em 880 e centra; restaurar volta ao tamanho de antes; o X
+  grava `homeWindow` no `settings.json`; reabre no último tamanho, centralizada, e maximizada se
+  estava (restaurar → o tamanho de antes); o "Sair" (`quit_app`) com a janela aberta grava na
+  saída — antes dele o arquivo não muda (nada de escrita a cada arrasto); um 3000×2000 guardado
+  abre em 1888×969, dentro da área, com a folga. O `SetWindowPos` programático passa por cima do
+  mínimo (o `ptMinTrackSize` do `WM_GETMINMAXINFO` vale no arrasto); o arrasto de verdade não
+  foi exercitado — moveria o mouse do usuário.
 - O `USERPROFILE` falso do sandbox ISOLA a Roaming/Local (o registro as guarda como
   `%USERPROFILE%\AppData\…`, expandido com o ambiente do processo): o `settings.json` do app de
   teste mora na home falsa. NÃO isola a Documentos redirecionada ao OneDrive (caminho absoluto —

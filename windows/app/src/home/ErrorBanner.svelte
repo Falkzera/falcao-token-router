@@ -43,7 +43,7 @@
     display: flex;
     align-items: flex-start;
     gap: 8px;
-    padding: 8px 16px;
+    padding: 8px var(--page-inline);
     background: color-mix(in srgb, var(--critical) 12%, transparent);
     color: var(--critical);
     font-size: var(--font-caption);

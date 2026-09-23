@@ -1,7 +1,8 @@
 <script lang="ts">
   // A janela única (≙ HomeWindow.swift): Grupos (o produto) e Ajustes, em abas.
-  // Tamanho fixo — as abas têm alturas naturais diferentes e a janela pularia
-  // de tamanho a cada troca.
+  // O tamanho é da janela (do usuário, lembrado pelo Rust), nunca do conteúdo:
+  // as abas têm alturas naturais diferentes e a janela pularia a cada troca.
+  // Numa janela larga, abas e páginas seguem a mesma coluna (`--page-inline`).
   import { onMount } from "svelte";
   import * as api from "../lib/api";
   import { t } from "../lib/i18n";
@@ -81,7 +82,7 @@
   .tabs {
     display: flex;
     gap: 4px;
-    padding: 8px 16px 0;
+    padding: 8px var(--page-inline) 0;
     border-bottom: 1px solid var(--border);
   }
   .tabs button {

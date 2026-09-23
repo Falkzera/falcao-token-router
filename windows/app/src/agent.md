@@ -6,10 +6,13 @@ ou `flyout`; no navegador, `?view=`). Runes do Svelte 5 (`$state`, `$derived`, `
 ## Arquivos
 - `main.ts` — monta o `App` e carrega o CSS base.
 - `App.svelte` — espera o `app_info` (idioma do Windows) antes de desenhar qualquer coisa; marca
-  `html[data-view]` (o flyout tem altura do conteúdo, sem rolagem).
+  `html[data-view]` (o flyout tem altura do conteúdo, sem rolagem) e `html[data-host]`
+  (`browser`: a janela Grupos/Ajustes simulada numa moldura 520×620; no app ela é do usuário e
+  o corpo a acompanha).
 - `panel/` — o flyout da bandeja. `home/` — a janela Grupos/Ajustes. `lib/` — ponte com o
   backend, tipos, i18n, formatação, relógio, ícones, backend simulado. `locales/` — os
-  catálogos en/pt-BR. `styles/app.css` — tokens claro/escuro (inclusive as cores de uso).
+  catálogos en/pt-BR. `styles/app.css` — tokens claro/escuro (inclusive as cores de uso) e a coluna das páginas da
+  janela (`--page-inline`).
 
 ## Padrões
 - **Toda string de UI vem do catálogo**, pela função `t("chave", …args)`; as chaves são as do

@@ -9,10 +9,14 @@
 //!   onde abrir o app): com ele, a janela abre na subida, e dá para fixar o
 //!   botão dela na barra de tarefas. O X não depende dele: fecha a janela e o
 //!   app fica na bandeja (até 23/09/2026, com ele ligado, o X só minimizava).
+//! - O último tamanho da janela Grupos/Ajustes (`home_window`): acompanhado na
+//!   memória a cada `Resized` (`remember`) e gravado ao fechar a janela e na
+//!   saída do app (`flush`).
 //! - `open_url` só abre o que está na lista: as páginas de Configurações que a
 //!   tela sugere, o logout do claude.ai e o login oficial.
 
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
 use router_core::platform::atomic_write::{read_retrying, write_atomic};
@@ -21,11 +25,16 @@ use tauri::{AppHandle, Manager, State};
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_opener::OpenerExt;
 
+use crate::home_window::WindowSize;
+
 #[derive(Clone, Default, PartialEq, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppSettings {
     #[serde(default)]
     pub show_in_taskbar: bool,
+    /// O último tamanho da janela Grupos/Ajustes (ver `home_window`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub home_window: Option<WindowSize>,
 }
 
 impl AppSettings {
@@ -42,6 +51,8 @@ impl AppSettings {
 pub struct SettingsStore {
     path: Option<PathBuf>,
     value: Mutex<AppSettings>,
+    /// A memória tem o que o disco ainda não tem (`remember` sem `flush`).
+    pending: AtomicBool,
     /// Por que o sistema recusou o registro de "abrir no login" (a tela mostra).
     autostart_failure: Mutex<Option<String>>,
 }
@@ -74,6 +85,7 @@ impl SettingsStore {
         SettingsStore {
             path,
             value: Mutex::new(value),
+            pending: AtomicBool::new(false),
             autostart_failure: Mutex::new(None),
         }
     }
@@ -82,17 +94,45 @@ impl SettingsStore {
         lock(&self.value).clone()
     }
 
+    /// Muda só a memória; `flush` grava. Para o que muda a cada passo — o
+    /// tamanho da janela durante o arrasto: gravar a cada `Resized` seria um
+    /// arquivo por quadro.
+    pub fn remember(&self, change: impl FnOnce(&mut AppSettings)) {
+        let mut value = lock(&self.value);
+        let before = value.clone();
+        change(&mut value);
+        if *value != before {
+            self.pending.store(true, Ordering::Relaxed);
+        }
+    }
+
+    /// Grava o que `remember` mudou (nada, se nada mudou).
+    pub fn flush(&self) -> std::io::Result<()> {
+        let value = lock(&self.value);
+        if !self.pending.load(Ordering::Relaxed) {
+            return Ok(());
+        }
+        self.write(&value)
+    }
+
     fn update(&self, change: impl FnOnce(&mut AppSettings)) -> std::io::Result<()> {
         let mut value = lock(&self.value);
         change(&mut value);
-        let Some(path) = &self.path else {
-            return Ok(());
-        };
-        if let Some(dir) = path.parent() {
-            std::fs::create_dir_all(dir)?;
+        self.write(&value)
+    }
+
+    /// Grava o valor inteiro — com ele vai também o que só estava na memória.
+    /// Sempre com a trava do valor na mão: ninguém o muda no meio.
+    fn write(&self, value: &AppSettings) -> std::io::Result<()> {
+        if let Some(path) = &self.path {
+            if let Some(dir) = path.parent() {
+                std::fs::create_dir_all(dir)?;
+            }
+            let bytes = serde_json::to_vec_pretty(value).map_err(std::io::Error::other)?;
+            write_atomic(path, &bytes)?;
         }
-        let bytes = serde_json::to_vec_pretty(&*value).map_err(std::io::Error::other)?;
-        write_atomic(path, &bytes)
+        self.pending.store(false, Ordering::Relaxed);
+        Ok(())
     }
 }
 
@@ -200,11 +240,63 @@ mod tests {
     /// ≙ `presentAtLaunch` do macOS: a janela abre sozinha quando não há o que
     /// mostrar na bandeja (nenhum grupo) ou quando o app deve estar na barra de
     /// tarefas — e a decisão é da subida.
+    /// O tamanho da janela muda a cada passo do arrasto: fica na memória e só
+    /// vai para o disco no `flush` (ao fechar a janela e na saída do app).
+    #[test]
+    fn the_window_size_reaches_the_disk_only_on_flush() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("settings.json");
+        let store = SettingsStore::at(Some(path.clone()));
+        store.flush().unwrap();
+        assert!(!path.exists(), "nada mudou: nada a gravar");
+
+        let size = WindowSize {
+            width: 900.0,
+            height: 700.0,
+            maximized: true,
+        };
+        store.remember(|s| s.home_window = Some(size));
+        assert_eq!(store.get().home_window, Some(size), "a memória já sabe");
+        assert_eq!(
+            SettingsStore::at(Some(path.clone())).get().home_window,
+            None
+        );
+
+        store.flush().unwrap();
+        assert_eq!(
+            SettingsStore::at(Some(path.clone())).get().home_window,
+            Some(size)
+        );
+
+        // Uma preferência gravada depois leva junto o que estava só na memória.
+        let resized = WindowSize {
+            width: 640.0,
+            ..size
+        };
+        store.remember(|s| s.home_window = Some(resized));
+        store.update(|s| s.show_in_taskbar = true).unwrap();
+        let reread = SettingsStore::at(Some(path)).get();
+        assert!(reread.show_in_taskbar);
+        assert_eq!(reread.home_window, Some(resized));
+    }
+
+    /// O `settings.json` de antes do tamanho guardado continua valendo.
+    #[test]
+    fn a_settings_file_from_before_the_window_size_still_reads() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("settings.json");
+        std::fs::write(&path, b"{\n  \"showInTaskbar\": true\n}").unwrap();
+        let settings = SettingsStore::at(Some(path)).get();
+        assert!(settings.show_in_taskbar);
+        assert_eq!(settings.home_window, None);
+    }
+
     #[test]
     fn the_window_opens_at_launch_without_groups_or_with_the_taskbar_option() {
         let plain = AppSettings::default();
         let taskbar = AppSettings {
             show_in_taskbar: true,
+            ..AppSettings::default()
         };
         assert!(plain.present_at_launch(true));
         assert!(!plain.present_at_launch(false));

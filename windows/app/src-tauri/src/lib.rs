@@ -7,6 +7,7 @@
 
 mod commands;
 mod flyout;
+mod home_window;
 mod i18n;
 mod locale;
 mod login;
@@ -103,13 +104,25 @@ pub fn show_home(app: &AppHandle, tab: HomeTab) {
     }
     let state = app.state::<AppState>();
     state.request_tab(tab);
+    let settings = app.state::<SettingsStore>();
+    let size = home_window::WindowSize::opening(settings.get().home_window);
+    // O acompanhamento parte do tamanho de abertura: aberta maximizada, é para
+    // ele que ela volta.
+    settings.remember(|s| s.home_window = Some(size));
     let built = WebviewWindowBuilder::new(app, HOME_WINDOW, WebviewUrl::App("index.html".into()))
         .title(i18n::t(state.locale, "home.title", &[]))
-        // Tamanho FIXO (≙ macOS 520×620): as abas têm alturas naturais
-        // diferentes e a janela pularia de tamanho a cada troca.
-        .inner_size(520.0, 620.0)
-        .resizable(false)
-        .maximizable(false)
+        // O tamanho é do usuário, nunca do conteúdo: as abas têm alturas
+        // naturais diferentes e a janela pularia a cada troca. Abre no último
+        // tamanho (na 1ª vez, o 520×620 de sempre), centralizada e encolhida
+        // para caber na área útil — ver `home_window`.
+        .inner_size(size.width, size.height)
+        .min_inner_size(home_window::MIN_WIDTH, home_window::MIN_HEIGHT)
+        .maximized(size.maximized)
+        .center()
+        .prevent_overflow_with_margin(tauri::LogicalSize::new(
+            home_window::SCREEN_MARGIN,
+            home_window::SCREEN_MARGIN,
+        ))
         .build();
     if let Ok(window) = built {
         let handle = window.clone();
@@ -119,14 +132,23 @@ pub fn show_home(app: &AppHandle, tab: HomeTab) {
         // 23/09/2026, com a opção, o X só minimizava (≙ o ícone do Dock, que
         // sobrevive à janela) — mas no Windows o botão da barra é da janela,
         // e quem fecha um app de bandeja espera vê-lo sumir de lá.
-        window.on_window_event(move |event| {
+        window.on_window_event(move |event| match event {
+            WindowEvent::Resized(size) => {
+                home_window::track(&handle, &handle.state::<SettingsStore>(), *size);
+            }
+            // O tamanho vai para o disco ao fechar; a saída do app ("Sair"),
+            // que não passa por aqui, grava no `run`.
+            WindowEvent::CloseRequested { .. } => {
+                let _ = handle.state::<SettingsStore>().flush();
+            }
             // A tela do login mora na janela: sem ela, ninguém veria o
             // desfecho — o `claude` é encerrado e a casa reservada limpa
             // (espera o processo sair: fora da thread da interface).
-            if let WindowEvent::Destroyed = event {
+            WindowEvent::Destroyed => {
                 let app = handle.app_handle().clone();
                 std::thread::spawn(move || login::close_quietly(&app));
             }
+            _ => {}
         });
         let _ = window.set_focus();
     }
@@ -218,14 +240,19 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("o app não conseguiu subir");
 
-    app.run(|_app, event| {
+    app.run(|app, event| match event {
         // Fechar a janela não encerra o app: ele vive na bandeja. Só o "Sair"
         // (que pede a saída com código) encerra.
-        if let RunEvent::ExitRequested {
+        RunEvent::ExitRequested {
             code: None, api, ..
-        } = event
-        {
-            api.prevent_exit();
+        } => api.prevent_exit(),
+        // O "Sair" com a janela aberta não passa pelo fechar dela: o último
+        // tamanho vai para o disco aqui.
+        RunEvent::Exit => {
+            if let Some(settings) = app.try_state::<SettingsStore>() {
+                let _ = settings.flush();
+            }
         }
+        _ => {}
     });
 }

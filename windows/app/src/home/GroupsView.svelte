@@ -145,7 +145,7 @@
     display: flex;
     flex-direction: column;
     gap: 16px;
-    padding: 16px;
+    padding: 16px var(--page-inline);
     overflow: auto;
   }
   header {

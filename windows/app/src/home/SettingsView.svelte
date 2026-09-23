@@ -74,7 +74,7 @@
     flex-direction: column;
     gap: 20px;
     height: 100%;
-    padding: 16px;
+    padding: 16px var(--page-inline);
     overflow: auto;
   }
   section {

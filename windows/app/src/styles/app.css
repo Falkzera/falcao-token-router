@@ -36,6 +36,13 @@
   --critical: #d95247;
 
   --radius: 8px;
+
+  /* As margens laterais das páginas da janela Grupos/Ajustes: 16 px no
+     tamanho de sempre (520); numa janela larga o conteúdo para em 880 px e
+     fica centrado — uma linha de conta (rótulo … números) de ponta a ponta de
+     uma tela cheia não se lê. Usada em `padding`, onde o `100%` é a largura
+     do bloco que contém a página: a da janela. */
+  --page-inline: max(16px, calc((100% - 880px) / 2));
 }
 
 @media (prefers-color-scheme: dark) {
@@ -86,11 +93,13 @@ html[data-view="flyout"] body {
 }
 
 /* A largura de cada janela — no navegador (backend simulado) a página inteira
-   seria larga demais para conferir o layout. No app, a janela já tem esse tamanho. */
+   seria larga demais para conferir o layout. No app o flyout já tem essa
+   largura, e a janela Grupos/Ajustes é do usuário (abre em 520×620 e
+   redimensiona): lá o corpo a acompanha, e a moldura fica só no navegador. */
 html[data-view="flyout"] body {
   max-width: 330px;
 }
-html[data-view="home"] body {
+html[data-view="home"][data-host="browser"] body {
   max-width: 520px;
   height: 620px;
   outline: 1px solid var(--border);

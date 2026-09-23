@@ -2,8 +2,10 @@
 
 ## Arquivos
 - `Home.svelte` — as duas abas, **Grupos** (o produto) e **Ajustes** (sem medidor nesta entrega).
-  Tamanho fixo 520×620 (definido no Rust): as abas têm alturas naturais diferentes e a janela
-  pularia de tamanho a cada troca. A bandeja pode pedir a aba (`navigate`); a aba da abertura
+  O tamanho é da janela (abre no último, 520×620 na 1ª vez; redimensiona e maximiza — o Rust
+  cuida, `home_window.rs`), nunca do conteúdo: as abas têm alturas naturais diferentes e a
+  janela pularia a cada troca. Numa janela larga, abas, páginas e o aviso de erro seguem a mesma
+  coluna (`--page-inline`: até 880 px, centrada; 16 px de margem no tamanho de sempre). A bandeja pode pedir a aba (`navigate`); a aba da abertura
   vale ANTES do 1º desenho (montar Grupos por um instante pediria o quadro do terminal à toa).
   Dona do diálogo do login ("Adicionar conta" e "Relogar…"): fica com a visão de revisão maior
   (evento × resposta do comando) e reabre o login em andamento quando a janela volta.
