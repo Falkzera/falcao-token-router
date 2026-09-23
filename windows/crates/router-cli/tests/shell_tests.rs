@@ -144,10 +144,16 @@ fn a_missing_router_is_announced_loudly() {
     let system = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into());
     let powershell = PathBuf::from(system).join(r"System32\WindowsPowerShell\v1.0\powershell.exe");
     let test = w.sandbox.cwd.join("teste.ps1");
+    // Com a saída redirecionada, o `Write-Host` sai na página de código do
+    // console (ANSI no runner da CI): o teste fixa UTF-8 e compara só trechos
+    // ASCII, para não depender de onde roda.
     fs::write(
         &test,
         format!(
-            "function claude {{ 'anterior:' + ($args -join ',') }}\r\n. '{}'\r\nclaude trabalho 6>&1\r\n",
+            "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8\r\n\
+             function claude {{ 'anterior:' + ($args -join ',') }}\r\n\
+             . '{}'\r\n\
+             claude trabalho 6>&1\r\n",
             ps1.display()
         ),
     )
@@ -168,7 +174,9 @@ fn a_missing_router_is_announced_loudly() {
         .unwrap();
 
     let text = stdout(&out);
-    assert!(text.contains("router.exe não encontrado"), "{text}");
+    assert!(text.contains("router.exe n"), "{text}");
+    assert!(text.contains("o encontrado em"), "{text}");
+    assert!(text.contains("sumiu"), "{text}");
     assert!(text.contains("anterior:trabalho"), "{text}");
     assert!(
         w.sandbox.records().is_empty(),
