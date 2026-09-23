@@ -84,6 +84,28 @@ fn installing_the_status_line_keeps_the_other_keys_in_place() {
     assert_eq!(keys, ["model", "statusLine", "theme"]);
 }
 
+/// O `launch` planta a status line a cada sessão: quando ela já está certa, o
+/// arquivo não é tocado (no grupo padrão ele é o `settings.json` do usuário).
+#[test]
+fn installing_the_same_status_line_again_does_not_touch_the_file() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dir = dedicated(tmp.path());
+    ShellIntegration::install_status_line("C:/r/router.exe statusline", &dir).unwrap();
+    let path = ShellIntegration::settings_path(&dir);
+    let long_ago =
+        std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1_000_000_000);
+    OpenOptions::new()
+        .write(true)
+        .open(&path)
+        .unwrap()
+        .set_modified(long_ago)
+        .unwrap();
+
+    ShellIntegration::install_status_line("C:/r/router.exe statusline", &dir).unwrap();
+
+    assert_eq!(fs::metadata(&path).unwrap().modified().unwrap(), long_ago);
+}
+
 /// O caso que motivou a checagem no macOS: o app mudou de nome e a status line
 /// continuou apontando para o caminho morto. Aqui: app reinstalado noutro lugar.
 #[test]

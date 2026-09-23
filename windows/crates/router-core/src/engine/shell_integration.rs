@@ -177,8 +177,17 @@ impl ShellIntegration {
 
     /// Escreve a `statusLine` no `settings.json` do perfil, **preservando** o
     /// resto (o padrão `~\.claude` tem `model` e outras chaves do usuário). Um
-    /// `settings.json` ilegível é recusado, nunca trocado por `{}`.
+    /// `settings.json` ilegível é recusado, nunca trocado por `{}`. Já estando
+    /// exatamente igual, o arquivo não é tocado — o `launch` chama isto a cada
+    /// sessão, e no grupo padrão o arquivo é o do usuário.
     pub fn install_status_line(command: &str, dir: &ConfigDir) -> Result<(), SettingsError> {
+        let current = read_retrying(&Self::settings_path(dir))
+            .ok()
+            .and_then(|data| serde_json::from_slice::<Value>(&data).ok())
+            .and_then(|root| root.get("statusLine").cloned());
+        if current.as_ref() == Some(&Self::status_line_value(command)) {
+            return Ok(());
+        }
         edit_object(&Self::settings_path(dir), |root| {
             root.insert("statusLine".to_string(), Self::status_line_value(command));
         })
