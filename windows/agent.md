@@ -17,6 +17,7 @@ um `.github/workflows/windows.yml` filtrado por caminho).
 - `docs/PLATFORM.md` — os fatos do Windows verificados (inglês), o mapa macOS → Windows e as
   diferenças deliberadas.
 - `scripts/test.ps1` — a verificação (fmt + clippy + testes + checagens do front), igual na CI.
+- `scripts/build.ps1` — o instalador NSIS (o `router.exe` como sidecar), conferido; igual na CI.
 - `app/` — o app Tauri v2 + Svelte 5 (`src-tauri/` é membro deste workspace).
 
 ## Estado
