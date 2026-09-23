@@ -5,7 +5,9 @@ passa no clippy e roda os testes dele junto com o resto.
 
 ## Arquivos
 - `Cargo.toml` — `falcao-token-router` (lib `falcao_token_router_lib`); tauri 2.11 com
-  `tray-icon`; plugins single-instance, autostart, opener, clipboard-manager (usados só do Rust).
+  `tray-icon`; plugins single-instance, autostart, opener, clipboard-manager (usados só do Rust);
+  `portable-pty` 0.9 (o login oficial num ConPTY — aprovado em 22/09/2026) e o `regex` do
+  workspace.
 - `build.rs` — `tauri_build::build()`: embute o `icons/icon.ico` no .exe e gera `gen/` (ignorado).
 - `tauri.conf.json` — `identifier` = `com.synqo.falcao-token-router` (o bundle id do macOS);
   `productName` ASCII sem espaço (`FalcaoTokenRouter`); nenhuma janela declarada (o Rust as

@@ -8,14 +8,23 @@
 //!   variáveis sensíveis chegaram (nomes, nunca valores);
 //! - `FAKE_CLAUDE_EXIT`: o código de saída (padrão 0);
 //! - `FAKE_CLAUDE_SLEEP_MS`: espera antes de responder (prazo da sonda);
-//! - `FAKE_CLAUDE_USAGE`: o que o `/usage` imprime num perfil logado.
+//! - `FAKE_CLAUDE_USAGE`: o que o `/usage` imprime num perfil logado;
+//! - `FAKE_CLAUDE_LOGIN`: o desfecho do `auth login` — `ok:<e-mail>` (grava a
+//!   credencial e a identidade no perfil e diz "Login successful."),
+//!   `code:<e-mail>` (o mesmo, depois de ler um código `a#b` do stdin; código
+//!   sem `#` dá "Invalid code"), `quiet:<e-mail>` (grava e sai com 0 sem dizer
+//!   nada), `nodisk` (diz que deu certo e não grava), `fail:<motivo>` (sai
+//!   com 1) ou `hang` (espera até ser encerrado).
 //!
 //! No `/usage`, "logado" = o perfil tem `.credentials.json` — como o real, que
 //! num perfil sem login sai com código 0 e só o resumo do `--print`.
+//!
+//! O `auth login` imprime o que o 2.1.280 imprime (lido no JS do binário em
+//! 23/09/2026), com o link num hyperlink OSC 8 quando a saída é terminal.
 
 use std::env;
-use std::fs::OpenOptions;
-use std::io::Write;
+use std::fs::{self, OpenOptions};
+use std::io::{BufRead, IsTerminal, Write};
 use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
@@ -50,6 +59,17 @@ fn main() {
         thread::sleep(Duration::from_millis(ms));
     }
 
+    if args.first().map(String::as_str) == Some("auth")
+        && args.get(1).map(String::as_str) == Some("login")
+    {
+        let email = args
+            .iter()
+            .position(|a| a == "--email")
+            .and_then(|i| args.get(i + 1))
+            .cloned();
+        std::process::exit(auth_login(profile.as_deref(), email.as_deref()));
+    }
+
     if args.iter().any(|a| a == "/usage") {
         let dir = profile.map(PathBuf::from).unwrap_or_else(|| {
             PathBuf::from(env::var("USERPROFILE").unwrap_or_default()).join(".claude")
@@ -70,6 +90,83 @@ fn main() {
         .and_then(|v| v.parse::<i32>().ok())
         .unwrap_or(0);
     std::process::exit(code);
+}
+
+/// O `claude auth login` de mentira. Devolve o código de saída.
+fn auth_login(profile: Option<&str>, email_hint: Option<&str>) -> i32 {
+    let mut url =
+        "https://claude.com/cai/oauth/authorize?code=true&client_id=fake&state=fake".to_string();
+    if let Some(email) = email_hint {
+        url.push_str("&login_hint=");
+        url.push_str(email);
+    }
+    let link = if std::io::stdout().is_terminal() {
+        format!("\x1b]8;;{url}\x07\x1b[94m{url}\x1b[39m\x1b]8;;\x07")
+    } else {
+        url
+    };
+    let mut out = std::io::stdout();
+    let _ = write!(
+        out,
+        "Opening browser to sign in\u{2026}\nIf the browser didn't open, visit: {link}\nPaste code here if prompted > "
+    );
+    let _ = out.flush();
+
+    let mode = env::var("FAKE_CLAUDE_LOGIN").unwrap_or_else(|_| "hang".to_string());
+    let (kind, value) = mode.split_once(':').unwrap_or((mode.as_str(), ""));
+    match kind {
+        "ok" | "quiet" => {
+            thread::sleep(Duration::from_millis(300));
+            write_login(profile, value);
+            if kind == "ok" {
+                let _ = writeln!(out, "Login successful.");
+            }
+            0
+        }
+        "code" => {
+            for line in std::io::stdin().lock().lines() {
+                let Ok(line) = line else { break };
+                let parts: Vec<&str> = line.trim().split('#').collect();
+                if parts.len() == 2 && !parts[0].is_empty() && !parts[1].is_empty() {
+                    write_login(profile, value);
+                    let _ = writeln!(out, "Login successful.");
+                    return 0;
+                }
+                eprintln!("Invalid code. Please make sure the full code was copied.");
+            }
+            1
+        }
+        "nodisk" => {
+            let _ = writeln!(out, "Login successful.");
+            0
+        }
+        "fail" => {
+            let _ = writeln!(out);
+            eprintln!("Login failed: {value}");
+            1
+        }
+        _ => loop {
+            thread::sleep(Duration::from_secs(60));
+        },
+    }
+}
+
+/// O que o login de verdade deixa no perfil: a credencial (blob com a forma
+/// da real, valores falsos) e a identidade no `.claude.json`.
+fn write_login(profile: Option<&str>, email: &str) {
+    let Some(dir) = profile.map(PathBuf::from) else {
+        return;
+    };
+    let _ = fs::create_dir_all(&dir);
+    let _ = fs::write(
+        dir.join(".credentials.json"),
+        r#"{"claudeAiOauth":{"accessToken":"falso-login"},"mcpOAuth":{}}"#,
+    );
+    let identity = serde_json::json!({
+        "oauthAccount": {"emailAddress": email, "organizationName": "Acme"},
+        "hasCompletedOnboarding": true,
+    });
+    let _ = fs::write(dir.join(".claude.json"), identity.to_string());
 }
 
 fn record(args: &[String], profile: Option<&str>) {

@@ -12,6 +12,7 @@ use std::time::Duration;
 
 use tauri::{AppHandle, Emitter, Manager};
 
+use crate::login::LoginState;
 use crate::state::AppState;
 use crate::tray;
 
@@ -24,7 +25,13 @@ const ROTATE_EVERY_TICKS: u64 = 6;
 pub const SNAPSHOT_CHANGED: &str = "snapshot-changed";
 
 /// Uma volta: relê (e, se `rotate`, roda a rotação), redesenha, avisa as janelas.
+/// Com um login em andamento a rotação fica para a próxima volta (ver
+/// `LoginState::in_progress`).
 pub fn tick(app: &AppHandle, rotate: bool) {
+    let rotate = rotate
+        && !app
+            .try_state::<LoginState>()
+            .is_some_and(|login| login.in_progress());
     {
         let state = app.state::<AppState>();
         let mut store = state.store();

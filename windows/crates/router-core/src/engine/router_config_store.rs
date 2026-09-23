@@ -563,6 +563,26 @@ impl RouterConfigStore {
         ReloginOutcome::Renewed(account)
     }
 
+    /// Relogin que voltou com OUTRA conta: o `claude auth login` já gravou o
+    /// login dela na casa desta, e ali ele faria "Usar" servir a outra conta com
+    /// o nome desta (o macOS deixava). A credencial estranha sai — a conta fica
+    /// sem login, o estado honesto, que a tela manda relogar; se ela está ativa
+    /// num grupo, o próximo espelho devolve à casa a do grupo. Só age quando a
+    /// casa tem mesmo OUTRA identidade. Devolve se apagou.
+    pub fn discard_wrong_relogin(&self, account_id: Id) -> bool {
+        let Some(account) = self.config.account(account_id) else {
+            return false;
+        };
+        match self.login.login_result(&account.home) {
+            Some(found) if found.email != account.identity.email => {
+                self.credentials
+                    .delete(&self.engine.credential_location_of(&account.home));
+                true
+            }
+            _ => false,
+        }
+    }
+
     /// Remove a conta do registro **e apaga a credencial dela** (e a casa).
     ///
     /// A cópia do GRUPO não é tocada de propósito, mesmo quando é esta conta que

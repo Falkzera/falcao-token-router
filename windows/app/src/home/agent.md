@@ -5,6 +5,8 @@
   Tamanho fixo 520×620 (definido no Rust): as abas têm alturas naturais diferentes e a janela
   pularia de tamanho a cada troca. A bandeja pode pedir a aba (`navigate`); a aba da abertura
   vale ANTES do 1º desenho (montar Grupos por um instante pediria o quadro do terminal à toa).
+  Dona do diálogo do login ("Adicionar conta" e "Relogar…"): fica com a visão de revisão maior
+  (evento × resposta do comando) e reabre o login em andamento quando a janela volta.
 - `GroupsView.svelte` — a aba do produto: cabeçalho com "Novo grupo", vazio com convite, os
   cartões, a seção da integração de terminal (depois dos grupos) e o aviso da última falha
   (`ErrorBanner`) embaixo. É dona do quadro do terminal (lento: pedido ao abrir, depois de cada
@@ -25,6 +27,12 @@
 - `SettingsView.svelte` — a aba Ajustes: "Abrir no login" (do sistema, com o motivo da recusa),
   "Mostrar na barra de tarefas" com a explicação, a dica do ícone escondido no `^` (→
   `ms-settings:taskbar`) e a versão.
+- `LoginDialog.svelte` — o login oficial (≙ LoginSheet): iniciando; o link (o navegador já
+  abriu nele) com copiar, "Abrir no navegador" e "Pediu um código?" (aviso de código
+  incompleto); conferindo; adicionada/renovada; duplicada e conta errada (com "Sair no
+  claude.ai" e "Tentar de novo"); falha com o motivo (o do `claude`, verbatim, quando ele
+  recusa); tempo esgotado com "Conferir de novo" (o spinner eterno do macOS). Fechar e Esc
+  cancelam; a limpeza do disco é do backend.
 - `AccountItem.svelte` — uma conta: alça (arrasta; com foco, ↑/↓ movem), ponto da ativa, rótulo e
   organização, selo do modelo, relógio de amostra velha, 5h/7d rotulados (só a janela que manda
   com peso e cor), "Usar" (na ativa o botão só some — o espaço fica e os números alinham) e o
@@ -53,6 +61,8 @@
   router, diretiva de grupo, instalação que grava só parte; Ajustes com o registro recusado.
 - NUNCA clicar "Ativar" nem "Abrir no login" no app de verdade: os `$PROFILE` e o `HKCU\…\Run`
   são os reais mesmo no sandbox.
+- Login (23/09): todos os estados no navegador (`&login=…`), nos dois idiomas e temas; e o
+  caminho real no app do sandbox com o `fake-claude` (ver `src-tauri/src/agent.md`).
 
 ## Pendências
-- Adicionar conta e Relogar: fatia 5.5 (login por ConPTY).
+- O login com o `claude` e o navegador de verdade: teste ponta a ponta (fase 7).

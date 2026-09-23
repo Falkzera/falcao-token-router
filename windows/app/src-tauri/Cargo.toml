@@ -21,6 +21,10 @@ tauri-plugin-single-instance = "2.4"
 tauri-plugin-autostart = "2.5"
 tauri-plugin-opener = "2.5"
 tauri-plugin-clipboard-manager = "2.3"
+# O login oficial (`claude auth login`) roda num ConPTY: sob um pipe simples o
+# link não sai e o navegador não abre (o `claude` se comporta como terminal).
+portable-pty = "0.9"
+regex.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 chrono.workspace = true

@@ -8,6 +8,8 @@
 //   &terminal=ausente|ok|bloqueado|parcial|velha|semrouter  &devmode=1
 //   &install=falha (Ativar grava só parte)  &diretiva=1 (Permitir não vence a política)
 //   &autostart=falha (o Windows recusa o registro)  &taskbar=1
+// O login (Adicionar conta / Relogar):
+//   &login=ok|codigo|duplicada|errada|recusado|encerrado|timeout|semclaude
 // Dados só de exemplo (@exemplo.com, Acme, C:\Users\exemplo).
 
 import type {
@@ -16,6 +18,8 @@ import type {
   HomeTab,
   InstallResult,
   Locale,
+  LoginPhase,
+  LoginView,
   ScriptsState,
   SettingsView,
   ShellName,
@@ -287,7 +291,145 @@ function findGroup(id: unknown): GroupView | undefined {
 
 let nextId = 100;
 
+// MARK: - Login
+
+const LOGIN_URL =
+  "https://claude.com/cai/oauth/authorize?code=true&client_id=00000000-0000-4000-8000-000000000000" +
+  "&response_type=code&redirect_uri=http%3A%2F%2Flocalhost%3A54545%2Fcallback" +
+  "&scope=org%3Acreate_api_key+user%3Aprofile+user%3Ainference&code_challenge=exemplo" +
+  "&code_challenge_method=S256&state=exemplo";
+
+let login: LoginView | null = null;
+let loginTarget: { relogin: boolean; groupId: string; accountId?: string } | null = null;
+let loginRevision = 0;
+let loginTimers: ReturnType<typeof setTimeout>[] = [];
+const loginListeners = new Set<(view: LoginView | null) => void>();
+
+export function mockLoginListen(handler: (view: LoginView | null) => void): () => void {
+  loginListeners.add(handler);
+  return () => loginListeners.delete(handler);
+}
+
+function publishLogin(): LoginView | null {
+  const view = login === null ? null : structuredClone(login);
+  setTimeout(() => loginListeners.forEach((l) => l(view)), 0);
+  return view;
+}
+
+function setPhase(phase: LoginPhase): LoginView | null {
+  login = { ...phase, revision: ++loginRevision, relogin: loginTarget?.relogin ?? false, invalidCode: false };
+  return publishLogin();
+}
+
+function setInvalidCode(invalidCode: boolean): void {
+  if (!login) return;
+  login = { ...login, invalidCode, revision: ++loginRevision };
+  publishLogin();
+}
+
+function later(ms: number, action: () => void): void {
+  loginTimers.push(setTimeout(action, ms));
+}
+
+function findAccount(id: string | undefined) {
+  return state.groups.flatMap((g) => g.accounts).find((a) => a.id === id);
+}
+
+/** Um login do começo: iniciando → link → (o cenário). */
+function runLogin(): LoginView | null {
+  loginTimers.forEach(clearTimeout);
+  loginTimers = [];
+  const scenario = param("login") ?? "ok";
+  if (scenario === "semclaude") return setPhase({ phase: "failed", reason: { code: "noClaude" } });
+  const first = setPhase({ phase: "starting" });
+  later(700, () => {
+    setPhase({ phase: "waiting", url: LOGIN_URL });
+    // "codigo": o navegador não devolveu sozinho — espera o código colado.
+    if (scenario !== "codigo") later(2500, () => finishLogin(scenario));
+  });
+  return first;
+}
+
+function finishLogin(scenario: string): void {
+  if (scenario === "recusado") {
+    setPhase({ phase: "failed", reason: { code: "refused", detail: "Request failed with status code 403" } });
+    return;
+  }
+  if (scenario === "encerrado") {
+    setPhase({ phase: "failed", reason: { code: "ended" } });
+    return;
+  }
+  setPhase({ phase: "confirming" });
+  later(900, () => settleLogin(scenario));
+}
+
+function settleLogin(scenario: string): void {
+  const target = loginTarget;
+  if (!target) return;
+  if (scenario === "timeout") {
+    setPhase({ phase: "timeout" });
+  } else if (target.relogin) {
+    const account = findAccount(target.accountId);
+    setPhase(
+      scenario === "errada"
+        ? { phase: "wrongAccount", expected: account?.email ?? "", got: "intrusa@exemplo.com" }
+        : { phase: "renewed", label: account?.label ?? "" },
+    );
+  } else if (scenario === "duplicada") {
+    setPhase({ phase: "duplicate", email: "equipe-1@exemplo.com" });
+  } else {
+    const n = nextId++;
+    findGroup(target.groupId)?.accounts.push({
+      id: `A${n}`,
+      label: `conta${n}`,
+      email: `conta${n}@exemplo.com`,
+      organization: null,
+      usage: null,
+    });
+    changed();
+    setPhase({ phase: "added", label: `conta${n}` });
+  }
+}
+
 const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
+  start_login: (args) => {
+    loginTarget = { relogin: false, groupId: String(args.groupId) };
+    return runLogin();
+  },
+  start_relogin: (args) => {
+    loginTarget = { relogin: true, groupId: String(args.groupId), accountId: String(args.accountId) };
+    return runLogin();
+  },
+  current_login: () => (login ? structuredClone(login) : null),
+  login_submit_code: (args) => {
+    if (login?.phase !== "waiting") return false;
+    // O `claude` quer `código#state`; outra coisa é "Invalid code".
+    const valid = /^[^#\s]+#[^#\s]+$/.test(String(args.code).trim());
+    setInvalidCode(false);
+    later(400, () => (valid ? finishLogin("ok") : setInvalidCode(true)));
+    return true;
+  },
+  login_retry: () => {
+    const retryable =
+      login !== null &&
+      ["duplicate", "wrongAccount", "timeout", "failed"].includes(login.phase) &&
+      !(login.phase === "failed" && login.reason.code === "noClaude");
+    return retryable ? runLogin() : login;
+  },
+  login_recheck: () => {
+    if (login?.phase !== "timeout") return login;
+    const view = setPhase({ phase: "confirming" });
+    later(900, () => settleLogin("ok"));
+    return view;
+  },
+  login_close: () => {
+    loginTimers.forEach(clearTimeout);
+    loginTimers = [];
+    loginTarget = null;
+    login = null;
+    publishLogin();
+    return changed();
+  },
   app_info: (): AppInfo => ({ version: "0.1.0-mock", locale: mockLocale(), initialTab: mockTab() }),
   get_snapshot: () => structuredClone(state),
   fit_flyout: () => undefined,

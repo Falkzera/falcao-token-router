@@ -104,3 +104,7 @@ Modelos, formato da amostra, leitor de uso, credencial, rotação e o store. Sem
   - `discard_pending_home`: login cancelado ou duplicado apaga a casa reservada (pode ter
     credencial de verdade) — nunca a de conta registrada (relogin usa a mesma casa), nunca fora
     de `<base>\accounts\`.
+- 23/09/2026: `discard_wrong_relogin` — o relogin que voltou com OUTRA conta deixou o login dela
+  na casa desta, e "Usar" serviria a outra conta com o nome desta (o macOS deixava). A credencial
+  estranha sai (a conta fica sem login, o estado honesto); só age quando a casa tem mesmo outra
+  identidade.

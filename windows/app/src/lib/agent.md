@@ -4,7 +4,9 @@
 - `api.ts` — as chamadas ao backend (`app_info`, `get_snapshot`, `fit_flyout`, `open_home`,
   `quit_app`, as ações de grupos e contas, a integração de terminal — `terminal_report`,
   `install_integration`, `allow_profiles_for` — e os ajustes — `get_settings`, `set_autostart`,
-  `set_show_in_taskbar`, `open_url`) e os eventos (`navigate`, `snapshot-changed`). Dentro do
+  `set_show_in_taskbar`, `open_url` —, o login — `start_login`, `start_relogin`,
+  `current_login`, `login_submit_code`, `login_retry`, `login_recheck`, `login_close`) e os
+  eventos (`navigate`, `snapshot-changed`, `login-changed`). Dentro do
   Tauri, `invoke`/`listen`; no navegador, o backend simulado. `currentView()` pelo rótulo da
   janela (ou `?view=`); `initialSelection()` abre o cartão de uma conta só no navegador
   (`?select=`).
@@ -12,8 +14,9 @@
   URL (`?view=flyout&state=uso|vazio|pronta|critico|erro&lang=pt-BR&select=A2`), a integração
   (`&terminal=ausente|ok|bloqueado|parcial|velha|semrouter&devmode=1&install=falha&diretiva=1`,
   com as mesmas contas do `view` do Rust e o 5.1 em `Restricted` de fábrica depois do Ativar) e
-  os ajustes (`&autostart=falha&taskbar=1`; `open_url` recusa o que o Rust recusa). Dados só de
-  exemplo (`@exemplo.com`, Acme, `C:\Users\exemplo`).
+  os ajustes (`&autostart=falha&taskbar=1`; `open_url` recusa o que o Rust recusa) e o login
+  (`&login=ok|codigo|duplicada|errada|recusado|encerrado|timeout|semclaude`, com as fases no
+  tempo e a revisão crescente). Dados só de exemplo (`@exemplo.com`, Acme, `C:\Users\exemplo`).
 - `types.ts` — espelho dos `#[derive(Serialize)]` do Rust (camelCase), inclusive o `Snapshot`.
 - `i18n.ts` — `t(chave, …args)`, `format` (`%@`, `%d`, `%1$@`, `%%`, como no macOS),
   `setLocale` (uma vez, na subida).

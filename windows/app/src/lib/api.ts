@@ -6,11 +6,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { mockInvoke, mockListen } from "./mock";
+import { mockInvoke, mockListen, mockLoginListen } from "./mock";
 import type {
   AppInfo,
   HomeTab,
   InstallResult,
+  LoginView,
   SettingsView,
   ShellName,
   Snapshot,
@@ -110,6 +111,27 @@ export const setAutostart = (on: boolean) => call<SettingsView>("set_autostart",
 export const setShowInTaskbar = (on: boolean) => call<SettingsView>("set_show_in_taskbar", { on });
 /** Só os endereços da lista do backend (Configurações do Windows, logout, login). */
 export const openUrl = (url: string) => call<void>("open_url", { url });
+
+// MARK: - Login oficial (o `claude auth login` num ConPTY, no backend)
+
+/** "Adicionar conta": o login numa casa reservada nova. */
+export const startLogin = (groupId: string) => call<LoginView>("start_login", { groupId });
+/** "Relogar…": na casa da conta, com o e-mail dela pré-preenchido. */
+export const startRelogin = (accountId: string, groupId: string) =>
+  call<LoginView>("start_relogin", { accountId, groupId });
+/** O login aberto agora (a janela reaberta volta a mostrá-lo). */
+export const currentLogin = () => call<LoginView | null>("current_login");
+export const loginSubmitCode = (code: string) => call<boolean>("login_submit_code", { code });
+export const loginRetry = () => call<LoginView | null>("login_retry");
+export const loginRecheck = () => call<LoginView | null>("login_recheck");
+/** Fecha (ou cancela) e faz a limpeza do disco que couber. */
+export const loginClose = () => call<Snapshot>("login_close");
+
+/** A fase do login mudou (`null` = fechado). */
+export async function onLoginChanged(handler: (view: LoginView | null) => void): Promise<UnlistenFn> {
+  if (!insideTauri) return mockLoginListen(handler);
+  return on<LoginView | null>("login-changed", handler);
+}
 
 /** A bandeja pediu outra aba com a janela já aberta. */
 export function onNavigate(handler: (tab: HomeTab) => void): Promise<UnlistenFn> {

@@ -3,10 +3,11 @@
   // Tamanho fixo — as abas têm alturas naturais diferentes e a janela pularia
   // de tamanho a cada troca.
   import { onMount } from "svelte";
-  import { onNavigate } from "../lib/api";
+  import * as api from "../lib/api";
   import { t } from "../lib/i18n";
-  import type { AppInfo, HomeTab } from "../lib/types";
+  import type { AccountView, AppInfo, HomeTab, LoginView } from "../lib/types";
   import GroupsView from "./GroupsView.svelte";
+  import LoginDialog from "./LoginDialog.svelte";
   import SettingsView from "./SettingsView.svelte";
 
   let { info }: { info: AppInfo } = $props();
@@ -17,11 +18,33 @@
   // svelte-ignore state_referenced_locally
   let tab = $state<HomeTab>(info.initialTab);
 
+  // MARK: o login oficial (Adicionar conta / Relogar…)
+  let login = $state<LoginView | null>(null);
+
+  /** Fica a visão mais nova: a resposta de um comando pode chegar DEPOIS do
+   *  evento de uma mudança posterior (o link sai em milissegundos). */
+  function accept(next: LoginView | null) {
+    if (next === null) login = null;
+    else if (login === null || next.revision >= login.revision) login = next;
+  }
+
+  async function addAccount(groupId: string) {
+    accept(await api.startLogin(groupId));
+  }
+
+  async function relogin(account: AccountView, groupId: string) {
+    accept(await api.startRelogin(account.id, groupId));
+  }
+
   onMount(() => {
     // A bandeja pode pedir outra aba com a janela já aberta.
-    const unlisten = onNavigate((next) => (tab = next));
+    const unlisten = api.onNavigate((next) => (tab = next));
+    // Um login em andamento continua na janela reaberta.
+    void api.currentLogin().then(accept);
+    const unlistenLogin = api.onLoginChanged(accept);
     return () => {
       void unlisten.then((stop) => stop());
+      void unlistenLogin.then((stop) => stop());
     };
   });
 </script>
@@ -38,13 +61,16 @@
 
   <section class="page" role="tabpanel">
     {#if tab === "groups"}
-      <!-- O login (adicionar e relogar) entra na fatia 5.5. -->
-      <GroupsView onAddAccount={() => {}} onRelogin={() => {}} />
+      <GroupsView onAddAccount={(groupId) => void addAccount(groupId)} onRelogin={(account, groupId) => void relogin(account, groupId)} />
     {:else}
       <SettingsView />
     {/if}
   </section>
 </div>
+
+{#if login}
+  <LoginDialog view={login} onClosed={() => (login = null)} />
+{/if}
 
 <style>
   .home {

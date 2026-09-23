@@ -23,11 +23,16 @@ um `.github/workflows/windows.yml` filtrado por caminho).
 - **Fase 3 (sensor)** e **Fase 4 (núcleo + CLI)** feitas em TDD (os testes do router no Swift
   portados — Engine, Store, Launcher, Probe, SessionRegistry — mais as regressões do Windows),
   clippy `-D warnings` e fmt limpos.
-- **Fase 5 (app Tauri)** em fatias: 5.0 feita — o que o app pede ao núcleo (`terminal_report`,
-  grupo criado dedicado, login estranho no `~\.claude`, contas exclusivas, medição em três
-  passos, casa pendente descartada); 5.1 feita — o anel (`gauge-mark`) e o esqueleto Tauri +
-  Svelte no workspace, no `test.ps1` e na CI. Próximas: bandeja, flyout, janela Grupos/Ajustes,
-  login por ConPTY.
+- **Fase 5 (app Tauri)** em fatias, todas feitas: 5.0 o que o app pede ao núcleo
+  (`terminal_report`, grupo criado dedicado, login estranho no `~\.claude`, contas exclusivas,
+  medição em três passos, casa pendente descartada); 5.1 o anel (`gauge-mark`) e o esqueleto
+  Tauri + Svelte no workspace, no `test.ps1` e na CI; 5.2 a bandeja (anel, tooltip com
+  procedência, laço de rotação); 5.3 o flyout; 5.4 a janela Grupos (cartões, ordem, confirmações,
+  integração de terminal por shell) e Ajustes (abrir no login, barra de tarefas); 5.5 o login
+  oficial por ConPTY (adicionar e relogar, com os estados do macOS e o tempo esgotado visível).
+  Conferido no navegador com o backend simulado (os dois idiomas e temas) e no app do sandbox.
+- Próximas: fase 6 (instalador NSIS com o `router.exe` como sidecar, `build.ps1`, README em
+  inglês) e fase 7 (ponta a ponta com contas reais, grupo dedicado).
 
 ## Regras (herdadas do repo + combinadas)
 - Comentários e `agent.md` em **pt-BR**; identificadores em inglês; docs/README em inglês.

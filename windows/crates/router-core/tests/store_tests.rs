@@ -189,6 +189,34 @@ fn a_relogin_into_another_account_is_wrong_account_and_changes_nothing() {
     );
 }
 
+/// O relogin que voltou com OUTRA conta deixou o login dela na casa desta:
+/// "Usar" serviria a intrusa com o nome desta. A credencial estranha sai (a
+/// conta fica sem login, o estado honesto: a tela manda relogar) — e só a
+/// estranha: a casa com o login certo nunca é tocada.
+#[test]
+fn a_wrong_relogin_leaves_no_foreign_credential_in_the_home() {
+    let mut env = make_store();
+    let group = env.store.add_group_with("trabalho", false);
+    let account = env.add_account("conta2@exemplo.com", group.id);
+    let location = env.adapter.credential_location(&account.home);
+
+    assert!(!env.store.discard_wrong_relogin(account.id), "login certo");
+    assert!(env.creds.exists(&location));
+
+    env.seed_login("intrusa@exemplo.com", &account.home);
+    assert!(env.store.discard_wrong_relogin(account.id));
+    assert!(
+        !env.creds.exists(&location),
+        "a credencial da intrusa ficou"
+    );
+    assert!(account.home.path().exists(), "a casa é da conta: fica");
+    assert!(env.store.config().account(account.id).is_some());
+    assert!(
+        !env.store.discard_wrong_relogin(Id::new()),
+        "conta desconhecida"
+    );
+}
+
 /// Órfãs não aparecem em tela nenhuma. As contas dos outros grupos ficam.
 #[test]
 fn removing_a_group_drops_its_exclusive_accounts_and_keeps_the_others() {

@@ -130,6 +130,33 @@ export interface InstallResult {
 /** O aviso do cartão de grupo sobre a integração. */
 export type IntegrationState = "ok" | "install" | "attention";
 
+/** Por que o login não terminou. */
+export type LoginFailure =
+  | { code: "noClaude" }
+  | { code: "pty"; detail: string }
+  | { code: "ended" }
+  /** O `claude` recusou (`Login failed: …`): o motivo, como ele disse. */
+  | { code: "refused"; detail: string };
+
+/** A fase do login (≙ os estados do LoginSheet do macOS, mais o tempo esgotado). */
+export type LoginPhase =
+  | { phase: "starting" }
+  | { phase: "waiting"; url: string }
+  | { phase: "confirming" }
+  | { phase: "added"; label: string }
+  | { phase: "renewed"; label: string }
+  | { phase: "duplicate"; email: string }
+  | { phase: "wrongAccount"; expected: string; got: string }
+  | { phase: "failed"; reason: LoginFailure }
+  | { phase: "timeout" };
+
+export type LoginView = LoginPhase & {
+  /** Cresce a cada mudança: a tela fica com a maior (evento × resposta). */
+  revision: number;
+  relogin: boolean;
+  invalidCode: boolean;
+};
+
 /** A aba Ajustes. "Abrir no login" vem SEMPRE do sistema. */
 export interface SettingsView {
   autostart: boolean;

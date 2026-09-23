@@ -9,6 +9,9 @@ mod commands;
 mod flyout;
 mod i18n;
 mod locale;
+mod login;
+mod login_output;
+mod login_session;
 mod rotation_loop;
 mod settings;
 mod snapshot;
@@ -114,11 +117,21 @@ pub fn show_home(app: &AppHandle, tab: HomeTab) {
             // (≙ o ícone do Dock): fechar só a minimiza, e o botão da barra
             // fica — dá para fixá-lo. A preferência é lida na hora do fechar,
             // então ligar/desligar vale sem reabrir a janela.
-            if let WindowEvent::CloseRequested { api, .. } = event {
-                if handle.state::<SettingsStore>().get().show_in_taskbar {
-                    api.prevent_close();
-                    let _ = handle.minimize();
+            match event {
+                WindowEvent::CloseRequested { api, .. } => {
+                    if handle.state::<SettingsStore>().get().show_in_taskbar {
+                        api.prevent_close();
+                        let _ = handle.minimize();
+                    }
                 }
+                // A tela do login mora na janela: sem ela, ninguém veria o
+                // desfecho — o `claude` é encerrado e a casa reservada limpa
+                // (espera o processo sair: fora da thread da interface).
+                WindowEvent::Destroyed => {
+                    let app = handle.app_handle().clone();
+                    std::thread::spawn(move || login::close_quietly(&app));
+                }
+                _ => {}
             }
         });
         let _ = window.set_focus();
@@ -160,6 +173,7 @@ pub fn run() {
                 .present_at_launch(state.store().config().groups.is_empty());
             app.manage(state);
             app.manage(settings);
+            app.manage(login::LoginState::default());
             app.manage(flyout::FlyoutState::default());
             flyout::create(app.handle())?;
             tray::create(app.handle())?;
@@ -195,7 +209,14 @@ pub fn run() {
             settings::get_settings,
             settings::set_autostart,
             settings::set_show_in_taskbar,
-            settings::open_url
+            settings::open_url,
+            login::start_login,
+            login::start_relogin,
+            login::current_login,
+            login::login_submit_code,
+            login::login_retry,
+            login::login_recheck,
+            login::login_close
         ])
         .build(tauri::generate_context!())
         .expect("o app não conseguiu subir");
