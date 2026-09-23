@@ -15,3 +15,9 @@ dist/
 
 # Specs e planos de design (locais, nao versionados)
 docs/superpowers/
+
+# Notas internas do mantenedor — NUNCA versionar.
+# O repo é público; contexto operacional (contas, pessoas, decisões em aberto)
+# fica fora dele. Ver NOTAS-INTERNAS.md, que esta linha protege.
+NOTAS-INTERNAS.md
+.local/
