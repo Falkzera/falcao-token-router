@@ -2,7 +2,9 @@ name: Windows
 
 # O porte Windows (Rust + Tauri) mora inteiro em `windows/`. Este workflow só
 # roda quando algo dali (ou ele mesmo) muda; o CI do macOS continua sendo o
-# portão do resto.
+# portão do resto. Além dos testes, ele gera o instalador e o publica como
+# artefato da execução: enquanto o Windows não tem release, é dali que se
+# baixa o app (o `windows/README.md` aponta para cá).
 on:
   pull_request:
     paths:
@@ -23,8 +25,11 @@ permissions:
 
 jobs:
   test:
+    name: Tests and installer
     runs-on: windows-latest
-    timeout-minutes: 45
+    # Só o build de release do app (LTO, um codegen unit) levou ~7 min na
+    # máquina de desenvolvimento; somado aos testes, 45 ficaria justo.
+    timeout-minutes: 60
     defaults:
       run:
         working-directory: windows
@@ -39,16 +44,20 @@ jobs:
           rustup show
           cargo --version
 
-      - uses: actions/cache@v4
+      # Com o `target` vão o debug dos testes e o release do instalador; o
+      # `%LOCALAPPDATA%\tauri` guarda o que o `tauri build` baixa (o NSIS e o
+      # bootstrapper do WebView2).
+      - uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             windows/target
+            ~/AppData/Local/tauri
           key: windows-cargo-${{ hashFiles('windows/Cargo.lock') }}
 
       # O front do app (Svelte + Vite): o `test.ps1` roda o svelte-check e o
-      # verificador de strings, e precisa das dependências instaladas.
+      # verificador de strings, e o `build.ps1` o compila para o instalador.
       - uses: actions/setup-node@v5
         with:
           node-version: 24
@@ -66,5 +75,15 @@ jobs:
         shell: pwsh
         run: ./scripts/test.ps1
 
-      - name: Build de release
-        run: cargo build --workspace --release
+      # Também o da máquina: o router.exe e o app em release, o instalador NSIS
+      # com o router.exe dentro — e o script confere o resultado.
+      - name: Instalador
+        shell: pwsh
+        run: ./scripts/build.ps1
+
+      - name: Artefato do instalador
+        uses: actions/upload-artifact@v6
+        with:
+          name: FalcaoTokenRouter-setup
+          path: windows/target/release/bundle/nsis/*-setup.exe
+          if-no-files-found: error
