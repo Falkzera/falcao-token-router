@@ -47,6 +47,12 @@ impl RouterPaths {
         GroupUsageStore::directory(&self.base)
     }
 
+    /// A escolha do usuário sobre a status line dos grupos, que a CLI lê a
+    /// cada render: `<base>\statusline.json` (ver `statusline::choice`).
+    pub fn status_line_file(&self) -> PathBuf {
+        self.base.join("statusline.json")
+    }
+
     /// A casa de cada conta — o perfil onde ela faz `auth login`. Uma por conta.
     pub fn account_home(&self, id: Id) -> ConfigDir {
         ConfigDir::dedicated(

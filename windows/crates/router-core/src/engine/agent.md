@@ -47,7 +47,8 @@ Modelos, formato da amostra, leitor de uso, credencial, rotação e o store. Sem
   (exige `pid` e `cwd`), `procStart` FILETIME (Windows) ou `ctime` (macOS), filtra `pidDomain`
   de outra máquina, confere o processo (tolerância 300 s; sem prova confia no pid), mais nova
   primeiro.
-- `router_paths.rs` — base `%LOCALAPPDATA%\com.synqo.falcao-router` (override `ROUTER_APP_SUPPORT`).
+- `router_paths.rs` — base `%LOCALAPPDATA%\com.synqo.falcao-router` (override `ROUTER_APP_SUPPORT`),
+  com `config.json`, `usage\` e o `statusline.json` (a escolha da status line, só do Windows).
 
 - `shell_integration.rs` — ≙ `ShellIntegration`: a `statusLine` (`/` e sem aspas; com espaço, 8.3;
   sem 8.3, aspas do shell detectado — `&` no PowerShell; `--profile` nos grupos dedicados),
