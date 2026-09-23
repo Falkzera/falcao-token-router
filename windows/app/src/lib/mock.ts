@@ -8,6 +8,9 @@
 //   &terminal=ausente|ok|bloqueado|parcial|velha|semrouter  &devmode=1
 //   &install=falha (Ativar grava só parte)  &diretiva=1 (Permitir não vence a política)
 //   &autostart=falha (o Windows recusa o registro)  &taskbar=1
+// A status line (aba Ajustes):
+//   &statusline=itens|vazia|comando  &runner=powershell|nenhum
+//   &teste=ok|colorido|vazio|falha|prazo|naosubiu|semshell (o que o "Testar" responde)
 // O login (Adicionar conta / Relogar):
 //   &login=ok|codigo|duplicada|errada|recusado|encerrado|timeout|semclaude
 // Dados só de exemplo (@exemplo.com, Acme, C:\Users\exemplo).
@@ -25,6 +28,11 @@ import type {
   ShellName,
   ShellView,
   Snapshot,
+  Span,
+  StatusLineChoice,
+  StatusLineItem,
+  StatusLineTest,
+  StatusLineView,
   TerminalView,
   UsageView,
 } from "./types";
@@ -258,6 +266,129 @@ const settings: SettingsView = {
   showInTaskbar: param("taskbar") === "1",
   version: "0.1.0-mock",
 };
+
+// MARK: - Status line
+
+const ITEMS: StatusLineItem[] = [
+  "group",
+  "model",
+  "effort",
+  "place",
+  "context",
+  "fiveHour",
+  "sevenDay",
+  "resets",
+  "cost",
+  "email",
+];
+
+function initialChoice(): StatusLineChoice {
+  switch (param("statusline")) {
+    case "itens":
+      return { mode: "app", hidden: ["context", "cost"], command: "" };
+    case "vazia":
+      return { mode: "app", hidden: [...ITEMS], command: "" };
+    case "comando":
+      return { mode: "command", hidden: [], command: "node C:/Users/exemplo/linha.js" };
+    default:
+      return { mode: "app", hidden: [], command: "" };
+  }
+}
+
+let statusChoice = initialChoice();
+
+// As cores que o `render` do núcleo usa (paleta Campbell + truecolor).
+const CYAN = "#3a96dd";
+const BLUE = "#3b78ff";
+const GREEN = "#13a10e";
+const GRAY = "#999999";
+
+/** Uma imitação do `render` do núcleo para a sessão de exemplo — só para o
+ *  navegador; no app, a prévia vem do Rust. */
+function mockPreview(choice: StatusLineChoice): Span[] {
+  const shows = (item: StatusLineItem) => !choice.hidden.includes(item);
+  const s = (text: string, color: string | null = null, bold = false): Span => ({ text, color, bold });
+  const portuguese = mockLocale() === "pt-BR";
+  const first = state.groups[0];
+  const email =
+    first?.accounts.find((a) => a.id === first.activeAccountId)?.email ??
+    (portuguese ? "voce@exemplo.com" : "you@example.com");
+  const now = Date.now();
+  const five = new Date(now + (2 * 60 + 13) * 60_000);
+  const seven = new Date(now + (4 * 24 + 5) * 3_600_000);
+  const days = portuguese
+    ? ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"]
+    : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const hhmm = (d: Date) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  const dayTime = (d: Date) => `${days[d.getDay()]} (${d.getDate()}) ${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
+
+  const segments: Span[][] = [];
+  if (shows("group")) {
+    const name = first?.name ?? (portuguese ? "Trabalho" : "Work");
+    segments.push([s("●", CYAN, true), s(" "), s(name, CYAN)]);
+  }
+  const effort = s("high", "#b1b9f9", true);
+  if (shows("model")) segments.push(shows("effort") ? [s("Opus 5.5", BLUE, true), s(" "), effort] : [s("Opus 5.5", BLUE, true)]);
+  else if (shows("effort")) segments.push([effort]);
+  if (shows("place")) segments.push([s("~/app", GRAY)]);
+  if (shows("context")) segments.push([s("███░░░░░░░", GREEN), s(" "), s("26%", GREEN), s(" "), s("51k/200k", GRAY)]);
+  const windows: Span[] = [];
+  if (shows("fiveHour")) {
+    windows.push(s("5h", GRAY), s(" "), s("█░░░░ 29%", GREEN));
+    if (shows("resets")) windows.push(s(" "), s(`↻ ${hhmm(five)}`, GRAY));
+  }
+  if (shows("sevenDay")) {
+    if (windows.length) windows.push(s("  "));
+    windows.push(s("7d", GRAY), s(" "), s("██░░░ 33%", GREEN));
+    if (shows("resets")) windows.push(s(" "), s(`↻ ${dayTime(seven)}`, GRAY));
+  }
+  if (windows.length) segments.push(windows);
+  if (shows("cost")) segments.push([s("$1.87", GRAY)]);
+  if (shows("email")) segments.push([s(email, GRAY)]);
+  return segments.flatMap((segment, i) => (i === 0 ? segment : [s(" │ ", GRAY), ...segment]));
+}
+
+function statusLineView(): StatusLineView {
+  const runner = param("runner");
+  return {
+    choice: structuredClone(statusChoice),
+    preview: mockPreview(statusChoice),
+    runner: runner === "nenhum" ? null : runner === "powershell" ? "powerShell" : "gitBash",
+    deadlineSeconds: 5,
+  };
+}
+
+function mockTest(command: string): StatusLineTest {
+  const line = (text: string): Span[] => [{ text, color: null, bold: false }];
+  switch (param("teste")) {
+    case "colorido":
+      return {
+        outcome: "printed",
+        spans: [
+          { text: "~/app", color: "#61d6d6", bold: true },
+          { text: " main ", color: "#16c60c", bold: false },
+          { text: "Opus 5.5", color: null, bold: false },
+        ],
+        elapsedMs: 180,
+      };
+    case "vazio":
+      return { outcome: "failed", code: 0, detail: "" };
+    case "falha":
+      return {
+        outcome: "failed",
+        code: 1,
+        detail: "node:internal/modules/cjs/loader:1228\n  throw err;\n  ^\n\nError: Cannot find module 'C:\\Users\\exemplo\\linha.js'",
+      };
+    case "prazo":
+      return { outcome: "timedOut", seconds: 5 };
+    case "naosubiu":
+      return { outcome: "notStarted", detail: "O sistema não pode encontrar o arquivo especificado. (os error 2)" };
+    case "semshell":
+      return { outcome: "noShell" };
+    default:
+      return { outcome: "printed", spans: line(`${command} → linha de exemplo`), elapsedMs: 140 };
+  }
+}
 
 /** A mesma lista do `allowed_url` do Rust — endereço fora dela é defeito do front. */
 function allowedUrl(url: string): boolean {
@@ -553,6 +684,22 @@ const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
     const url = String(args.url);
     if (!allowedUrl(url)) throw new Error(`mock: endereço fora da lista: ${url}`);
     console.info("mock: abrir", url);
+  },
+  get_status_line: () => statusLineView(),
+  // Como o Rust: a escolha que volta é a normalizada (itens na ordem da linha).
+  set_status_line: (args) => {
+    const choice = args.choice as StatusLineChoice;
+    statusChoice = {
+      mode: choice.mode === "command" ? "command" : "app",
+      hidden: ITEMS.filter((item) => choice.hidden.includes(item)),
+      command: choice.command,
+    };
+    console.info("mock: status line gravada", JSON.stringify(statusChoice));
+    return statusLineView();
+  },
+  test_status_line: async (args) => {
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    return mockTest(String(args.command));
   },
 };
 

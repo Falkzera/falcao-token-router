@@ -16,6 +16,7 @@ mod rotation_loop;
 mod settings;
 mod snapshot;
 mod state;
+mod status_line;
 mod system;
 mod terminal;
 mod tray;
@@ -210,6 +211,9 @@ pub fn run() {
             settings::set_autostart,
             settings::set_show_in_taskbar,
             settings::open_url,
+            status_line::get_status_line,
+            status_line::set_status_line,
+            status_line::test_status_line,
             login::start_login,
             login::start_relogin,
             login::current_login,

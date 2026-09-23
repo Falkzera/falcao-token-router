@@ -24,9 +24,16 @@
   diretiva de grupo vencer), a linha do `.bashrc` com copiar para o `.bash_profile` que o ignora,
   a função `claude` do usuário encadeada (info), o app movido (scripts velhos) e a dica do Modo
   de Desenvolvedor (→ `ms-settings:developers`). "Instalada ✓" por 2 s só com `ok`.
-- `SettingsView.svelte` — a aba Ajustes: "Abrir no login" (do sistema, com o motivo da recusa),
-  "Mostrar na barra de tarefas" com a explicação, a dica do ícone escondido no `^` (→
-  `ms-settings:taskbar`) e a versão.
+- `SettingsView.svelte` — a aba Ajustes: a status line (em cima), "Abrir no login" (do sistema,
+  com o motivo da recusa), "Mostrar na barra de tarefas" com a explicação, a dica do ícone
+  escondido no `^` (→ `ms-settings:taskbar`) e a versão.
+- `StatusLineSection.svelte` — a status line das sessões dos grupos: a chave "Usar a status line
+  do app"; ligada, a PRÉVIA (vinda do backend, desenhada pelo código da CLI; num fundo de
+  terminal escuro nos dois temas — as cores da linha são para ele) e os 10 itens, com
+  "Restaurar a completa"; desligada, "Seu comando" (grava ao sair do campo ou no Enter), o
+  shell que o roda e o prazo, e "Testar" (desligado sem shell ou sem comando), com a linha que
+  ele imprimiu ou o porquê da falha (e o começo do stderr). Grava na hora, em FILA (sair do
+  campo clicando na chave grava o comando e depois o modo — a última vence).
 - `LoginDialog.svelte` — o login oficial (≙ LoginSheet): iniciando; o link (o navegador já
   abriu nele) com copiar, "Abrir no navegador" e "Pediu um código?" (aviso de código
   incompleto); conferindo; adicionada/renovada; duplicada e conta errada (com "Sair no
@@ -54,6 +61,13 @@
   falha); os textos da integração falam de Windows (terminal novo, sem `source ~/.zshrc`).
 
 ## Conferência
+- Status line (23/09/2026): no navegador (backend simulado), nos dois idiomas e temas — itens
+  (uma gravação por clique, a prévia muda, "Restaurar a completa"), linha vazia, modo comando
+  (grava ao sair do campo; Enter com o mesmo texto não regrava), os desfechos do "Testar" e o
+  sem-shell (Testar desligado). No app do SANDBOX: a prévia vem do Rust, o arquivo cai na base
+  do sandbox, o "Testar" roda pelo Git Bash de verdade, e o `router.exe` de dev lê a mesma
+  escolha (modo comando e linha do app). As duas páginas do app (janela e flyout) têm o mesmo
+  título e endereço: dirigir a janela pela que tem `[role=tablist]`.
 - Chrome headless pelo DevTools Protocol (script no scratchpad da sessão): arrasto real,
   teclado, limiar (1 gravação ao soltar), renomear, medir com spinner, diálogos e menus, nos dois
   temas e idiomas. Integração (23/09): nunca instalada → Ativar → "Instalando…" → "Instalada ✓"

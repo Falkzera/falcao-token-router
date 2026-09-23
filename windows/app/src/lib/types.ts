@@ -165,6 +165,52 @@ export interface SettingsView {
   version: string;
 }
 
+/** Um item da linha completa do app, na ordem dela. */
+export type StatusLineItem =
+  | "group"
+  | "model"
+  | "effort"
+  | "place"
+  | "context"
+  | "fiveHour"
+  | "sevenDay"
+  | "resets"
+  | "cost"
+  | "email";
+
+/** O `statusline.json` (a CLI lê a cada render). `hidden` = os itens TIRADOS. */
+export interface StatusLineChoice {
+  mode: "app" | "command";
+  hidden: StatusLineItem[];
+  command: string;
+}
+
+/** Um trecho da linha com a cor que o terminal daria (`null` = a padrão). */
+export interface Span {
+  text: string;
+  color: string | null;
+  bold: boolean;
+}
+
+/** Quem roda o comando do usuário (nome de produto, não se traduz). */
+export type Runner = "gitBash" | "powerShell";
+
+export interface StatusLineView {
+  choice: StatusLineChoice;
+  /** Desenhada pelo mesmo código do `router statusline`. */
+  preview: Span[];
+  runner: Runner | null;
+  deadlineSeconds: number;
+}
+
+/** O que o "Testar" viu. */
+export type StatusLineTest =
+  | { outcome: "printed"; spans: Span[]; elapsedMs: number }
+  | { outcome: "failed"; code: number | null; detail: string }
+  | { outcome: "notStarted"; detail: string }
+  | { outcome: "timedOut"; seconds: number }
+  | { outcome: "noShell" };
+
 export interface Snapshot {
   groups: GroupView[];
   measuringGroup: string | null;

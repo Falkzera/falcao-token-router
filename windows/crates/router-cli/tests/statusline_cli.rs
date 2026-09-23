@@ -188,6 +188,37 @@ fn the_command_mode_prints_the_users_line_from_the_same_json() {
     assert!(usage_file(app.path(), "conta1@exemplo.com").exists());
 }
 
+/// Muita status line imprime sem a quebra de linha no fim: a linha não pode se
+/// perder no buffer do stdout do router.
+#[test]
+fn a_users_line_without_a_final_newline_is_not_lost() {
+    let profile = tempfile::tempdir().unwrap();
+    let app = tempfile::tempdir().unwrap();
+    write_identity(profile.path(), "conta1@exemplo.com");
+    let command = command_for(
+        &assert_cmd::cargo::cargo_bin("fake-claude"),
+        "statusline-echo",
+    );
+    write_choice(
+        app.path(),
+        &serde_json::json!({"mode": "command", "command": command}).to_string(),
+    );
+    let assert = assert_cmd::Command::cargo_bin("router")
+        .unwrap()
+        .arg("statusline")
+        .env("CLAUDE_CONFIG_DIR", profile.path())
+        .env("ROUTER_APP_SUPPORT", app.path())
+        .env("FAKE_CLAUDE_NO_NEWLINE", "1")
+        .env_remove("ROUTER_STATUSLINE_CHAINED")
+        .write_stdin(FULL)
+        .assert()
+        .success();
+    assert_eq!(
+        String::from_utf8_lossy(&assert.get_output().stdout),
+        "eco: Opus 5.5 encadeado=1"
+    );
+}
+
 /// Um comando que falha (aqui, nem existe) não deixa a sessão sem linha.
 #[test]
 fn a_command_that_fails_falls_back_to_the_app_line() {

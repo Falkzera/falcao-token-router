@@ -69,7 +69,12 @@ fn main() {
         let json: serde_json::Value = serde_json::from_str(&input).unwrap_or_default();
         let model = json["model"]["display_name"].as_str().unwrap_or("?");
         let chained = env::var("ROUTER_STATUSLINE_CHAINED").unwrap_or_default();
-        println!("eco: {model} encadeado={chained}");
+        // Muita status line imprime sem a quebra no fim (`process.stdout.write`).
+        if env::var_os("FAKE_CLAUDE_NO_NEWLINE").is_some() {
+            print!("eco: {model} encadeado={chained}");
+        } else {
+            println!("eco: {model} encadeado={chained}");
+        }
     } else if args.first().map(String::as_str) == Some("auth")
         && args.get(1).map(String::as_str) == Some("login")
     {

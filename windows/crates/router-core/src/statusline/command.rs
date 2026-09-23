@@ -151,10 +151,24 @@ pub enum Outcome {
 }
 
 /// Roda o comando do usuário com a entrada (o JSON da status line), no shell
-/// dado, com prazo.
+/// dado, com prazo, na pasta de quem chama (a CLI roda na pasta da sessão).
 pub fn run(shell: &Shell, command: &str, input: &[u8], deadline: Duration) -> Outcome {
+    run_in(None, shell, command, input, deadline)
+}
+
+/// O mesmo, numa pasta dada — o "Testar" do app roda na de uma sessão.
+pub fn run_in(
+    dir: Option<&Path>,
+    shell: &Shell,
+    command: &str,
+    input: &[u8],
+    deadline: Duration,
+) -> Outcome {
     let mut process = shell.process(command, |key| std::env::var(key).ok());
     process.env(CHAINED_ENV, "1");
+    if let Some(dir) = dir {
+        process.current_dir(dir);
+    }
     run_process(process, input, deadline)
 }
 
@@ -356,6 +370,26 @@ mod tests {
         assert_eq!(
             String::from_utf8_lossy(&line).trim(),
             "modelo: Opus 5.5 encadeado: 1"
+        );
+    }
+
+    /// O "Testar" do app roda na pasta de uma sessão (a CLI já herda a dela).
+    #[test]
+    fn the_command_can_run_in_a_given_folder() {
+        let tmp = tempfile::tempdir().unwrap();
+        let outcome = run_in(
+            Some(tmp.path()),
+            &powershell(),
+            "Write-Output (Get-Location).ProviderPath",
+            b"{}",
+            Duration::from_secs(20),
+        );
+        let Outcome::Printed(line) = outcome else {
+            panic!("{outcome:?}");
+        };
+        assert_eq!(
+            std::fs::canonicalize(String::from_utf8_lossy(&line).trim()).unwrap(),
+            std::fs::canonicalize(tmp.path()).unwrap()
         );
     }
 

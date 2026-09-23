@@ -4,7 +4,8 @@
 - `api.ts` — as chamadas ao backend (`app_info`, `get_snapshot`, `fit_flyout`, `open_home`,
   `quit_app`, as ações de grupos e contas, a integração de terminal — `terminal_report`,
   `install_integration`, `allow_profiles_for` — e os ajustes — `get_settings`, `set_autostart`,
-  `set_show_in_taskbar`, `open_url` —, o login — `start_login`, `start_relogin`,
+  `set_show_in_taskbar`, `open_url` —, a status line — `get_status_line`, `set_status_line`,
+  `test_status_line` —, o login — `start_login`, `start_relogin`,
   `current_login`, `login_submit_code`, `login_retry`, `login_recheck`, `login_close`) e os
   eventos (`navigate`, `snapshot-changed`, `login-changed`). Dentro do
   Tauri, `invoke`/`listen`; no navegador, o backend simulado. `currentView()` pelo rótulo da
@@ -14,7 +15,10 @@
   URL (`?view=flyout&state=uso|vazio|pronta|critico|erro&lang=pt-BR&select=A2`), a integração
   (`&terminal=ausente|ok|bloqueado|parcial|velha|semrouter&devmode=1&install=falha&diretiva=1`,
   com as mesmas contas do `view` do Rust e o 5.1 em `Restricted` de fábrica depois do Ativar) e
-  os ajustes (`&autostart=falha&taskbar=1`; `open_url` recusa o que o Rust recusa) e o login
+  os ajustes (`&autostart=falha&taskbar=1`; `open_url` recusa o que o Rust recusa), a status
+  line (`&statusline=itens|vazia|comando&runner=powershell|nenhum&teste=ok|colorido|vazio|
+  falha|prazo|naosubiu|semshell`; a prévia é uma imitação do `render` do núcleo só para o
+  navegador, e a escolha gravada volta normalizada como no Rust) e o login
   (`&login=ok|codigo|duplicada|errada|recusado|encerrado|timeout|semclaude`, com as fases no
   tempo e a revisão crescente). Dados só de exemplo (`@exemplo.com`, Acme, `C:\Users\exemplo`).
 - `types.ts` — espelho dos `#[derive(Serialize)]` do Rust (camelCase), inclusive o `Snapshot`.

@@ -76,6 +76,15 @@
   "Tentar de novo" da conta nova é numa casa NOVA.
 - `i18n.rs` — os MESMOS catálogos do front (`include_str!`), com o mesmo preenchimento de
   placeholder (`%@`, `%d`, `%1$@`, `%%`); `t(idioma, chave, args)`.
+- `status_line.rs` — a seção da status line nos Ajustes: `get_status_line`/`set_status_line`
+  (a escolha em `<base>\statusline.json`, gravação atômica — a CLI a lê a cada render) e a
+  PRÉVIA (`preview`, testada): a sessão de exemplo do núcleo pelo MESMO caminho da CLI
+  (`view_from` → `apply` → `render`), com o nome e a conta ativa do 1º grupo (sem eles, nomes
+  de exemplo do catálogo), truecolor e dias no idioma do app. `spans` (testada) converte o ANSI
+  em trechos com as cores da paleta Campbell do Windows Terminal (16 cores, 256 e truecolor; o
+  resto — fundo, OSC 8, cursor — some). `test_status_line` (fora da thread da interface) roda o
+  comando do usuário pelo executor da CLI, com a sessão de exemplo, na pasta da home, e diz o
+  desfecho (`printed`/`failed`/`notStarted`/`timedOut`/`noShell`).
 - `system.rs` — tema da BARRA de tarefas (`SystemUsesLightTheme`), tamanho do ícone pequeno na
   escala do sistema, o `router.exe` ao lado do app (`ROUTER_EXE`, o nome do sidecar do
   instalador), o shell da status line. Os testes também fixam o contrato do empacotamento

@@ -16,4 +16,5 @@ Binário que os testes de integração da CLI usam no lugar do `claude` (via
   `fail:<motivo>` ou `hang`. Os testes do driver de login o rodam num ConPTY de verdade; o app
   do sandbox também pode usá-lo (`ROUTER_CLAUDE_BIN`) para conferir o login sem conta real.
   `statusline-echo` faz de status line do usuário (o modo "meu comando" do router): lê o JSON
-  do stdin até o EOF e imprime `eco: <modelo> encadeado=<ROUTER_STATUSLINE_CHAINED>`.
+  do stdin até o EOF e imprime `eco: <modelo> encadeado=<ROUTER_STATUSLINE_CHAINED>` (sem a
+  quebra de linha no fim com `FAKE_CLAUDE_NO_NEWLINE`).

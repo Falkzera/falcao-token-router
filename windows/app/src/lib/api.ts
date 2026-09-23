@@ -15,6 +15,9 @@ import type {
   SettingsView,
   ShellName,
   Snapshot,
+  StatusLineChoice,
+  StatusLineTest,
+  StatusLineView,
   TerminalView,
   View,
 } from "./types";
@@ -111,6 +114,15 @@ export const setAutostart = (on: boolean) => call<SettingsView>("set_autostart",
 export const setShowInTaskbar = (on: boolean) => call<SettingsView>("set_show_in_taskbar", { on });
 /** Só os endereços da lista do backend (Configurações do Windows, logout, login). */
 export const openUrl = (url: string) => call<void>("open_url", { url });
+
+// MARK: - Status line (a escolha mora na base do router; a CLI a lê a cada render)
+
+export const getStatusLine = () => call<StatusLineView>("get_status_line");
+/** Grava na hora e devolve a prévia nova. */
+export const setStatusLine = (choice: StatusLineChoice) =>
+  call<StatusLineView>("set_status_line", { choice });
+/** Roda o comando com uma sessão de exemplo (leva até o prazo). */
+export const testStatusLine = (command: string) => call<StatusLineTest>("test_status_line", { command });
 
 // MARK: - Login oficial (o `claude auth login` num ConPTY, no backend)
 

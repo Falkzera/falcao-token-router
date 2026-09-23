@@ -11,8 +11,8 @@ removido (o teste pode rodar dentro de uma sessão do Claude Code, com o perfil 
 - `statusline_cli.rs` — o sensor: grava e imprime; sem `rate_limits` não grava; stdin que nunca
   fecha sai rápido; prazo sem entrada. A escolha: itens tirados somem; ilegível = a completa;
   modo comando imprime a linha do usuário (o `fake-claude statusline-echo`) a partir do mesmo
-  JSON e com o EOF; comando que falha cai na linha do app com os itens; o próprio router como
-  comando não entra em laço.
+  JSON e com o EOF (e a linha sem quebra no fim não se perde); comando que falha cai na linha do
+  app com os itens; o próprio router como comando não entra em laço.
 - `cli_tests.rs` — `is-group` (mudo), `launch` (troca, ambiente limpo, argumentos com e sem `--`,
   código de saída, sensor e junction plantados, sai da conta cheia), `rotate` (espelha antes de
   trocar), `measure` (saída, amostra `probe`, ativa pelo grupo), sensor com `--profile`, `doctor`
