@@ -60,3 +60,9 @@ do WebView2 para `%LOCALAPPDATA%\tauri`. `README.md` (inglês) é o guia de quem
   hyperlink OSC 8 do link é re-emitido pelo ConPTY; e o ambiente base do `portable-pty` vem
   também do REGISTRO (`env_clear` antes do ambiente filtrado). Sucesso = `Login successful.`
   e o processo sai sozinho; o desfecho vale só conferido no disco.
+- Instalador (23/09/2026): cada sessão de `claude <grupo>` mantém um `router.exe` rodando, e
+  exe em execução não se sobrescreve nem se apaga — mas se RENOMEIA. Os ganchos do NSIS
+  (`app/src-tauri/installer-hooks.nsh`) o tiram do caminho; sem eles a atualização silenciosa
+  pulava o arquivo e dizia sucesso.
+- Sandbox com `USERPROFILE` falso: a home precisa de `AppData\Local` e `AppData\Roaming`, senão
+  o `SHGetKnownFolderPath` falha e o WebView2 grava em `<exe>.WebView2` ao lado do exe.

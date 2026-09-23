@@ -113,6 +113,28 @@ mod tests {
         assert_eq!(names, [ROUTER_EXE]);
     }
 
+    /// O `router.exe` fica EM USO enquanto dura uma sessão de `claude <grupo>`
+    /// (o `router launch` espera o `claude`). Sem os ganchos, a atualização
+    /// silenciosa pulava o arquivo e dizia sucesso — o app novo com o router
+    /// velho — e a desinstalação o deixava para trás (conferido em 23/09/2026).
+    #[test]
+    fn the_installer_moves_a_router_in_use_out_of_the_way() {
+        let base = config(include_str!("../tauri.conf.json"));
+        assert_eq!(
+            base["bundle"]["windows"]["nsis"]["installerHooks"].as_str(),
+            Some("installer-hooks.nsh")
+        );
+        let hooks = include_str!("../installer-hooks.nsh");
+        for hook in ["NSIS_HOOK_PREINSTALL", "NSIS_HOOK_PREUNINSTALL"] {
+            let start = hooks
+                .find(&format!("!macro {hook}"))
+                .unwrap_or_else(|| panic!("sem o gancho {hook}"));
+            let body = &hooks[start..start + hooks[start..].find("!macroend").unwrap()];
+            assert!(body.contains("FALCAO_ROUTER_OUT_OF_THE_WAY"), "{hook}");
+        }
+        assert!(hooks.contains(&format!("$INSTDIR\\{ROUTER_EXE}")));
+    }
+
     /// O `externalBin` não pode morar no `tauri.conf.json`: o `build.rs` do
     /// Tauri copia o sidecar para `target\<perfil>\` em TODO `cargo build` do
     /// app. Sem o arquivo (a CI, um clone novo) a compilação quebra; com ele,

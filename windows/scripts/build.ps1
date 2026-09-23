@@ -34,7 +34,10 @@ try {
         }
         # O sidecar vem de um config à parte: no tauri.conf.json ele quebraria
         # todo `cargo build` do app sem o arquivo (ver o agent.md do src-tauri).
-        # O `tauri build` roda o `npm run build` (o front) antes do Rust.
+        # O `tauri build` roda o `npm run build` (o front) antes do Rust. Ele
+        # apaga e recria target\release\nsis: um processo com o diretório atual
+        # lá dentro (um terminal, um shell de ferramenta) o faz falhar com
+        # "arquivo em uso" (os error 32).
         Write-Host "== front + app (release) + instalador ==" -ForegroundColor Cyan
         npx tauri build --config src-tauri/tauri.installer.conf.json
         if ($LASTEXITCODE -ne 0) { throw "o tauri build falhou" }
@@ -44,8 +47,8 @@ try {
     }
 
     # A conferência: o instalador é DESTE build, e o script que o NSIS compilou
-    # leva o router.exe ao lado do exe do app. (O `installer.nsi` é do bundler
-    # do Tauri 2.11; se ele mudar de lugar numa versão nova, isto falha alto.)
+    # leva o router.exe ao lado do exe do app, e os ganchos. (O `installer.nsi`
+    # é do bundler do Tauri 2.11; se ele mudar de lugar, isto falha alto.)
     Write-Host "== conferência ==" -ForegroundColor Cyan
     $setup = "target\release\bundle\nsis\$($conf.productName)_$($conf.version)_x64-setup.exe"
     if (-not (Test-Path $setup) -or (Get-Item $setup).LastWriteTime -lt $started) {
@@ -57,6 +60,10 @@ try {
     }
     if ($nsi -notmatch [regex]::Escape("!define MAINBINARYNAME `"$($conf.mainBinaryName)`"")) {
         throw "o exe do app no instalador não se chama $($conf.mainBinaryName).exe"
+    }
+    # Os ganchos que tiram do caminho um router.exe em uso (sessão aberta).
+    if ($nsi -notmatch '(?m)^!include ".*\\installer-hooks\.nsh"') {
+        throw "o instalador não leva os ganchos do installer-hooks.nsh"
     }
 
     $mb = { param($path) "{0:N1} MB" -f ((Get-Item $path).Length / 1MB) }

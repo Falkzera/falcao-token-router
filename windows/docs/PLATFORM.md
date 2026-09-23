@@ -171,6 +171,8 @@ An NSIS installer built by the Tauri CLI 2.11.5. Checked on 2026-09-23 in the
   NSIS picks the one that matches the Windows display language. WebView2 comes
   through the embedded bootstrapper, which downloads the runtime only when it is
   missing.
+- The installer and the uninstaller close a running app first (the silent ones
+  without asking).
 - The uninstaller removes the app's exe, `router.exe`, `uninstall.exe`, the
   shortcuts, the uninstall key and the `FalcaoTokenRouter` value under
   `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` (the name the autostart
@@ -181,6 +183,28 @@ An NSIS installer built by the Tauri CLI 2.11.5. Checked on 2026-09-23 in the
   (the install location, kept for a reinstall).
 - The installer isn't code-signed, so SmartScreen stops it once. A build made on the
   same machine carries no Mark of the Web and isn't stopped.
+
+**`router.exe` in use.** Every session opened with `claude <group>` keeps a
+`router launch` process alive until the session ends. Windows refuses to overwrite
+or delete a running executable, but it lets you **rename** it, and the process keeps
+running from the image it already loaded. Installed and updated for real on
+2026-09-23, with a stand-in process holding `router.exe`:
+
+- With Tauri's stock template, a silent update **skipped** the file and exited 0: the
+  new app ended up with the old `router.exe`, and nothing said so. An interactive
+  update stops at NSIS's "Error opening file for writing" instead.
+- The port's NSIS hooks (`app/src-tauri/installer-hooks.nsh`) move a `router.exe`
+  in use out of the way before install and uninstall: to `%TEMP%` under a unique
+  name, or renamed in place if that fails. The update then wrote the new file (the
+  session kept running), the uninstall removed the whole folder, and the next run
+  deleted the leftover from the previous one once nothing held it.
+
+**WebView2's fallback folder.** Tauri points each webview's data at
+`%LOCALAPPDATA%\<identifier>`. When that path can't be resolved, WebView2 falls back
+to `<exe>.WebView2` **next to the executable**. `SHGetKnownFolderPath` fails when the
+folder doesn't exist, and that happened in a test sandbox whose fake `USERPROFILE`
+had no `AppData\Local` yet: the first webview's data landed inside the install
+folder. A real profile always has the folder, and the sandbox now creates it.
 
 ## Mapping from macOS
 

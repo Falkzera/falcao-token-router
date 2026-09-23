@@ -192,6 +192,14 @@ threshold.
 | The app's own settings, and its window's cache | `%APPDATA%\com.synqo.falcao-token-router`, and the same name under `%LOCALAPPDATA%` |
 | The terminal integration | one line in each `$PROFILE` and in `~/.bashrc`, pointing at `shell.ps1` / `shell.sh` in the router's folder |
 
+## Updating
+
+Run the newer installer over the old one. It closes the app if it's running (it asks
+first) and replaces the program; your groups, accounts and settings stay. Sessions
+you opened with `claude <group>` keep running: the installer moves the `router.exe`
+they're using out of the way, and your next `claude <group>` runs the new one. Start
+the app again afterwards — the installer's last page offers to.
+
 ## Uninstall
 
 1. *Optional:* in the app, remove the accounts you added. That deletes their logins
@@ -200,7 +208,8 @@ threshold.
    removes the program. Your groups and accounts stay in
    `%LOCALAPPDATA%\com.synqo.falcao-router`, in case you reinstall. The
    uninstaller's **Delete the application data** box removes only the app's own
-   settings and cache.
+   settings and cache. A `claude <group>` session that is still open keeps running;
+   the `router.exe` it uses goes to your `%TEMP%` folder.
 3. Remove the integration: in each PowerShell, `notepad $PROFILE` and delete the
    line that mentions `com.synqo.falcao-router`; do the same in `~/.bashrc`. Until
    you do, `claude <group>` prints a red warning that `router.exe` is missing and
