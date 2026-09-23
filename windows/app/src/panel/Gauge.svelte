@@ -3,11 +3,13 @@
   // Sem teto calibrado nem saturação: aqui há uma fração e um reset, e é só
   // isso que se promete.
   import { clock } from "../lib/clock.svelte";
-  import { resetText, severity } from "../lib/format";
+  import { notStarted, resetText, severity } from "../lib/format";
   import { t } from "../lib/i18n";
   import type { Reading } from "../lib/types";
 
-  let { title, reading }: { title: string; reading: Reading | null } = $props();
+  // `session`: é a janela de 5h, a única que pode não ter começado.
+  let { title, reading, session = false }: { title: string; reading: Reading | null; session?: boolean } =
+    $props();
 </script>
 
 <div class="gauge">
@@ -28,7 +30,13 @@
     {/if}
   </span>
   <span class="caption">
-    {reading ? resetText(reading, clock.now) : t("panel.account.window.expired")}
+    {#if !reading}
+      {t("panel.account.window.expired")}
+    {:else if session && notStarted(reading)}
+      {t("panel.reset.notStarted.detail")}
+    {:else}
+      {resetText(reading, clock.now)}
+    {/if}
   </span>
 </div>
 

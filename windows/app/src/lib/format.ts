@@ -33,6 +33,15 @@ export function clockTime(iso: string): string {
   );
 }
 
+/** A janela de 5h em 0% e sem reset ainda não começou: ela só conta a partir
+ *  da 1ª mensagem, e até lá a Anthropic não manda o `resets_at` — o próprio
+ *  `/usage` imprime "Current session: 0% used" sem o "· resets" (lido no JS do
+ *  Claude Code 2.1.281, 23/09/2026: o trecho do reset só entra com a data). As
+ *  janelas semanais trazem a data sempre, mesmo em 0%. Só para a de 5h. */
+export function notStarted(reading: Reading | null): boolean {
+  return reading !== null && reading.resetsAt === null && reading.fraction === 0;
+}
+
 /** Quanto falta: "1h 12m" / "3m", e "4d 13h" a partir de um dia — o reset
  *  semanal contado só em horas ("109h 12m") não se lê. */
 export function untilText(seconds: number): string {

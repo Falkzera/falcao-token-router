@@ -26,7 +26,9 @@
   `setLocale` (uma vez, na subida).
 - `format.ts` — duração ("1h 12m"), quanto falta com dias (`untilText`: "4d 13h" a partir de um
   dia), "reseta seg (28) 9:00 · em 4d 13h" (`resetText`: o "quando" vem escrito do núcleo, o que
-  falta é contado de agora), semáforo (0,66/0,90) e os limiares de idade (1 h esmaece, 12 h
+  falta é contado de agora), `notStarted` (5h em 0% sem reset = a janela não começou — o
+  `/usage` do Claude Code 2.1.281 só escreve o "· resets" com a data, e a de 5h sem uso não tem;
+  as semanais têm sempre), semáforo (0,66/0,90) e os limiares de idade (1 h esmaece, 12 h
   relógio).
 - `clock.svelte.ts` — o relógio da tela, andando a cada 30 s (idades não congelam na tela aberta).
 - `Icon.svelte` — os ícones do app em SVG (grupos, ajustes, fechar, relógio, sensor, sonda,

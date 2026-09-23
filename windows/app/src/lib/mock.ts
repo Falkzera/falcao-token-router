@@ -90,7 +90,13 @@ function usage(
     fraction,
     text: pct(fraction),
     bound,
-    fiveHour: five === null ? null : reading(five, 3, false),
+    // Como a Anthropic: a janela de 5h sem uso não começou e vem sem reset.
+    fiveHour:
+      five === null
+        ? null
+        : five === 0
+          ? { fraction: 0, text: pct(0), resetsAt: null, resetsLabel: null }
+          : reading(five, 3, false),
     sevenDay: seven === null ? null : reading(seven, 50, true),
     model: model
       ? { name: model.name, reading: reading(model.fraction, 30, true), sampledAt: minutesAgo(model.ageMinutes) }
@@ -126,6 +132,7 @@ function work(): GroupView {
       { id: "A1", label: "equipe-1", email: "equipe-1@exemplo.com", organization: "Acme", usage: usage(0.12, 0.4, "probe", 125) },
       { id: "A2", label: "equipe-2", email: "equipe-2@exemplo.com", organization: "Acme", usage: usage(0.34, 0.81, "sensor", 3) },
       { id: "A3", label: "equipe-3", email: "equipe-3@exemplo.com", organization: "Acme", usage: null },
+      { id: "A6", label: "equipe-4", email: "equipe-4@exemplo.com", organization: "Acme", usage: usage(0, 0.02, "probe", 1) },
     ],
   });
 }

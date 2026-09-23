@@ -26,7 +26,7 @@
   </div>
 
   {#if usage}
-    <Gauge title={t("panel.gauge.current")} reading={usage.fiveHour} />
+    <Gauge title={t("panel.gauge.current")} reading={usage.fiveHour} session />
     <Gauge title={t("panel.gauge.weekly")} reading={usage.sevenDay} />
     <!-- Rótulo e ícone acompanham a origem: antena é o sensor (uma requisição
          que a conta atendeu), medidor é a sonda (uma consulta de propósito). -->

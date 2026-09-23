@@ -6,22 +6,25 @@
 // pede. Uma idade só para as duas afirmaria que o número do Fable é tão fresco
 // quanto o das 5 horas — e é justamente o do Fable que trava a conta.
 
-import { ageSeconds, duration, resetText } from "../lib/format";
+import { ageSeconds, duration, notStarted, resetText } from "../lib/format";
 import { t } from "../lib/i18n";
 import type { Reading, UsageView } from "../lib/types";
 
 /** Quando cada janela reseta, uma por linha ("5h reseta 22:30 · em 1h 12m") —
- *  o "quando" como a status line o escreve; o que falta, contado de agora. */
+ *  o "quando" como a status line o escreve; o que falta, contado de agora. A
+ *  de 5h que não começou diz isso, em vez de sumir da lista. */
 function resets(usage: UsageView, now: number): string {
+  const five = t("panel.accounts.window.fiveHour");
+  const lines = notStarted(usage.fiveHour) ? [t("panel.accounts.reset.notStarted.help.format", five)] : [];
   const windows: [string, Reading | null][] = [
-    [t("panel.accounts.window.fiveHour"), usage.fiveHour],
+    [five, usage.fiveHour],
     [t("panel.accounts.window.sevenDay"), usage.sevenDay],
     [usage.model?.name ?? "", usage.model?.reading ?? null],
   ];
-  return windows
-    .filter((entry): entry is [string, Reading] => entry[1]?.resetsAt != null)
-    .map(([name, reading]) => t("panel.accounts.reset.help.format", name, resetText(reading, now)))
-    .join("\n");
+  for (const [name, reading] of windows) {
+    if (reading?.resetsAt) lines.push(t("panel.accounts.reset.help.format", name, resetText(reading, now)));
+  }
+  return lines.join("\n");
 }
 
 export function accountHelp(usage: UsageView | null, now: number): string {
