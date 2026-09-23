@@ -30,6 +30,7 @@ use crate::platform::atomic_write::{read_retrying, write_atomic};
 use crate::platform::json_file::{edit_object, JsonFileError};
 use crate::platform::known_folders::documents_dir;
 use crate::platform::profile_append::{append_block, AppendOutcome};
+use crate::platform::short_path::short_path;
 
 /// Erro ao gravar o `settings.json` de um perfil.
 pub type SettingsError = JsonFileError;
@@ -158,6 +159,17 @@ impl ShellIntegration {
         command
     }
 
+    /// A status line que o perfil de um grupo deve ter: `--profile` só no
+    /// dedicado. Cria a pasta do perfil antes — o nome 8.3 só existe para o que
+    /// existe, e sem ele o comando mudaria entre uma instalação e a seguinte.
+    pub fn status_line_for_profile(router: &Path, dir: &ConfigDir, shell: StatusShell) -> String {
+        let profile = (!dir.is_default).then(|| dir.path());
+        if let Some(path) = &profile {
+            let _ = fs::create_dir_all(path);
+        }
+        Self::status_line_command(router, profile.as_deref(), shell, &short_path)
+    }
+
     /// O valor da chave `statusLine`.
     pub fn status_line_value(command: &str) -> Value {
         json!({"type": "command", "command": command, "padding": 0})
@@ -239,9 +251,12 @@ function global:claude {{
 # Sem `exec`: a sessão roda como filha do shell, que continua aberto quando ela acaba.
 
 # Uma função `claude` que já existia continua valendo para o `claude` sem grupo.
-if declare -F claude >/dev/null 2>&1 && ! declare -f claude | grep -q '{SHIM_MARKER}'; then
-  eval "$(declare -f claude | sed '1s/^claude /falcao_claude_anterior /')"
+# Só com o próprio bash (sem grep/sed, que podem faltar no PATH).
+__falcao_def="$(declare -f claude 2>/dev/null)"
+if [ -n "$__falcao_def" ] && [[ "$__falcao_def" != *{SHIM_MARKER}* ]]; then
+  eval "falcao_claude_anterior${{__falcao_def#claude}}"
 fi
+unset __falcao_def
 
 claude() {{
   : {SHIM_MARKER}

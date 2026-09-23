@@ -139,6 +139,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "fake-claude"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+]
+
+[[package]]
 name = "fastrand"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -401,6 +408,7 @@ version = "0.1.0"
 dependencies = [
  "assert_cmd",
  "chrono",
+ "regex",
  "router-core",
  "serde",
  "serde_json",

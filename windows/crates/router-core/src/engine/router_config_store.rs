@@ -37,7 +37,6 @@ use super::shell_integration::{ShellIntegration, ShellTargets, StatusShell};
 use crate::ids::Id;
 use crate::platform::atomic_write::{read_retrying, write_atomic};
 use crate::platform::paths::is_strictly_inside;
-use crate::platform::short_path::short_path;
 use crate::usage::claude_usage_probe::{ClaudeUsageProbe, ProbeTarget};
 
 /// Última falha de uma ação, para a UI mostrar (com o texto do catálogo dela).
@@ -641,20 +640,13 @@ impl RouterConfigStore {
     }
 
     /// A status line que o perfil de um grupo deve ter, para o shell que o
-    /// Claude Code vai usar. Cria a pasta do perfil antes: o nome 8.3 só existe
-    /// para o que existe, e sem ele o comando mudaria entre uma instalação e a
-    /// seguinte.
+    /// Claude Code vai usar.
     pub fn expected_status_line(&self, group: &AccountGroup, shell: StatusShell) -> Option<String> {
         let router = self.router_path.as_deref()?;
-        let profile = (!group.config_dir.is_default).then(|| group.config_dir.path());
-        if let Some(dir) = &profile {
-            let _ = fs::create_dir_all(dir);
-        }
-        Some(ShellIntegration::status_line_command(
+        Some(ShellIntegration::status_line_for_profile(
             router,
-            profile.as_deref(),
+            &group.config_dir,
             shell,
-            &short_path,
         ))
     }
 

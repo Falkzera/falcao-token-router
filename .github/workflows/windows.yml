@@ -1,0 +1,57 @@
+name: Windows
+
+# O porte Windows (Rust) mora inteiro em `windows/`. Este workflow só roda quando
+# algo dali (ou ele mesmo) muda; o CI do macOS continua sendo o portão do resto.
+on:
+  pull_request:
+    paths:
+      - "windows/**"
+      - ".github/workflows/windows.yml"
+  push:
+    branches: [main]
+    paths:
+      - "windows/**"
+      - ".github/workflows/windows.yml"
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: windows
+
+    steps:
+      - uses: actions/checkout@v5
+
+      # O `rust-toolchain.toml` fixa o canal e os componentes; o rustup do
+      # runner instala o que faltar.
+      - name: Toolchain
+        run: |
+          rustup show
+          cargo --version
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            windows/target
+          key: windows-cargo-${{ hashFiles('windows/Cargo.lock') }}
+
+      # O mesmo script da máquina: fmt --check, clippy -D warnings e a suíte
+      # (que roda o shell.ps1 no Windows PowerShell 5.1 e o shell.sh no Git Bash
+      # de verdade — os dois existem no runner).
+      - name: Testes
+        shell: pwsh
+        run: ./scripts/test.ps1
+
+      - name: Build de release
+        run: cargo build --workspace --release

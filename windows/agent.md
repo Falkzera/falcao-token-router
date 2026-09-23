@@ -6,19 +6,23 @@ v2**, lendo e escrevendo os MESMOS arquivos que o app macOS: `config.json` e
 um `.github/workflows/windows.yml` filtrado por caminho).
 
 ## Estrutura
-- `Cargo.toml` — workspace (resolver 2, edition 2021, rust-version 1.89).
+- `Cargo.toml` — workspace (resolver 2, edition 2021, rust-version 1.89) e as dependências comuns.
 - `rust-toolchain.toml` — canal stable, alvo `x86_64-pc-windows-msvc`.
-- `crates/router-core/` — o motor (modelos, sensor, leitor de uso). Sem I/O de rede.
-- `crates/router-cli/` — a CLI `router` (por ora só `statusline`).
+- `crates/router-core/` — o motor (modelos, credencial em arquivo, rotação, store, sessões,
+  integração de terminal, sonda). Sem UI, sem rede.
+- `crates/router-cli/` — a CLI `router` (`statusline`, `launch`, `is-group`, `rotate`, `measure`,
+  `doctor`).
+- `crates/fake-claude/` — `claude` de mentira para os testes de integração (nunca empacotado).
+- `docs/PLATFORM.md` — os fatos do Windows verificados (inglês), o mapa macOS → Windows e as
+  diferenças deliberadas.
 - `scripts/test.ps1` — a verificação (fmt + clippy + testes), igual na CI.
 - `app/` (fase 5, ainda não existe) — o app Tauri.
 
 ## Estado
-- **Fase 3 (sensor) feita e validada:** `router statusline` lê `rate_limits` do
-  stdin (com prazo, sem esperar EOF), grava a amostra por conta (só se houver
-  janela) e imprime a linha colorida. Testes portados do macOS + regressões Windows.
-- Próximo: Fase 4 — núcleo e CLI completos (rotação, credencial em arquivo,
-  `launch`/`is-group`/`rotate`/`doctor`/`measure`) em TDD.
+- **Fase 3 (sensor)** e **Fase 4 (núcleo + CLI)** feitas em TDD: 210 testes (os do router no
+  Swift portados — Engine, Store, Launcher, Probe, SessionRegistry — mais as regressões do
+  Windows), clippy `-D warnings` e fmt limpos.
+- Próximo: Fase 5 — o app Tauri (bandeja, janela Grupos/Ajustes, login por ConPTY, laço de 180 s).
 
 ## Regras (herdadas do repo + combinadas)
 - Comentários e `agent.md` em **pt-BR**; identificadores em inglês; docs/README em inglês.

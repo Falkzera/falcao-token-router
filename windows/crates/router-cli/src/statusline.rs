@@ -6,6 +6,9 @@
 //!   pega o 1º JSON completo e tem prazo; nunca espera EOF.
 //! - grava a amostra **só se houver ao menos uma janela** — no macOS uma amostra
 //!   sem janela apagava a última leitura (a conta cheia virava "pronta").
+//! - o perfil vem do `CLAUDE_CONFIG_DIR`; se a variável não chegar (subprocesso
+//!   com ambiente raspado), do `--profile` que a status line do grupo embute.
+//! - respeita o `ROUTER_APP_SUPPORT` (o sensor do macOS o ignora).
 
 use std::io::Write;
 use std::sync::mpsc;
@@ -18,6 +21,7 @@ use serde_json::{Map, Value};
 
 use router_core::engine::anthropic_adapter::AnthropicAdapter;
 use router_core::engine::config_dir::ConfigDir;
+use router_core::engine::engine_lock::EngineLock;
 use router_core::engine::group_usage::{GroupUsageSample, GroupUsageStore, UsageOrigin};
 use router_core::engine::provider::ProviderAdapter;
 use router_core::engine::router_paths::RouterPaths;
@@ -26,9 +30,13 @@ use router_core::usage::usage_percent::UsagePercent;
 /// Prazo do leitor de stdin. O sensor real precisa ser rápido e nunca pendurar.
 const DEADLINE_MS: u64 = 250;
 
-pub fn run() {
+/// Quanto esperar pela trava do motor antes de gravar mesmo assim: a status line
+/// não pode esperar uma troca de conta terminar.
+const LOCK_WAIT: Duration = Duration::from_millis(100);
+
+pub fn run(args: &[String]) {
     let input = read_stdin_with_deadline();
-    let dir = current_config_dir();
+    let dir = current_config_dir(profile_arg(args).as_deref());
     // Identidade do PERFIL (o `.claude.json`), nunca do stdin.
     let email = AnthropicAdapter.identity(&dir).map(|id| id.email);
 
@@ -50,8 +58,9 @@ pub fn run() {
                 None,
                 UsageOrigin::Sensor,
             );
-            let usage_dir = RouterPaths::new().usage_dir();
-            let _ = GroupUsageStore::write(&sample, email, &usage_dir);
+            let paths = RouterPaths::new();
+            let _lock = EngineLock::acquire(&paths.base, LOCK_WAIT);
+            let _ = GroupUsageStore::write(&sample, email, &paths.usage_dir());
         }
     }
 
@@ -62,12 +71,21 @@ pub fn run() {
     std::process::exit(0);
 }
 
+/// O valor de `--profile <perfil>`, se veio.
+fn profile_arg(args: &[String]) -> Option<String> {
+    let at = args.iter().position(|a| a == "--profile")?;
+    args.get(at + 1).filter(|p| !p.is_empty()).cloned()
+}
+
 /// O perfil de onde a amostra vem: `CLAUDE_CONFIG_DIR` não-vazio → dedicado;
-/// senão o padrão (`<home>\.claude`).
-fn current_config_dir() -> ConfigDir {
+/// senão o `--profile` embutido; senão o padrão (`<home>\.claude`).
+fn current_config_dir(profile: Option<&str>) -> ConfigDir {
     match std::env::var("CLAUDE_CONFIG_DIR") {
         Ok(raw) if !raw.is_empty() => ConfigDir::dedicated(raw),
-        _ => ConfigDir::standard(&home_dir()),
+        _ => match profile {
+            Some(p) => ConfigDir::dedicated(p),
+            None => ConfigDir::standard(&home_dir()),
+        },
     }
 }
 
@@ -219,5 +237,16 @@ mod tests {
     fn label_is_local_part_or_question_mark() {
         assert!(render_line(Some("equipe1@exemplo.com"), None, None).contains("equipe1"));
         assert!(render_line(None, None, None).contains('?'));
+    }
+
+    #[test]
+    fn the_profile_argument_is_read_after_the_flag() {
+        let args = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert_eq!(
+            profile_arg(&args(&["--profile", "C:/Users/exemplo/g"])).as_deref(),
+            Some("C:/Users/exemplo/g")
+        );
+        assert_eq!(profile_arg(&args(&["--profile"])), None);
+        assert_eq!(profile_arg(&args(&[])), None);
     }
 }

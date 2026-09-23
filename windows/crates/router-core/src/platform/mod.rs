@@ -2,6 +2,7 @@
 //! atômica de arquivo, e — nas próximas fases — links, liveness, caminhos curtos.
 
 pub mod atomic_write;
+pub mod console;
 pub mod git_bash;
 pub mod host;
 pub mod json_file;

@@ -1,7 +1,7 @@
 # Workspace do porte Windows. Nada aqui muda o app macOS — tudo vive sob windows/.
 [workspace]
 resolver = "2"
-members = ["crates/router-core", "crates/router-cli"]
+members = ["crates/router-core", "crates/router-cli", "crates/fake-claude"]
 
 [workspace.package]
 edition = "2021"
@@ -20,6 +20,7 @@ windows-sys = { version = "0.61", features = [
     "Win32_Security",
     "Win32_Storage_FileSystem",
     "Win32_System_Com",
+    "Win32_System_Console",
     "Win32_System_Registry",
     "Win32_System_SystemInformation",
     "Win32_System_Threading",

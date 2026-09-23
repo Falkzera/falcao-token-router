@@ -17,6 +17,9 @@ use std::path::{Path, PathBuf};
 use chrono::Utc;
 use serde_json::Value;
 
+use super::anthropic_adapter::AnthropicAdapter;
+use super::config_dir::ConfigDir;
+use super::provider::ProviderAdapter;
 use crate::platform::atomic_write::{read_retrying, write_atomic};
 
 /// Prefixo das pastas de cópia — é por ele que se sabe que a cópia já foi feita.
@@ -37,6 +40,16 @@ impl DefaultProfileGuard {
             claude_json,
             backups: base.join("backups"),
         }
+    }
+
+    /// A guarda do `<home>\.claude` do usuário, com as cópias sob `base`.
+    pub fn for_home(home: &str, base: &Path) -> Self {
+        let dir = ConfigDir::standard(home);
+        Self::new(
+            AnthropicAdapter.credential_location(&dir),
+            dir.global_config_path(),
+            base,
+        )
     }
 
     /// Esta escrita é no perfil padrão? Comparação sem caixa e sem ligar para a
