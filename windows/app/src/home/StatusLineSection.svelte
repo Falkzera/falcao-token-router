@@ -65,11 +65,15 @@
     if (draft !== current.command) save({ ...current, command: draft });
   }
 
+  /** O resultado vale para o comando testado: editar o campo ou trocar de modo o
+   *  apaga, e um resultado que chega depois de uma edição não aparece. */
   async function runTest() {
+    const command = draft;
     testing = true;
     test = null;
     try {
-      test = await api.testStatusLine(draft);
+      const result = await api.testStatusLine(command);
+      if (draft === command) test = result;
     } finally {
       testing = false;
     }
@@ -95,7 +99,10 @@
         <Switch
           checked={choice.mode === "app"}
           label={t("settings.statusLine.useApp")}
-          onChange={(on) => save({ ...choice, mode: on ? "app" : "command", command: draft })}
+          onChange={(on) => {
+            test = null;
+            save({ ...choice, mode: on ? "app" : "command", command: draft });
+          }}
         />
         <p class="detail">{t("settings.statusLine.detail")}</p>
       </div>
@@ -138,6 +145,7 @@
               autocomplete="off"
               placeholder={t("settings.statusLine.command.placeholder")}
               bind:value={draft}
+              oninput={() => (test = null)}
               onblur={() => commitCommand(choice)}
               onkeydown={(event) => {
                 if (event.key === "Enter") commitCommand(choice);

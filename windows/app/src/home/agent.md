@@ -32,7 +32,9 @@
   terminal escuro nos dois temas — as cores da linha são para ele) e os 10 itens, com
   "Restaurar a completa"; desligada, "Seu comando" (grava ao sair do campo ou no Enter), o
   shell que o roda e o prazo, e "Testar" (desligado sem shell ou sem comando), com a linha que
-  ele imprimiu ou o porquê da falha (e o começo do stderr). Grava na hora, em FILA (sair do
+  ele imprimiu ou o porquê da falha (e o começo do stderr). O resultado vale para o comando
+  testado: editar o campo ou trocar de modo o apaga, e um que chega depois de uma edição não
+  aparece. Grava na hora, em FILA (sair do
   campo clicando na chave grava o comando e depois o modo — a última vence).
 - `LoginDialog.svelte` — o login oficial (≙ LoginSheet): iniciando; o link (o navegador já
   abriu nele) com copiar, "Abrir no navegador" e "Pediu um código?" (aviso de código
