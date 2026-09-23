@@ -113,7 +113,8 @@ they reset, the session's cost and the e-mail of the account serving you:
 The usage windows appear once the session has had its first answer. That line is
 also the **sensor**: it hands the router the usage that Claude Code itself received —
 so in a group, it takes the place of any status line you configured yourself (yours
-keeps working in your other profiles).
+keeps working in your other profiles). To trim the line, or to see your own status
+line in group sessions, see [Status line](#status-line).
 
 ### 5. Watch the switch
 
@@ -134,8 +135,9 @@ start `claude work` and, with **Auto-switch** on, every 3 minutes while the app 
 ```
 
 `router doctor` checks what fails **silently** — the profile lines, the execution
-policy, each group's status line actually running through your shell, the active
-accounts, live sessions and the `claude` binary — and names what's wrong. Like the
+policy, each group's status line actually running through your shell, your status
+line choice (and your own command, if you use one), the active accounts, live
+sessions and the `claude` binary — and names what's wrong. Like the
 macOS `router`, it prints in Portuguese: `ok` marks a check that passed, `!!` one
 that didn't, and the last line is `tudo certo.` (all good) or `há problemas acima.`
 (problems above).
@@ -150,10 +152,33 @@ that didn't, and the last line is `tudo certo.` (all good) or `há problemas aci
 - **Groups** has what the walkthrough used and, per group, the rotation order (drag,
   or ↑/↓), **Log in again…** for an account whose login expired, **Remove account**,
   **Measure accounts**, rename, default and delete.
-- **Settings**: **Open at login** and **Show in taskbar**.
+- **Settings**: the **Status line** (below), **Open at login** and **Show in
+  taskbar**.
 
 Closing the window leaves the app running in the notification area; **Quit** ends
 it. The app follows your Windows language — English or Portuguese.
+
+### Status line
+
+**Settings → Status line** picks what group sessions show below the prompt. The
+router measures usage whatever you pick, and a change applies at the next update of
+the sessions already open.
+
+- **Use the app's status line** (the default) is the full line shown in step 4.
+  Untick what you don't want to see — group, model, effort, branch or folder,
+  context, the 5-hour window, the 7-day window, reset times, cost, account e-mail —
+  and the preview, drawn by the same code the sessions use, follows. With every item
+  unticked, the line stays empty.
+- Turn it off to run **your own command** instead — the status line you use in your
+  other profiles, for example. After measuring, the router runs it with the same
+  JSON Claude Code sends and the way Claude Code runs a status line: through Git
+  Bash, or PowerShell when there's no Git Bash. **Test** runs it with a sample
+  session. If your command fails, prints nothing or takes longer than 5 seconds, the
+  session shows the app's line instead; whatever the command leaves running in the
+  background ends with it.
+
+The choice is kept in `%LOCALAPPDATA%\com.synqo.falcao-router\statusline.json`. If
+that file is missing or unreadable, sessions show the full line.
 
 ## What the numbers mean
 
@@ -197,6 +222,7 @@ threshold.
 |---|---|
 | The app and `router.exe` | `%LOCALAPPDATA%\FalcaoTokenRouter` |
 | Groups, accounts, their profiles, the samples | `%LOCALAPPDATA%\com.synqo.falcao-router` — the same layout as the macOS app's `Application Support` folder |
+| The status line choice | `statusline.json` in that same folder (Windows only) |
 | The app's own settings, and its window's cache | `%APPDATA%\com.synqo.falcao-token-router`, and the same name under `%LOCALAPPDATA%` |
 | The terminal integration | one line in each `$PROFILE` and in `~/.bashrc`, pointing at `shell.ps1` / `shell.sh` in the router's folder |
 

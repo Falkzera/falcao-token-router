@@ -51,16 +51,32 @@ and `router doctor` reports it when set.
 ## The status line
 
 - It runs through **Git Bash** when Git for Windows is installed, PowerShell
-  otherwise. Claude Code looks for bash in this order: `CLAUDE_CODE_GIT_BASH_PATH`,
-  `%ProgramFiles%\Git\bin\bash.exe`, `%ProgramFiles(x86)%\Git\bin\bash.exe`, then the
-  `git.exe` on `PATH`.
+  otherwise. Claude Code looks for bash in this order: `CLAUDE_CODE_GIT_BASH_PATH`
+  (ignored unless it names a `bash`/`sh` that exists), `%ProgramFiles%\Git\bin\bash.exe`,
+  `%ProgramFiles(x86)%\Git\bin\bash.exe`, then the `git.exe` on `PATH`.
+- How Claude Code runs the command (JS of 2.1.280, read on 2026-09-23 — the status
+  line goes through the same executor as command hooks):
+  - Git Bash: `spawn(command, {shell: <bash.exe>})`, i.e. `bash -c <command>`, with the
+    bash folder prepended to `PATH`; a command whose first word ends in `.sh` becomes
+    `bash <command>`.
+  - PowerShell: `pwsh` on `PATH`, then PowerShell 7's install folders (including the
+    Store alias), then `powershell` on `PATH`, then Windows PowerShell 5.1 in
+    `System32` — run as `-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command
+    <command>`, without `Bypass` when `CLAUDE_CODE_POWERSHELL_RESPECT_EXECUTION_POLICY`
+    is set.
+  - No window (`windowsHide`); the environment gains `CLAUDE_PROJECT_DIR`, `COLUMNS`
+    and `LINES`; stdin gets the JSON plus a newline, then `end()` is called on it.
+  - The output is shown only when the command exits with 0; each line is trimmed and
+    empty lines are dropped. The timeout is the hooks' (10 minutes), and the run is
+    aborted when the next update starts.
 - A path with **forward slashes and no quotes** works in both shells; quoted, it
   breaks in PowerShell. The port writes `C:/…/router.exe statusline`, falls back to
   the 8.3 short name when the path has a space, and only then to shell-specific
   quoting (`& '…'` for PowerShell).
 - **stdin may never be closed.** Dozens of hung status-line processes were observed.
   The sensor parses the first complete JSON value, has a 250 ms deadline and always
-  exits.
+  exits. (The 2.1.280 executor calls `end()` on stdin after the JSON, yet the spike
+  never saw an EOF arrive; the deadline stays.)
 - The **first render has no `rate_limits`** (they arrive after the first API
   response). The macOS sensor writes an empty sample there, which erases the last
   reading; the port writes nothing without a window.
@@ -85,6 +101,41 @@ and `router doctor` reports it when set.
 - Secondary text uses an explicit light gray (`ESC[38;2;153;153;153m`) where the
   terminal has truecolor: Windows Terminal renders "faint" (`ESC[2m`) by halving the
   color, which disappears on a dark background.
+
+## The user's choice of status line
+
+Windows only (the macOS app always shows its own line). **Settings → Status line**
+writes `<data dir>\statusline.json`, and `router statusline` reads it on every render,
+after recording the sample — the sensor is the same in every mode:
+
+```json
+{"mode": "app", "hidden": ["context", "cost"], "command": ""}
+```
+
+- `mode: "app"` (the default) draws the full line minus the `hidden` items: `group`,
+  `model`, `effort`, `place`, `context`, `fiveHour`, `sevenDay`, `resets`, `cost`,
+  `email`. The file keeps the items taken **out**, so an item added later shows up
+  for everyone. With all of them out, the line is empty.
+- `mode: "command"` runs the user's `command` with the same JSON, the way Claude Code
+  would (above), and prints its output. The router does close the command's stdin
+  after the JSON, so a script that reads to the end finishes. A failure — the command can't start, exits
+  with non-zero, prints nothing or takes longer than **5 s** — prints the app's line
+  instead. A blank command is the app's line too.
+- The command's whole process tree runs in a **Job Object** with
+  `KILL_ON_JOB_CLOSE`: the process is created suspended, assigned to the job, then
+  resumed, so no grandchild escapes. The tree ends at the deadline, and when the
+  router exits or dies (the job's last handle closes with it); `TerminateProcess` on
+  the shell alone would leave, say, a hung `node` behind on every render. A child the
+  command left in the background holding stdout gets 150 ms after the shell exits.
+- The command runs with `ROUTER_STATUSLINE_CHAINED=1`: a `router statusline` inside it
+  (the router set as the user's own command, or a script that calls it) draws the
+  app's line instead of running the command again. `CLAUDE_CODE_SHELL_PREFIX` is not
+  applied a second time.
+- A missing, unreadable or unexpected file means the full line; an unknown item or
+  mode is ignored without discarding the rest. The app writes the file atomically.
+- `router doctor` runs each group's sensor with `ROUTER_STATUSLINE_CHAINED` set (it
+  checks the sensor runs, and an empty line passes), reports the choice, and in
+  command mode runs the user's command against a sample session.
 
 ## PowerShell and Git Bash
 
@@ -229,6 +280,7 @@ folder. A real profile always has the folder, and the sandbox now creates it.
 | Shell integration | zsh function in `~/.zshrc` | `shell.ps1` in both `$PROFILE`s, `shell.sh` in `~/.bashrc` (Git Bash) |
 | Data directory | `~/Library/Application Support/com.synqo.falcao-router` | `%LOCALAPPDATA%\com.synqo.falcao-router` (Local, not Roaming) |
 | Finding `claude` | three separate searches | one resolver: `ROUTER_CLAUDE_BIN`, `~\.local\bin\claude.exe`, `PATH`, `%APPDATA%\npm` (an npm `claude.cmd` shim is read and run as `node cli.js`, never through `cmd.exe`); Claude Desktop's copy and WindowsApps aliases are skipped |
+| Group status line | always the router's line | the router's line with the items the user keeps, or the user's own command after the sensor (`statusline.json`) |
 
 ## Deliberate differences
 
@@ -250,8 +302,9 @@ The port does not reproduce these macOS behaviours (each has a regression test):
 - a group's status line reduced to `account 5h 7d`, which replaced whatever status
   line the user had with less than it showed. The port's line shows the group, the
   model and its effort, the branch, the context window, both windows with the time
-  they reset, the session's cost and the active account's e-mail (the sensor behind
-  it is unchanged);
+  they reset, the session's cost and the active account's e-mail; each item can be
+  turned off in Settings, or the user's own status line command can run instead,
+  after the sensor (the sensor behind it is unchanged);
 - reordering accounts dropping one that the requested order forgot.
 
 And these in the app (checked in the browser against the mocked backend, and in the

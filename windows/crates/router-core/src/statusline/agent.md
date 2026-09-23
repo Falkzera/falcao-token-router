@@ -46,7 +46,9 @@ sessão. O sensor (a amostra) não passa por aqui.
   hooks — Git Bash por `spawn(comando, {shell: bash})` (= `bash -c`) com a pasta do bash na
   frente do `PATH` e o prefixo `bash ` para um `.sh`; sem Git Bash, `pwsh`/`powershell` com
   `-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command`; `windowsHide`; o JSON + `\n` e
-  o stdin FECHADO; a saída só com código 0, cada linha aparada, vazias fora; prazo dos hooks
+  o `end()` do stdin (o spike nunca viu o EOF chegar ao sensor — um pipe herdado por outro
+  processo fica aberto; o router fecha o do comando de fato, com teste); a saída só com código
+  0, cada linha aparada, vazias fora; prazo dos hooks
   (10 min) e cancelamento a cada atualização nova. O router copia tudo, menos o prazo (5 s) e
   o destino da árvore (morre junto). O `CLAUDE_CODE_SHELL_PREFIX` não é reaplicado ao comando.
 - 23/09/2026: o `view_from` (JSON → `View`) saiu da CLI para cá: a prévia monta a linha pelo

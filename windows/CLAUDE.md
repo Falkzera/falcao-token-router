@@ -64,5 +64,11 @@ do WebView2 para `%LOCALAPPDATA%\tauri`. `README.md` (inglês) é o guia de quem
   exe em execução não se sobrescreve nem se apaga — mas se RENOMEIA. Os ganchos do NSIS
   (`app/src-tauri/installer-hooks.nsh`) o tiram do caminho; sem eles a atualização silenciosa
   pulava o arquivo e dizia sucesso.
+- Status line (23/09/2026, JS do 2.1.280): roda pelo executor dos hooks — `bash -c` com a pasta
+  do bash na frente do `PATH` (1º termo `.sh` ganha `bash `); sem Git Bash, `pwsh`/`powershell`
+  com `-ExecutionPolicy Bypass`; JSON + `\n` e `end()` no stdin (o spike nunca viu o EOF chegar
+  — o prazo do sensor fica); só mostra saída de código 0. O modo "meu comando" do router
+  (`statusline.json`, escolha só do Windows) reproduz isso fechando de fato o stdin do comando,
+  com prazo de 5 s e a árvore do comando num Job Object.
 - Sandbox com `USERPROFILE` falso: a home precisa de `AppData\Local` e `AppData\Roaming`, senão
   o `SHGetKnownFolderPath` falha e o WebView2 grava em `<exe>.WebView2` ao lado do exe.

@@ -8,7 +8,8 @@
 //!   PowerShell (o 7 antes do 5.1) com `-NoProfile -NonInteractive
 //!   -ExecutionPolicy Bypass -Command` — o `Bypass` sai com
 //!   `CLAUDE_CODE_POWERSHELL_RESPECT_EXECUTION_POLICY`;
-//! - sem janela; o JSON + `\n` no stdin, e o stdin FECHADO (EOF);
+//! - sem janela; o JSON + `\n` no stdin, e o `end()` dele (aqui o pipe fecha
+//!   de fato: o comando recebe o EOF — que o sensor, no spike, nunca viu chegar);
 //! - vale a saída de quem sai com código 0 e imprime algo visível — o Claude
 //!   Code mostra só isso (senão a linha fica vazia; aqui, vale a do app).
 //!
