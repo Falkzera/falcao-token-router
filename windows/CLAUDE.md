@@ -11,9 +11,12 @@ herdado (custo por JSONL, preços, alertas) **não** entra neste porte.
 & "$env:USERPROFILE\.cargo\bin\cargo.exe" build -p fake-claude  # os testes o rodam; `cargo test` não gera o .exe
 & "$env:USERPROFILE\.cargo\bin\cargo.exe" test --workspace
 .\scripts\test.ps1        # fmt + clippy -D warnings + test + svelte-check/check-strings (= CI)
+.\scripts\build.ps1       # o instalador NSIS (router.exe como sidecar), conferido (= CI)
 cd app; npm run dev       # front no navegador, com backend simulado
 cd app; $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"; npx tauri dev   # o app
 ```
+O instalador sai em `target\release\bundle\nsis\`; o 1º build baixa o NSIS e o bootstrapper
+do WebView2 para `%LOCALAPPDATA%\tauri`. `README.md` (inglês) é o guia de quem instala.
 
 ## Mapa
 - `crates/router-core` = ≙ `Sources/CCUsageCore` (parte do router). Sem UI, sem rede.
@@ -37,6 +40,11 @@ cd app; $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"; npx tauri dev   # o
   (`ROUTER_CLAUDE_BIN`) vão para um sandbox, e `CLAUDE_CONFIG_DIR` é removido do filho.
 - Texto com `\` (caminhos do Windows) se edita pelo editor, não por heredoc de shell — o
   heredoc já comeu barras e virou caractere de controle em `agent.md`.
+- O `router.exe` entra no instalador pelo `app/src-tauri/tauri.installer.conf.json`, NUNCA
+  pelo `tauri.conf.json`: o `build.rs` do Tauri copia o `externalBin` em todo `cargo build`
+  do app (quebra a CI e troca o `router.exe` de debug que os testes da CLI rodam).
+- Instalar o app nesta máquina só com o usuário de acordo; o instalado sobe com o ambiente
+  do sandbox (`ROUTER_APP_SUPPORT`, `USERPROFILE` falsos) até o teste ponta a ponta.
 
 ## Achados do Windows que moldam o porte (spike, 22/09/2026)
 - Troca a quente vale: escrever `<perfil>\.credentials.json` com **mtime novo**

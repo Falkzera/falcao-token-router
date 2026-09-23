@@ -103,6 +103,11 @@ and `router doctor` reports it when set.
   up) and `history.jsonl` stays per group. **No hardlinks:** 2.1.280 prunes
   `history.jsonl` by rewriting it when it is a regular file (and skips links), so a
   hardlink would silently diverge.
+- Deleting a folder that holds these junctions leaves their targets alone with
+  `cmd /c rd /s /q`, and also with `Remove-Item -Recurse -Force` in PowerShell 7.6
+  and in Windows PowerShell 5.1.26100 — checked on 2026-09-23 against a junction to
+  a nested throwaway folder. Other builds of 5.1 weren't tried, so the README points
+  to `rd`, which doesn't depend on the PowerShell version.
 
 ## Signing in
 
@@ -140,6 +145,42 @@ that prints the same text:
   registry** (user and system variables). The port clears it and passes only the
   filtered environment (no proxies or alternative credentials, none of a
   surrounding Claude Code session's variables, the account's `CLAUDE_CONFIG_DIR`).
+
+## Packaging
+
+An NSIS installer built by the Tauri CLI 2.11.5. Checked on 2026-09-23 in the
+`installer.nsi` that the build generates (`target\release\nsis\x64\`):
+
+- It installs **per user**, in `%LOCALAPPDATA%\FalcaoTokenRouter`, without
+  administrator rights. The folder takes its name from `productName`, which is plain
+  ASCII so that the path the status line cites gains no space or accent.
+- `router.exe` ships as a **sidecar** (`bundle.externalBin`), and lands **beside the
+  app's exe** under its name without the target triple
+  (`File /a "/oname=router.exe"`). The app finds it there, next to its own
+  executable, and on every start points the terminal integration at it — so a
+  reinstall in another folder heals itself.
+- The sidecar is declared in a config that only the installer build merges
+  (`tauri build --config src-tauri/tauri.installer.conf.json`). The Tauri build
+  script copies every `externalBin` into `target\<profile>\` on **every** cargo build
+  of the app: declared in `tauri.conf.json`, it would break a clean build (the file
+  doesn't exist yet) and overwrite the workspace's freshly built `router.exe` — the
+  one the CLI tests run — with the last installer's copy.
+- Without `mainBinaryName`, the installed exe keeps cargo's name
+  (`falcao-token-router.exe`); the port sets it to `FalcaoTokenRouter`.
+- The installer is in English and Brazilian Portuguese; with no language selector,
+  NSIS picks the one that matches the Windows display language. WebView2 comes
+  through the embedded bootstrapper, which downloads the runtime only when it is
+  missing.
+- The uninstaller removes the app's exe, `router.exe`, `uninstall.exe`, the
+  shortcuts, the uninstall key and the `FalcaoTokenRouter` value under
+  `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` (the name the autostart
+  plugin uses). It never touches `%LOCALAPPDATA%\com.synqo.falcao-router`, where the
+  accounts' credentials are. Only with *Delete the application data* checked does it
+  also remove `%APPDATA%` and `%LOCALAPPDATA%\com.synqo.falcao-token-router` (the
+  app's settings and WebView2 cache) and `HKCU\Software\synqo\FalcaoTokenRouter`
+  (the install location, kept for a reinstall).
+- The installer isn't code-signed, so SmartScreen stops it once. A build made on the
+  same machine carries no Mark of the Web and isn't stopped.
 
 ## Mapping from macOS
 

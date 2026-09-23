@@ -6,6 +6,8 @@ v2**, lendo e escrevendo os MESMOS arquivos que o app macOS: `config.json` e
 um `.github/workflows/windows.yml` filtrado por caminho).
 
 ## Estrutura
+- `README.md` — o guia de quem instala (inglês): do instalador à troca de conta, problemas
+  conhecidos, onde as coisas moram, desinstalar, compilar.
 - `Cargo.toml` — workspace (resolver 2, edition 2021, rust-version 1.89) e as dependências comuns.
 - `rust-toolchain.toml` — canal stable, alvo `x86_64-pc-windows-msvc`.
 - `crates/router-core/` — o motor (modelos, credencial em arquivo, rotação, store, sessões,
@@ -32,8 +34,12 @@ um `.github/workflows/windows.yml` filtrado por caminho).
   integração de terminal por shell) e Ajustes (abrir no login, barra de tarefas); 5.5 o login
   oficial por ConPTY (adicionar e relogar, com os estados do macOS e o tempo esgotado visível).
   Conferido no navegador com o backend simulado (os dois idiomas e temas) e no app do sandbox.
-- Próximas: fase 6 (instalador NSIS com o `router.exe` como sidecar, `build.ps1`, README em
-  inglês) e fase 7 (ponta a ponta com contas reais, grupo dedicado).
+- **Fase 6 (empacotamento)**: instalador NSIS por usuário (en/pt-BR, WebView2 por bootstrapper,
+  o `router.exe` como sidecar ao lado do `FalcaoTokenRouter.exe`), `scripts/build.ps1` que
+  confere o que saiu, a CI publicando o instalador como artefato, e o `README.md` em inglês
+  para quem nunca viu o app (instalar → grupo → duas contas → integração → `claude <grupo>`
+  → ver a troca → `router doctor`, problemas conhecidos, desinstalar).
+- Próxima: fase 7 (ponta a ponta com contas reais, grupo dedicado, seguindo o README).
 
 ## Regras (herdadas do repo + combinadas)
 - Comentários e `agent.md` em **pt-BR**; identificadores em inglês; docs/README em inglês.

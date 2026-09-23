@@ -25,5 +25,6 @@ O `tauri dev` precisa do `cargo` no PATH (nesta máquina ele não está por padr
 - 22/09/2026: sem plugin JS nenhum — o front só fala com comandos do próprio app (`lib/api.ts`),
   o que deixa o backend simulado do navegador do mesmo tamanho que a API real.
 - 22/09/2026: o `cargo` compila o app SEM o `dist` do front (em modo dev o Tauri usa o
-  `devUrl`); a CI roda Rust e front como passos independentes. O pacote de verdade (fase 6) sai
-  do `tauri build`.
+  `devUrl`); a CI roda Rust e front como passos independentes. O pacote de verdade sai do
+  `scripts\build.ps1` (23/09/2026): `tauri build` com o config do instalador, que roda o
+  `npm run build` (o `dist`) antes do Rust.
