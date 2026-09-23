@@ -125,12 +125,14 @@
     {#if checking}
       <p class="status muted"><span class="spinner" aria-hidden="true"></span>{t("groups.terminal.checking")}</p>
     {:else}
-      <p class="status muted"><Rich text={t("groups.terminal.pitch")} /></p>
+      <!-- O `.status` é flex: sem o `span`, cada trecho do texto (e o código no
+           meio) viraria uma coluna. -->
+      <p class="status muted"><span><Rich text={t("groups.terminal.pitch")} /></span></p>
     {/if}
   {:else if !report.routerFound}
     <p class="status warn"><Icon name="warning" size={13} /><span>{t("groups.error.routerPathUnknown")}</span></p>
   {:else if report.scripts === "missing"}
-    <p class="status muted"><Rich text={t("groups.terminal.pitch")} /></p>
+    <p class="status muted"><span><Rich text={t("groups.terminal.pitch")} /></span></p>
   {:else}
     {#if report.fullyInstalled}
       <p class="status ok"><Icon name="check" size={13} /><span><Rich text={t("groups.terminal.ready")} /></span></p>
