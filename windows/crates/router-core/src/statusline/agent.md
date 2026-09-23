@@ -11,7 +11,18 @@ sessão. O sensor (a amostra) não passa por aqui.
   comando do usuário depois do sensor; em branco, vale a linha do app). Leitura TOLERANTE:
   ausente, ilegível ou de outro formato = a de fábrica; item e modo desconhecidos são
   ignorados sem levar o resto. Gravação atômica. O `serde` passa pelo mesmo caminho tolerante
-  (o app troca esse formato com a tela).
+  (o app troca esse formato com a tela). `apply` tira da `View` o que foi escondido (o
+  "horário do reset" vale para as duas janelas; tudo de fora = linha vazia, o "nada").
+- `command.rs` — o modo "meu comando": `Shell` (Git Bash; sem ele, PowerShell — `detect`) e
+  `process` (o processo como o Claude Code o monta), `bash_line` (1º termo `.sh` → `bash …`),
+  `run` → `Outcome` (`Printed` só com código 0 e saída visível; `Failed` com código e começo do
+  stderr; `NotStarted`; `TimedOut`). JSON + `\n` no stdin e EOF; sem janela; a árvore no
+  `platform::job` (morre no prazo de 5 s, e quando o router sai); um filho em segundo plano
+  que segura o stdout ganha 150 ms e vai junto. `CHAINED_ENV` marca o comando: um router
+  dentro dele não roda o comando de novo.
+- `session.rs` — o JSON do Claude Code → `View` (`view_from`, `label_for`, `window`, que o
+  sensor também usa) e a sessão de EXEMPLO (`sample`: a prévia e o "Testar" dos Ajustes, o
+  `doctor`), com os resets no futuro dentro das janelas.
 - `view.rs` — a LINHA, pura: `● grupo │ Modelo effort │ branch │ contexto │ 5h ↻ 7d ↻ │ $custo │
   e-mail`. Cor por grupo (posição na lista), Fable em vermelho, as cores do seletor do `/effort`
   (brilho no `xhigh`, arco-íris no `max`, pela fase do relógio), cinza explícito com truecolor,
@@ -31,3 +42,12 @@ sessão. O sensor (a amostra) não passa por aqui.
   parte na base — a CLI não lê os ajustes do app (Roaming) e o `config.json` é o formato
   combinado com o macOS. O modo "não usar a linha do app" roda o comando DO USUÁRIO (a linha
   mínima e o "nada" já saem desligando itens).
+- 23/09/2026 (lido no JS do `claude.exe` 2.1.280): a status line passa pelo executor dos
+  hooks — Git Bash por `spawn(comando, {shell: bash})` (= `bash -c`) com a pasta do bash na
+  frente do `PATH` e o prefixo `bash ` para um `.sh`; sem Git Bash, `pwsh`/`powershell` com
+  `-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command`; `windowsHide`; o JSON + `\n` e
+  o stdin FECHADO; a saída só com código 0, cada linha aparada, vazias fora; prazo dos hooks
+  (10 min) e cancelamento a cada atualização nova. O router copia tudo, menos o prazo (5 s) e
+  o destino da árvore (morre junto). O `CLAUDE_CODE_SHELL_PREFIX` não é reaplicado ao comando.
+- 23/09/2026: o `view_from` (JSON → `View`) saiu da CLI para cá: a prévia monta a linha pelo
+  mesmo caminho da sessão, só que com a sessão de exemplo.

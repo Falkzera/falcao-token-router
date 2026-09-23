@@ -95,7 +95,8 @@ pub struct Context {
 }
 
 pub struct View {
-    pub label: Label,
+    /// `None` quando o usuário tirou o grupo da linha.
+    pub label: Option<Label>,
     pub model: Option<String>,
     pub model_id: Option<String>,
     pub effort: Option<String>,
@@ -123,20 +124,31 @@ pub fn render(view: &View, style: &Style) -> String {
     };
     let mut segments = Vec::new();
 
-    let (color, name) = match &view.label {
-        Label::Group { name, index } => (GROUP_COLORS[index % GROUP_COLORS.len()], name),
-        Label::Account(name) => (YELLOW, name),
-    };
-    segments.push(format!("{color}{BOLD}●{RESET} {color}{name}{RESET}"));
+    if let Some(label) = &view.label {
+        let (color, name) = match label {
+            Label::Group { name, index } => (GROUP_COLORS[index % GROUP_COLORS.len()], name),
+            Label::Account(name) => (YELLOW, name),
+        };
+        segments.push(format!("{color}{BOLD}●{RESET} {color}{name}{RESET}"));
+    }
 
-    if let Some(display) = &view.model {
-        let color = model_color(display, view.model_id.as_deref());
-        let mut segment = format!("{color}{BOLD}{}{RESET}", model_name(display));
-        if let Some(level) = &view.effort {
-            segment.push(' ');
-            segment.push_str(&paint_effort(level, style, gray));
+    // O esforço vai ao lado do modelo; sem o modelo (tirado pelo usuário), sozinho.
+    let effort = view
+        .effort
+        .as_deref()
+        .map(|level| paint_effort(level, style, gray));
+    match (&view.model, effort) {
+        (Some(display), effort) => {
+            let color = model_color(display, view.model_id.as_deref());
+            let mut segment = format!("{color}{BOLD}{}{RESET}", model_name(display));
+            if let Some(effort) = effort {
+                segment.push(' ');
+                segment.push_str(&effort);
+            }
+            segments.push(segment);
         }
-        segments.push(segment);
+        (None, Some(effort)) => segments.push(effort),
+        (None, None) => {}
     }
 
     if let Some(place) = &view.place {
@@ -395,19 +407,20 @@ pub fn truecolor(env: impl Fn(&str) -> Option<String>) -> bool {
         || lower("TERM").is_some_and(|v| v.contains("direct") || v.contains("truecolor"))
 }
 
+/// A linha de exemplo dos testes — da linha e da escolha que a recorta.
 #[cfg(test)]
-mod tests {
+pub(crate) mod fixtures {
     use super::*;
     use chrono::NaiveDate;
 
-    fn at(y: i32, m: u32, d: u32, h: u32, min: u32) -> NaiveDateTime {
+    pub fn at(y: i32, m: u32, d: u32, h: u32, min: u32) -> NaiveDateTime {
         NaiveDate::from_ymd_opt(y, m, d)
             .unwrap()
             .and_hms_opt(h, min, 0)
             .unwrap()
     }
 
-    fn style(truecolor: bool, portuguese: bool) -> Style {
+    pub fn style(truecolor: bool, portuguese: bool) -> Style {
         Style {
             truecolor,
             portuguese,
@@ -415,16 +428,17 @@ mod tests {
         }
     }
 
-    fn plain(text: &str) -> String {
+    /// Sem as cores: o texto que se vê.
+    pub fn plain(text: &str) -> String {
         regex::Regex::new("\x1b\\[[0-9;]*m")
             .unwrap()
             .replace_all(text, "")
             .into_owned()
     }
 
-    fn bare(label: Label) -> View {
+    pub fn bare(label: Label) -> View {
         View {
-            label,
+            label: Some(label),
             model: None,
             model_id: None,
             effort: None,
@@ -437,7 +451,7 @@ mod tests {
         }
     }
 
-    fn full() -> View {
+    pub fn full() -> View {
         View {
             model: Some("Opus 5.5 (1M context)".into()),
             model_id: Some("claude-opus-5-5".into()),
@@ -465,6 +479,12 @@ mod tests {
             })
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::fixtures::*;
+    use super::*;
 
     #[test]
     fn the_line_has_every_segment_in_order() {
@@ -473,6 +493,36 @@ mod tests {
             "● Trabalho │ Opus 5.5 high │ port/windows │ █████░░░░░ 51% 511k/1000k │ \
              5h █░░░░ 29% ↻ 14:05  7d ██░░░ 33% ↻ seg (28) 9:00 │ $24.77 │ conta1@exemplo.com"
         );
+    }
+
+    /// Os itens tirados pela escolha do usuário somem da linha sem deixar
+    /// separador sobrando.
+    #[test]
+    fn without_the_group_the_line_starts_at_the_next_item() {
+        let mut view = full();
+        view.label = None;
+        let line = plain(&render(&view, &style(false, true)));
+        assert!(line.starts_with("Opus 5.5 high │ port/windows │"), "{line}");
+    }
+
+    #[test]
+    fn the_effort_stands_alone_when_the_model_is_out() {
+        let mut view = full();
+        view.model = None;
+        let line = plain(&render(&view, &style(false, true)));
+        assert!(
+            line.starts_with("● Trabalho │ high │ port/windows │"),
+            "{line}"
+        );
+        // Com as cores do seletor, como ao lado do modelo.
+        assert!(render(&view, &style(false, true)).contains("\x1b[94m\x1b[1mhigh\x1b[0m"));
+    }
+
+    #[test]
+    fn a_view_with_nothing_is_an_empty_line() {
+        let mut view = bare(Label::Account("conta1".into()));
+        view.label = None;
+        assert_eq!(render(&view, &style(true, true)), "");
     }
 
     #[test]

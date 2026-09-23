@@ -19,6 +19,10 @@
 //! No `/usage`, "logado" = o perfil tem `.credentials.json` — como o real, que
 //! num perfil sem login sai com código 0 e só o resumo do `--print`.
 //!
+//! `statusline-echo` faz o papel de uma status line do usuário (o modo "meu
+//! comando" do router): lê o JSON do stdin ATÉ O FIM (só termina com EOF) e
+//! imprime `eco: <modelo> encadeado=<ROUTER_STATUSLINE_CHAINED>`.
+//!
 //! O `auth login` imprime o que o 2.1.280 imprime (lido no JS do binário em
 //! 23/09/2026), com o link num hyperlink OSC 8 quando a saída é terminal.
 
@@ -59,7 +63,14 @@ fn main() {
         thread::sleep(Duration::from_millis(ms));
     }
 
-    if args.first().map(String::as_str) == Some("auth")
+    if args.first().map(String::as_str) == Some("statusline-echo") {
+        let mut input = String::new();
+        let _ = std::io::Read::read_to_string(&mut std::io::stdin(), &mut input);
+        let json: serde_json::Value = serde_json::from_str(&input).unwrap_or_default();
+        let model = json["model"]["display_name"].as_str().unwrap_or("?");
+        let chained = env::var("ROUTER_STATUSLINE_CHAINED").unwrap_or_default();
+        println!("eco: {model} encadeado={chained}");
+    } else if args.first().map(String::as_str) == Some("auth")
         && args.get(1).map(String::as_str) == Some("login")
     {
         let email = args

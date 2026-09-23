@@ -114,6 +114,114 @@ fn stdin_that_never_closes_exits_fast() {
     assert!(usage_file(app.path(), "conta1@exemplo.com").exists());
 }
 
+// A escolha do usuário (`statusline.json` na base).
+
+/// Uma sessão com tudo o que a linha completa mostra.
+const FULL: &str = r#"{"model":{"id":"claude-opus-5-5","display_name":"Opus 5.5"},
+    "context_window":{"total_input_tokens":511000,"context_window_size":1000000,"used_percentage":51},
+    "cost":{"total_cost_usd":1.5},
+    "rate_limits":{"five_hour":{"used_percentage":42,"resets_at":4102444800},
+                   "seven_day":{"used_percentage":7,"resets_at":4102444800}}}"#;
+
+fn write_choice(app: &std::path::Path, json: &str) {
+    let base = app.join("com.synqo.falcao-router");
+    std::fs::create_dir_all(&base).unwrap();
+    std::fs::write(base.join("statusline.json"), json).unwrap();
+}
+
+/// O `router statusline` num perfil com a conta1, com a escolha dada.
+fn statusline_with(choice: Option<&str>) -> (String, tempfile::TempDir) {
+    let profile = tempfile::tempdir().unwrap();
+    let app = tempfile::tempdir().unwrap();
+    write_identity(profile.path(), "conta1@exemplo.com");
+    if let Some(choice) = choice {
+        write_choice(app.path(), choice);
+    }
+    let assert = assert_cmd::Command::cargo_bin("router")
+        .unwrap()
+        .arg("statusline")
+        .env("CLAUDE_CONFIG_DIR", profile.path())
+        .env("ROUTER_APP_SUPPORT", app.path())
+        .env_remove("ROUTER_STATUSLINE_CHAINED")
+        .write_stdin(FULL)
+        .assert()
+        .success();
+    let stdout = String::from_utf8_lossy(&assert.get_output().stdout).into_owned();
+    (stdout, app)
+}
+
+/// Um comando com `/`, sem aspas: roda igual no Git Bash e no PowerShell.
+fn command_for(exe: &std::path::Path, args: &str) -> String {
+    assert!(exe.is_file(), "{} não foi compilado", exe.display());
+    format!("{} {args}", exe.to_string_lossy().replace('\\', "/"))
+}
+
+#[test]
+fn the_items_taken_out_leave_the_line() {
+    let (line, _app) = statusline_with(Some(r#"{"hidden": ["context", "cost", "email"]}"#));
+    assert!(line.contains("Opus 5.5") && line.contains("5h"), "{line}");
+    for gone in ["511k", "$1.50", "conta1@exemplo.com"] {
+        assert!(!line.contains(gone), "{gone} ainda está em: {line}");
+    }
+}
+
+/// A status line nunca falha por causa da escolha: ilegível vale a completa.
+#[test]
+fn an_unreadable_choice_is_the_full_line() {
+    let (line, _app) = statusline_with(Some("{ nao e json"));
+    for shown in ["Opus 5.5", "511k", "5h", "$1.50", "conta1@exemplo.com"] {
+        assert!(line.contains(shown), "falta {shown} em: {line}");
+    }
+}
+
+/// O modo "meu comando": o sensor grava como sempre, e a linha é a do comando
+/// do usuário, feita a partir do MESMO JSON (e ele termina: recebeu o EOF).
+#[test]
+fn the_command_mode_prints_the_users_line_from_the_same_json() {
+    let command = command_for(
+        &assert_cmd::cargo::cargo_bin("fake-claude"),
+        "statusline-echo",
+    );
+    let choice = serde_json::json!({"mode": "command", "command": command}).to_string();
+    let (line, app) = statusline_with(Some(&choice));
+    assert_eq!(line.trim(), "eco: Opus 5.5 encadeado=1");
+    assert!(usage_file(app.path(), "conta1@exemplo.com").exists());
+}
+
+/// Um comando que falha (aqui, nem existe) não deixa a sessão sem linha.
+#[test]
+fn a_command_that_fails_falls_back_to_the_app_line() {
+    let choice = r#"{"mode": "command", "command": "C:/nao/existe/linha.exe", "hidden": ["cost"]}"#;
+    let (line, _app) = statusline_with(Some(choice));
+    assert!(
+        line.contains("5h") && line.contains("conta1@exemplo.com"),
+        "{line}"
+    );
+    assert!(
+        !line.contains("$1.50"),
+        "a linha do app vem com os itens escolhidos: {line}"
+    );
+}
+
+/// O próprio router como comando (ou um script que o chame) não entra em laço:
+/// dentro do comando, o router desenha a linha do app.
+#[test]
+fn a_router_inside_the_command_does_not_run_it_again() {
+    let command = command_for(&assert_cmd::cargo::cargo_bin("router"), "statusline");
+    let choice = serde_json::json!({"mode": "command", "command": command}).to_string();
+    let start = Instant::now();
+    let (line, _app) = statusline_with(Some(&choice));
+    assert!(
+        line.contains("5h") && line.contains("conta1@exemplo.com"),
+        "{line}"
+    );
+    assert!(
+        start.elapsed() < Duration::from_secs(4),
+        "{:?}",
+        start.elapsed()
+    );
+}
+
 /// Sem entrada nenhuma e stdin aberto: o prazo dispara e o processo sai (sem
 /// gravar amostra, porque não houve janela).
 #[test]

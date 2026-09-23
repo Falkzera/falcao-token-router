@@ -31,7 +31,18 @@ impl GitBashEnv {
 
 /// O `bash.exe` que o Claude Code usaria, ou `None` (ele usaria o PowerShell).
 pub fn find_git_bash(env: &GitBashEnv) -> Option<PathBuf> {
-    if let Some(p) = env.override_path.as_deref().filter(|p| p.is_file()) {
+    // A variável só vale para um bash/sh que existe; com outro nome, o Claude
+    // Code a ignora (e avisa) e segue a busca — visto no 2.1.280, 23/09/2026.
+    let is_bash = |p: &Path| {
+        p.file_name().and_then(|n| n.to_str()).is_some_and(|n| {
+            ["bash.exe", "sh.exe", "bash", "sh"].contains(&n.to_lowercase().as_str())
+        })
+    };
+    if let Some(p) = env
+        .override_path
+        .as_deref()
+        .filter(|p| is_bash(p) && p.is_file())
+    {
         return Some(p.to_path_buf());
     }
     let installed = [&env.program_files, &env.program_files_x86]

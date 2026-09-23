@@ -13,7 +13,6 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
-use std::process::Command;
 use std::time::Duration;
 
 use chrono::Utc;
@@ -32,6 +31,9 @@ use router_core::engine::terminal_report::{
 };
 use router_core::platform::atomic_write::read_retrying;
 use router_core::platform::git_bash::{find_git_bash, GitBashEnv};
+use router_core::statusline::choice::{Item, Mode, StatusLineChoice};
+use router_core::statusline::command::{self, Outcome, Shell};
+use router_core::statusline::session;
 use router_core::usage::claude_binary::ClaudeBinary;
 use router_core::usage::usage_percent::UsagePercent;
 use router_core::{ConfigDir, Id, RouterConfig};
@@ -124,7 +126,9 @@ pub fn run() -> bool {
     check_scripts(&mut report, &ps1, &sh, &me, git_bash.is_some());
     let targets = ShellTargets::for_user(Path::new(&home));
     check_profiles(&mut report, &targets, &ps1, &sh, git_bash.is_some());
-    check_status_lines(&mut report, &config, &me, shell, git_bash.as_deref());
+    let runner = Shell::detect();
+    check_status_lines(&mut report, &config, &me, shell, runner.as_ref());
+    check_status_line_choice(&mut report, &paths, runner.as_ref());
     check_project_status_line(&mut report, &me);
 
     let engine = RotationEngine::new(shared::credentials(&paths, &home), shared::adapters());
@@ -276,7 +280,7 @@ fn check_status_lines(
     config: &RouterConfig,
     me: &Path,
     shell: StatusShell,
-    git_bash: Option<&Path>,
+    runner: Option<&Shell>,
 ) {
     let shell_name = match shell {
         StatusShell::Bash => "Git Bash",
@@ -294,7 +298,17 @@ fn check_status_lines(
             );
             continue;
         }
-        match run_status_line(&expected, git_bash, &group.config_dir) {
+        let Some(runner) = runner else {
+            report.check(
+                false,
+                format!(
+                    "sensor no grupo {}: nem Git Bash nem PowerShell para rodá-lo",
+                    group.name
+                ),
+            );
+            continue;
+        };
+        match run_status_line(&expected, runner, &group.config_dir) {
             Ok(()) => report.check(
                 true,
                 format!(
@@ -313,29 +327,106 @@ fn check_status_lines(
     }
 }
 
-fn run_status_line(command: &str, git_bash: Option<&Path>, dir: &ConfigDir) -> Result<(), String> {
-    let mut process = match git_bash {
-        Some(bash) => {
-            let mut c = Command::new(bash);
-            c.arg("-c").arg(command);
-            c
-        }
-        None => {
-            let mut c = Command::new("powershell.exe");
-            c.args(["-NoProfile", "-NonInteractive", "-Command", command]);
-            c
-        }
-    };
+/// Roda o sensor pelo shell e do jeito que o Claude Code o roda.
+fn run_status_line(command: &str, runner: &Shell, dir: &ConfigDir) -> Result<(), String> {
+    let mut process = runner.process(command, |key| std::env::var(key).ok());
+    // Só o sensor: com a marca de encadeado, o router nunca roda o comando do
+    // usuário (ele tem linha própria, `check_status_line_choice`).
+    process.env(command::CHAINED_ENV, "1");
     match dir.environment_value() {
         Some(value) => process.env("CLAUDE_CONFIG_DIR", value),
         None => process.env_remove("CLAUDE_CONFIG_DIR"),
     };
-    // `{}`: sem `rate_limits`, o sensor imprime a linha e NÃO grava amostra.
+    // `{}`: sem `rate_limits`, o sensor imprime a linha e NÃO grava amostra. Vale
+    // o código 0 — a linha pode sair vazia (o usuário tirou todos os itens).
     match shared::run_with_timeout(process, Some(b"{}"), Duration::from_secs(20)) {
-        Some((Some(0), out)) if !out.trim().is_empty() => Ok(()),
-        Some((code, _)) => Err(format!("saiu com o código {code:?} ou sem imprimir nada")),
+        Some((Some(0), _)) => Ok(()),
+        Some((code, _)) => Err(format!("saiu com o código {code:?}")),
         None => Err("não respondeu em 20 s".to_string()),
     }
+}
+
+/// O que as sessões dos grupos mostram (a escolha da aba Ajustes) — e, no modo
+/// comando, se o comando do usuário imprime algo com uma sessão de exemplo.
+fn check_status_line_choice(report: &mut Report, paths: &RouterPaths, runner: Option<&Shell>) {
+    let choice = StatusLineChoice::load(&paths.status_line_file());
+    let command = match (choice.mode, choice.command_to_run()) {
+        (Mode::App, _) => {
+            report.check(
+                true,
+                format!("status line: a linha do app, {}", items_text(&choice)),
+            );
+            return;
+        }
+        (Mode::Command, None) => {
+            report.check(
+                true,
+                "status line: modo comando sem comando — vale a linha do app",
+            );
+            return;
+        }
+        (Mode::Command, Some(command)) => command.to_string(),
+    };
+    let Some(runner) = runner else {
+        report.check(
+            false,
+            "status line: nem Git Bash nem PowerShell para rodar o seu comando — as sessões mostram a linha do app",
+        );
+        return;
+    };
+    let cwd = std::env::current_dir()
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let sample = session::sample(&cwd, Utc::now()).to_string();
+    let why = match command::run(runner, &command, sample.as_bytes(), command::DEADLINE) {
+        Outcome::Printed(_) => {
+            report.check(
+                true,
+                "status line: o seu comando imprime (numa sessão de exemplo)",
+            );
+            return;
+        }
+        Outcome::Failed { code: Some(0), .. } => "não imprimiu nada".to_string(),
+        Outcome::Failed { code, stderr } => {
+            let first = stderr.lines().next().unwrap_or_default();
+            format!("saiu com o código {code:?} {first}")
+                .trim_end()
+                .to_string()
+        }
+        Outcome::NotStarted(e) => format!("não subiu ({e})"),
+        Outcome::TimedOut => format!("passou de {} s", command::DEADLINE.as_secs()),
+    };
+    report.check(
+        false,
+        format!("status line: o seu comando {why} — as sessões mostram a linha do app"),
+    );
+}
+
+/// "completa", "sem nenhum item (vazia)" ou "sem contexto, custo".
+fn items_text(choice: &StatusLineChoice) -> String {
+    let hidden = choice.hidden();
+    if hidden.is_empty() {
+        return "completa".to_string();
+    }
+    if hidden.len() == Item::ALL.len() {
+        return "sem nenhum item (vazia)".to_string();
+    }
+    let names: Vec<&str> = hidden
+        .iter()
+        .map(|item| match item {
+            Item::Group => "grupo",
+            Item::Model => "modelo",
+            Item::Effort => "esforço",
+            Item::Place => "branch/pasta",
+            Item::Context => "contexto",
+            Item::FiveHour => "janela de 5h",
+            Item::SevenDay => "janela de 7d",
+            Item::Resets => "horário do reset",
+            Item::Cost => "custo",
+            Item::Email => "e-mail",
+        })
+        .collect();
+    format!("sem {}", names.join(", "))
 }
 
 /// Uma `statusLine` de PROJETO vence a do grupo (visto no spike: rodando da

@@ -4,4 +4,6 @@
 //! código.
 
 pub mod choice;
+pub mod command;
+pub mod session;
 pub mod view;

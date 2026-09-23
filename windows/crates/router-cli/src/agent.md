@@ -12,16 +12,21 @@ desconhecido sai com 2.
   JSON sem esperar EOF), perfil = `CLAUDE_CONFIG_DIR` → `--profile` embutido → padrão; grava a
   amostra **só com e-mail e ao menos uma janela**, sob a trava (espera 100 ms); monta o que a
   linha mostra (`view_from`: o JSON do Claude Code + o grupo dono do perfil, `label_for`, pelo
-  `config.json`), imprime e sai 0 sempre. O desenho da linha mora no núcleo
-  (`router_core::statusline::view`), que a prévia do app também usa.
+  `config.json`), imprime e sai 0 sempre. Depois da amostra, lê a escolha (`statusline.json`,
+  a cada render): no modo comando roda o comando do usuário com o mesmo JSON e imprime a saída
+  dele (falhou, sem JSON ou já dentro do comando → a linha do app); senão a linha do app com os
+  itens escolhidos. O JSON → linha mora no núcleo (`router_core::statusline`), que a prévia do
+  app também usa.
 - `launch.rs` — `launch` (aceita `<g> -- args` e `<g> args`; ativa sob a trava; planta o sensor;
   liga o compartilhamento; ambiente direto; sobe o `claude` como FILHO ignorando Ctrl+C no router
   e repassa o código de saída), `is-group` (mudo, só o código) e `rotate` (mudo).
 - `measure.rs` — a sonda por conta (ativa pelo perfil do grupo), saída igual à do macOS.
 - `doctor.rs` — as checagens do macOS + as do Windows (scripts, `$PROFILE` das duas edições e
   `.bashrc`, `.bash_profile`, política de execução sem o escopo Process, sensor de cada grupo
-  rodando DE VERDADE pelo shell detectado, statusLine de projeto competindo, links quebrados,
-  variáveis que desviam a sessão, `claude` e versão).
+  rodando DE VERDADE pelo shell e do jeito do Claude Code — só o sensor: com a marca de
+  encadeado, e vale o código 0, porque a linha pode sair vazia —, a escolha da status line (no
+  modo comando, o comando do usuário roda com a sessão de exemplo), statusLine de projeto
+  competindo, links quebrados, variáveis que desviam a sessão, `claude` e versão).
 
 ## Decisões
 - 22/09/2026 (spike): stdin da status line **nunca fecha** → leitor com prazo; 1º render vem sem
@@ -44,7 +49,11 @@ desconhecido sai com 2.
   saiu. O sensor e a regra de cor das janelas (0,70/0,90) não mudaram.
 - 23/09/2026 (status line configurável): o desenho da linha (`statusline_view.rs`) foi para o
   núcleo, `router_core::statusline::view` — a prévia nos Ajustes do app desenha com o mesmo
-  código. O `regex` virou dependência só dos testes.
+  código. O `regex` virou dependência só dos testes. Depois o `view_from`/`label_for`/`window`
+  também (`router_core::statusline::session`).
+- 23/09/2026: o `statusline` aplica a escolha do usuário; o modo comando é o único com processo
+  extra por render. O `doctor` roda o sensor pelo mesmo `Shell` do núcleo (antes: `bash -c` ou
+  `powershell.exe` fixo; agora o `pwsh` vem antes, como no Claude Code).
 
 ## Pendências
 - Ctrl+C durante `launch` só dá para conferir à mão (enviar Ctrl+C num teste atingiria o próprio

@@ -481,3 +481,34 @@ fn git_bash_is_found_in_the_order_claude_code_uses() {
     env.override_path = Some(custom.clone());
     assert_eq!(find_git_bash(&env), Some(custom));
 }
+
+/// O `CLAUDE_CODE_GIT_BASH_PATH` só vale se o arquivo for um bash/sh (visto no
+/// JS do 2.1.280): senão o Claude Code o ignora e segue a busca.
+#[test]
+fn the_git_bash_override_must_name_a_bash_or_sh() {
+    let tmp = tempfile::tempdir().unwrap();
+    let touch = |p: &Path| {
+        fs::create_dir_all(p.parent().unwrap()).unwrap();
+        fs::write(p, b"").unwrap();
+        p.to_path_buf()
+    };
+    let installed = touch(
+        &tmp.path()
+            .join("Program Files")
+            .join("Git")
+            .join("bin")
+            .join("bash.exe"),
+    );
+    let with = |override_path: PathBuf| GitBashEnv {
+        override_path: Some(override_path),
+        program_files: Some(tmp.path().join("Program Files")),
+        program_files_x86: None,
+        path: None,
+    };
+    for name in ["bash.exe", "SH.EXE", "bash", "sh"] {
+        let custom = touch(&tmp.path().join("meu").join(name));
+        assert_eq!(find_git_bash(&with(custom.clone())), Some(custom), "{name}");
+    }
+    let zsh = touch(&tmp.path().join("meu").join("zsh.exe"));
+    assert_eq!(find_git_bash(&with(zsh)), Some(installed));
+}

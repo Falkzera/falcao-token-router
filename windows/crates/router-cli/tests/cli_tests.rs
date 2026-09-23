@@ -381,6 +381,78 @@ fn doctor_reports_the_state_of_the_installation() {
     assert_eq!(out.status.code(), Some(1));
 }
 
+fn write_choice(w: &World, choice: serde_json::Value) {
+    let base = w.sandbox.paths().base;
+    fs::create_dir_all(&base).unwrap();
+    fs::write(base.join("statusline.json"), choice.to_string()).unwrap();
+}
+
+/// Com todos os itens tirados a linha é vazia — e o sensor continua rodando:
+/// o `doctor` confere que ele roda, não o que ele desenha.
+#[test]
+fn doctor_accepts_an_empty_line_and_names_the_choice() {
+    let w = world(1);
+    w.sandbox.run(&["launch", "trabalho"]);
+
+    let text = stdout(&w.sandbox.run(&["doctor"]));
+    assert!(
+        text.contains("ok  status line: a linha do app, completa"),
+        "{text}"
+    );
+
+    let all = [
+        "group", "model", "effort", "place", "context", "fiveHour", "sevenDay", "resets", "cost",
+        "email",
+    ];
+    write_choice(&w, serde_json::json!({"hidden": all}));
+    let text = stdout(&w.sandbox.run(&["doctor"]));
+    assert!(
+        text.contains("ok  sensor no grupo Trabalho: instalado e rodando pelo"),
+        "{text}"
+    );
+    assert!(
+        text.contains("ok  status line: a linha do app, sem nenhum item (vazia)"),
+        "{text}"
+    );
+
+    write_choice(&w, serde_json::json!({"hidden": ["context", "cost"]}));
+    let text = stdout(&w.sandbox.run(&["doctor"]));
+    assert!(
+        text.contains("ok  status line: a linha do app, sem contexto, custo"),
+        "{text}"
+    );
+}
+
+/// No modo comando, o `doctor` roda o comando do usuário com a sessão de
+/// exemplo — e diz quando ele não imprime (as sessões mostram a linha do app).
+#[test]
+fn doctor_tries_the_users_command() {
+    let w = world(1);
+    w.sandbox.run(&["launch", "trabalho"]);
+    let echo = format!(
+        "{} statusline-echo",
+        fake_claude().to_string_lossy().replace('\\', "/")
+    );
+    write_choice(&w, serde_json::json!({"mode": "command", "command": echo}));
+    let text = stdout(&w.sandbox.run(&["doctor"]));
+    assert!(
+        text.contains("ok  sensor no grupo Trabalho: instalado e rodando pelo"),
+        "{text}"
+    );
+    assert!(
+        text.contains("ok  status line: o seu comando imprime"),
+        "{text}"
+    );
+
+    write_choice(
+        &w,
+        serde_json::json!({"mode": "command", "command": "C:/nao/existe/linha.exe"}),
+    );
+    let text = stdout(&w.sandbox.run(&["doctor"]));
+    assert!(text.contains("!!  status line: o seu comando"), "{text}");
+    assert!(text.contains("as sessões mostram a linha do app"), "{text}");
+}
+
 #[test]
 fn an_unknown_command_prints_the_usage() {
     let out = Sandbox::new().run(&["xyz"]);

@@ -17,6 +17,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
+use super::view::View;
 use crate::platform::atomic_write::{read_retrying, write_atomic};
 
 /// Um item da linha completa, na ordem em que ela os desenha.
@@ -167,6 +168,33 @@ impl StatusLineChoice {
         &self.hidden
     }
 
+    /// A linha que esta escolha mostra: o que foi tirado sai da `View` antes do
+    /// `render` — o mesmo recorte na sessão e na prévia do app.
+    pub fn apply(&self, mut view: View) -> View {
+        for &item in &self.hidden {
+            match item {
+                Item::Group => view.label = None,
+                Item::Model => view.model = None,
+                Item::Effort => view.effort = None,
+                Item::Place => view.place = None,
+                Item::Context => view.context = None,
+                Item::FiveHour => view.five_hour = None,
+                Item::SevenDay => view.seven_day = None,
+                Item::Resets => {
+                    for window in [&mut view.five_hour, &mut view.seven_day]
+                        .into_iter()
+                        .flatten()
+                    {
+                        window.resets_local = None;
+                    }
+                }
+                Item::Cost => view.cost_usd = None,
+                Item::Email => view.email = None,
+            }
+        }
+        view
+    }
+
     /// O comando a rodar depois do sensor: só no modo comando, e só se não
     /// estiver em branco (em branco, vale a linha do app).
     pub fn command_to_run(&self) -> Option<&str> {
@@ -181,6 +209,8 @@ impl StatusLineChoice {
 mod tests {
     use super::*;
     use crate::engine::router_paths::RouterPaths;
+    use crate::statusline::view::fixtures::{full, plain, style};
+    use crate::statusline::view::render;
 
     fn file_with(text: &str) -> (tempfile::TempDir, std::path::PathBuf) {
         let tmp = tempfile::tempdir().unwrap();
@@ -329,6 +359,55 @@ mod tests {
             with(Mode::Command, " node linha.js \n").command_to_run(),
             Some("node linha.js")
         );
+    }
+
+    // A escolha aplicada à linha (o `render` é o mesmo da sessão).
+
+    fn line_without(items: &[Item]) -> String {
+        let mut choice = StatusLineChoice::default();
+        for &item in items {
+            choice.set_shown(item, false);
+        }
+        plain(&render(&choice.apply(full()), &style(false, true)))
+    }
+
+    #[test]
+    fn the_factory_choice_draws_the_full_line() {
+        let style = style(true, true);
+        assert_eq!(
+            render(&StatusLineChoice::default().apply(full()), &style),
+            render(&full(), &style)
+        );
+    }
+
+    #[test]
+    fn the_items_taken_out_leave_the_line() {
+        assert_eq!(
+            line_without(&[Item::Context, Item::Email]),
+            "● Trabalho │ Opus 5.5 high │ port/windows │ \
+             5h █░░░░ 29% ↻ 14:05  7d ██░░░ 33% ↻ seg (28) 9:00 │ $24.77"
+        );
+        assert_eq!(
+            line_without(&[Item::Group, Item::Effort, Item::Resets, Item::Cost]),
+            "Opus 5.5 │ port/windows │ █████░░░░░ 51% 511k/1000k │ \
+             5h █░░░░ 29%  7d ██░░░ 33% │ conta1@exemplo.com"
+        );
+        assert_eq!(
+            line_without(&[Item::Model, Item::Place, Item::FiveHour]),
+            "● Trabalho │ high │ █████░░░░░ 51% 511k/1000k │ \
+             7d ██░░░ 33% ↻ seg (28) 9:00 │ $24.77 │ conta1@exemplo.com"
+        );
+        assert_eq!(
+            line_without(&[Item::SevenDay]),
+            "● Trabalho │ Opus 5.5 high │ port/windows │ █████░░░░░ 51% 511k/1000k │ \
+             5h █░░░░ 29% ↻ 14:05 │ $24.77 │ conta1@exemplo.com"
+        );
+    }
+
+    /// Tudo de fora é o "nada": a linha vazia (o sensor mede do mesmo jeito).
+    #[test]
+    fn every_item_out_is_an_empty_line() {
+        assert_eq!(line_without(&Item::ALL), "");
     }
 
     #[test]

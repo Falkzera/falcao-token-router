@@ -9,10 +9,14 @@ removido (o teste pode rodar dentro de uma sessão do Claude Code, com o perfil 
 - `common/mod.rs` — `Sandbox` (`router(args)`, `command(programa)`, `records()` do fake) e
   `world(n)`: um grupo dedicado "Trabalho" com `n` contas logadas (credencial + identidade).
 - `statusline_cli.rs` — o sensor: grava e imprime; sem `rate_limits` não grava; stdin que nunca
-  fecha sai rápido; prazo sem entrada.
+  fecha sai rápido; prazo sem entrada. A escolha: itens tirados somem; ilegível = a completa;
+  modo comando imprime a linha do usuário (o `fake-claude statusline-echo`) a partir do mesmo
+  JSON e com o EOF; comando que falha cai na linha do app com os itens; o próprio router como
+  comando não entra em laço.
 - `cli_tests.rs` — `is-group` (mudo), `launch` (troca, ambiente limpo, argumentos com e sem `--`,
   código de saída, sensor e junction plantados, sai da conta cheia), `rotate` (espelha antes de
-  trocar), `measure` (saída, amostra `probe`, ativa pelo grupo), sensor com `--profile`, `doctor`.
+  trocar), `measure` (saída, amostra `probe`, ativa pelo grupo), sensor com `--profile`, `doctor`
+  (inclusive a linha vazia aceita, a escolha nomeada e o comando do usuário testado).
 - `shell_tests.rs` — `shell.ps1` EXECUTADO no Windows PowerShell 5.1 e `shell.sh` no Git Bash com
   `PATH` mínimo: roteia, repassa o código, encadeia a função anterior, sem recursão ao recarregar,
   e avisa alto quando o `router.exe` sumiu.
