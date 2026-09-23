@@ -18,7 +18,6 @@ mod launch;
 mod measure;
 mod shared;
 mod statusline;
-mod statusline_view;
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();

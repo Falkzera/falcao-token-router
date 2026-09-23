@@ -12,6 +12,7 @@ pub mod time_fmt;
 
 pub mod engine;
 pub mod platform;
+pub mod statusline;
 pub mod usage;
 
 // Reexports de conveniência — a superfície pública fica plana como no Swift.

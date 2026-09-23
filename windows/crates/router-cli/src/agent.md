@@ -12,12 +12,8 @@ desconhecido sai com 2.
   JSON sem esperar EOF), perfil = `CLAUDE_CONFIG_DIR` → `--profile` embutido → padrão; grava a
   amostra **só com e-mail e ao menos uma janela**, sob a trava (espera 100 ms); monta o que a
   linha mostra (`view_from`: o JSON do Claude Code + o grupo dono do perfil, `label_for`, pelo
-  `config.json`), imprime e sai 0 sempre.
-- `statusline_view.rs` — a LINHA, pura: `● grupo │ Modelo effort │ branch │ contexto │ 5h ↻ 7d ↻
-  │ $custo │ e-mail`. Cor por grupo (posição na lista), Fable em vermelho, as cores do seletor
-  do `/effort` (brilho no `xhigh`, arco-íris no `max`, pela fase do relógio), cinza explícito
-  com truecolor, dias do reset no idioma do Windows, branch pelo `.git/HEAD` (com teto para os
-  testes), caminho encurtado a partir da home.
+  `config.json`), imprime e sai 0 sempre. O desenho da linha mora no núcleo
+  (`router_core::statusline::view`), que a prévia do app também usa.
 - `launch.rs` — `launch` (aceita `<g> -- args` e `<g> args`; ativa sob a trava; planta o sensor;
   liga o compartilhamento; ambiente direto; sobe o `claude` como FILHO ignorando Ctrl+C no router
   e repassa o código de saída), `is-group` (mudo, só o código) e `rotate` (mudo).
@@ -46,6 +42,9 @@ desconhecido sai com 2.
   a troca). Tudo do JSON documentado da status line; nada de processo por render (o branch vem
   do `.git/HEAD`). Sem `rate_limits` (1º render) a linha só omite as janelas — o "sem uso ainda"
   saiu. O sensor e a regra de cor das janelas (0,70/0,90) não mudaram.
+- 23/09/2026 (status line configurável): o desenho da linha (`statusline_view.rs`) foi para o
+  núcleo, `router_core::statusline::view` — a prévia nos Ajustes do app desenha com o mesmo
+  código. O `regex` virou dependência só dos testes.
 
 ## Pendências
 - Ctrl+C durante `launch` só dá para conferir à mão (enviar Ctrl+C num teste atingiria o próprio

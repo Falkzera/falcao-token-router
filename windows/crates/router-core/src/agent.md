@@ -9,6 +9,7 @@ Sem UI e sem rede. Lê e escreve os MESMOS arquivos do app macOS (`config.json`,
 - `time_fmt.rs` — datas ISO-8601 **sem fração** (o decodificador `.iso8601` do Swift recusa fração).
 - `engine/` — modelos, credencial, rotação, store, lançador, sessões, integração de terminal.
 - `platform/` — o específico do Windows (E/S com nova tentativa, mutex, FILETIME, links, 8.3…).
+- `statusline/` — a linha que o sensor imprime; a CLI e a prévia do app desenham com ela.
 - `usage/` — `usage_percent`, resolvedor do `claude` e a sonda `/usage`.
 
 ## Padrões

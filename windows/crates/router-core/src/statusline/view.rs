@@ -10,12 +10,15 @@
 //! oficial da status line), do `.claude.json` do perfil e do `config.json`.
 //!
 //! Pura: o relógio (a fase das animações), o idioma e o suporte a cor vêm de
-//! fora, e o sensor (a amostra) não passa por aqui.
+//! fora, e o sensor (a amostra) não passa por aqui. Mora no núcleo porque a
+//! prévia dos Ajustes do app desenha com ESTE código — a prévia e a sessão
+//! nunca discordam.
 
 use std::path::{Path, PathBuf};
 
 use chrono::{Datelike, NaiveDateTime, Timelike};
-use router_core::usage::usage_percent::UsagePercent;
+
+use crate::usage::usage_percent::UsagePercent;
 
 const RESET: &str = "\x1b[0m";
 const BOLD: &str = "\x1b[1m";

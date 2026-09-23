@@ -1,6 +1,6 @@
 //! O sensor: lê `rate_limits` do stdin, grava a amostra por conta e imprime a
-//! linha do grupo (o layout mora em `statusline_view`). Nenhuma chamada de rede,
-//! nenhum token nosso.
+//! linha do grupo (o layout mora no núcleo, `router_core::statusline::view`).
+//! Nenhuma chamada de rede, nenhum token nosso.
 //!
 //! Mudanças do Windows sobre o macOS:
 //! - stdin **pode nunca fechar** (medido: processos pendurados), então o leitor
@@ -28,10 +28,10 @@ use router_core::engine::group_usage::{GroupUsageSample, GroupUsageStore, UsageO
 use router_core::engine::provider::ProviderAdapter;
 use router_core::engine::router_paths::RouterPaths;
 use router_core::platform::{paths, ui_language};
+use router_core::statusline::view::{self as statusline_view, Context, Label, Style, View, Window};
 use router_core::RouterConfig;
 
 use crate::shared;
-use crate::statusline_view::{self, Context, Label, Style, View, Window};
 
 /// Prazo do leitor de stdin. O sensor real precisa ser rápido e nunca pendurar.
 const DEADLINE_MS: u64 = 250;
