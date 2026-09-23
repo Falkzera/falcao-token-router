@@ -1,6 +1,6 @@
 //! A bandeja (≙ `MenuBarLabel` + o `MenuBarExtra` do macOS): o anel desenhado
-//! em runtime, o tooltip com janela/origem/idade e o menu do botão direito.
-//! Clique esquerdo abre a janela (o flyout entra na próxima fatia).
+//! em runtime, o tooltip com janela/origem/idade, o menu do botão direito e o
+//! flyout no clique esquerdo.
 
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
@@ -12,6 +12,7 @@ use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager};
 
+use crate::flyout::{self, Area};
 use crate::i18n::t;
 use crate::state::{AppState, HomeTab};
 use crate::system;
@@ -100,13 +101,27 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {
+            // Solta do botão esquerdo, como os flyouts do sistema. O `rect` é
+            // o ícone, em pixels físicos (no excedente do Windows 11, o ícone
+            // dentro do popup do `^`).
             if let TrayIconEvent::Click {
                 button: MouseButton::Left,
                 button_state: MouseButtonState::Up,
+                rect,
                 ..
             } = event
             {
-                crate::show_home(tray.app_handle(), HomeTab::Groups);
+                let position = rect.position.to_physical::<i32>(1.0);
+                let size = rect.size.to_physical::<i32>(1.0);
+                flyout::toggle(
+                    tray.app_handle(),
+                    Area {
+                        x: position.x,
+                        y: position.y,
+                        w: size.width,
+                        h: size.height,
+                    },
+                );
             }
         })
         .build(app)?;

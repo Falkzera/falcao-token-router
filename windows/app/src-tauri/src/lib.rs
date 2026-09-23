@@ -5,9 +5,11 @@
 //! flyout da bandeja e a janela de Grupos/Ajustes), o laço de rotação, o login
 //! por ConPTY e a ponte de comandos com o front em Svelte.
 
+mod flyout;
 mod i18n;
 mod locale;
 mod rotation_loop;
+mod snapshot;
 mod state;
 mod system;
 mod tray;
@@ -45,6 +47,30 @@ fn app_info(app: AppHandle, state: State<'_, AppState>) -> AppInfo {
         locale: state.locale,
         initial_tab: state.take_tab(),
     }
+}
+
+/// O quadro atual (grupos, contas, uso com procedência, sessões, erro).
+#[tauri::command]
+fn get_snapshot(state: State<'_, AppState>) -> snapshot::Snapshot {
+    snapshot::build(&state.store(), state.measuring())
+}
+
+/// O front mediu o conteúdo do flyout: a janela acompanha a altura.
+#[tauri::command]
+fn fit_flyout(app: AppHandle, height: f64) {
+    flyout::fit_height(&app, height);
+}
+
+/// Uma porta do rodapé do flyout: fecha o flyout e abre a janela na aba.
+#[tauri::command]
+fn open_home(app: AppHandle, tab: HomeTab) {
+    flyout::hide(&app);
+    show_home(&app, tab);
+}
+
+#[tauri::command]
+fn quit_app(app: AppHandle) {
+    app.exit(0);
 }
 
 /// Mostra a janela de Grupos/Ajustes na aba pedida, criando-a se preciso, e a
@@ -97,6 +123,8 @@ pub fn run() {
             // ainda (1ª execução, nenhum grupo) — decidido uma vez, na subida.
             let first_run = state.store().config().groups.is_empty();
             app.manage(state);
+            app.manage(flyout::FlyoutState::default());
+            flyout::create(app.handle())?;
             tray::create(app.handle())?;
             rotation_loop::start(app.handle().clone());
             if first_run {
@@ -104,7 +132,13 @@ pub fn run() {
             }
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![app_info])
+        .invoke_handler(tauri::generate_handler![
+            app_info,
+            get_snapshot,
+            fit_flyout,
+            open_home,
+            quit_app
+        ])
         .build(tauri::generate_context!())
         .expect("o app não conseguiu subir");
 

@@ -1,10 +1,17 @@
-# app/src/lib — a ponte com o backend
+# app/src/lib — a ponte com o backend e o que as telas dividem
 
 ## Arquivos
-- `api.ts` — as chamadas ao backend. Dentro do Tauri, `invoke`; no navegador (`npm run dev`),
-  o backend simulado. Único lugar que conhece nome de comando.
-- `mock.ts` — o backend simulado: os mesmos comandos, com cenário e idioma pela URL
-  (`?view=home&lang=pt-BR`), para cada estado da tela ser conferido no Chrome.
-- `types.ts` — espelho dos `#[derive(Serialize)]` do Rust (camelCase).
+- `api.ts` — as chamadas ao backend (`app_info`, `get_snapshot`, `fit_flyout`, `open_home`,
+  `quit_app`) e os eventos (`navigate`, `snapshot-changed`). Dentro do Tauri, `invoke`/`listen`;
+  no navegador, o backend simulado. `currentView()` pelo rótulo da janela (ou `?view=`);
+  `initialSelection()` abre o cartão de uma conta só no navegador (`?select=`).
+- `mock.ts` — o backend simulado: os mesmos comandos, com cenário, idioma, aba e seleção pela
+  URL (`?view=flyout&state=uso|vazio|pronta|critico|erro&lang=pt-BR&select=A2`). Dados só de
+  exemplo (`@exemplo.com`, Acme).
+- `types.ts` — espelho dos `#[derive(Serialize)]` do Rust (camelCase), inclusive o `Snapshot`.
 - `i18n.ts` — `t(chave, …args)`, `format` (`%@`, `%d`, `%1$@`, `%%`, como no macOS),
-  `setLocale` (uma vez, na subida, pelo idioma que o backend manda).
+  `setLocale` (uma vez, na subida).
+- `format.ts` — duração ("1h 12m"), hora do reset, "reseta 13:20 · em 4h 6m", semáforo
+  (0,66/0,90) e os limiares de idade (1 h esmaece, 12 h relógio).
+- `clock.svelte.ts` — o relógio da tela, andando a cada 30 s (idades não congelam na tela aberta).
+- `Icon.svelte` — os ícones do app em SVG (grupos, ajustes, fechar, relógio, sensor, sonda).

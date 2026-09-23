@@ -11,7 +11,17 @@
   a aba pedida para a próxima abertura da janela.
 - `tray.rs` — a bandeja: anel do `gauge-mark` no tamanho exato do ícone pequeno (cache por
   `TrayKey`), tooltip, menu do botão direito (Grupos, Ajustes, Sair — as portas do rodapé do
-  painel do macOS); clique esquerdo abre a janela (o flyout vem na 5.3).
+  painel do macOS); clique esquerdo (na soltura) abre o flyout junto do ícone.
+- `flyout.rs` — a janela do flyout: criada escondida na subida (1º clique imediato), 330 px,
+  sem borda, com sombra, sempre por cima, fora da barra de tarefas; some ao perder o foco; o
+  clique que a fechou não a reabre (guarda de 300 ms); `position` (pura, testada): acima da
+  barra embaixo, abaixo dela em cima, ao lado nas laterais, acima do clique quando o ícone está
+  no excedente, sempre dentro da área útil do monitor; a altura segue o conteúdo. Abrir relê o
+  quadro (como o painel do macOS).
+- `snapshot.rs` — o quadro que as janelas leem: grupos e contas na ordem do usuário, conta
+  ativa, uso com janela/origem/idade e os % PRONTOS (`UsagePercent` do núcleo), sessões (total
+  e engajadas), contas exclusivas (para a confirmação de apagar grupo), o comando do terminal e
+  o erro da última ação como fato com código (`ErrorView`).
 - `tray_text.rs` — o que a bandeja diz, lógica pura: o anel segue a conta do grupo PADRÃO (sem
   ativa nele, o primeiro grupo com ativa); uma linha por grupo com **janela, origem e idade**
   (`Trabalho: equipe-2 · 7d 81% (sensor, 3m)`); janela por modelo diz "sonda" e a idade da
@@ -33,4 +43,7 @@
 - Ícone novo cai no excedente (`^`) da bandeja — daí a dica de fixar e a opção da barra de tarefas.
 
 ## Pendências (próximas fatias)
-- 5.3 flyout no clique esquerdo; 5.4 comandos da janela; 5.5 login por ConPTY.
+- 5.4 comandos da janela (grupos, contas, integração, ajustes); 5.5 login por ConPTY.
+- Conferir à mão o flyout no clique real da bandeja (posição com a barra embaixo e no excedente
+  do Windows 11, sumir ao perder o foco, clique que fecha não reabre) — o clique no ícone não
+  se automatiza sem mover o mouse do usuário.

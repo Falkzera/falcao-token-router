@@ -1,13 +1,15 @@
 # app/src — o front (Svelte 5 + TypeScript)
 
-Uma página para as duas janelas: `App.svelte` decide a superfície (a janela `home` hoje; o
-flyout da bandeja nas próximas fatias). Runes do Svelte 5 (`$state`, `$props`).
+Uma página para as duas janelas: `App.svelte` decide a superfície pelo rótulo da janela (`home`
+ou `flyout`; no navegador, `?view=`). Runes do Svelte 5 (`$state`, `$derived`, `$props`).
 
 ## Arquivos
 - `main.ts` — monta o `App` e carrega o CSS base.
-- `App.svelte` — espera o `app_info` (idioma do Windows) antes de desenhar qualquer coisa.
-- `home/` — a janela Grupos/Ajustes. `lib/` — ponte com o backend, tipos, i18n, backend
-  simulado. `locales/` — os catálogos en/pt-BR. `styles/app.css` — tokens claro/escuro.
+- `App.svelte` — espera o `app_info` (idioma do Windows) antes de desenhar qualquer coisa; marca
+  `html[data-view]` (o flyout tem altura do conteúdo, sem rolagem).
+- `panel/` — o flyout da bandeja. `home/` — a janela Grupos/Ajustes. `lib/` — ponte com o
+  backend, tipos, i18n, formatação, relógio, ícones, backend simulado. `locales/` — os
+  catálogos en/pt-BR. `styles/app.css` — tokens claro/escuro (inclusive as cores de uso).
 
 ## Padrões
 - **Toda string de UI vem do catálogo**, pela função `t("chave", …args)`; as chaves são as do
@@ -16,3 +18,4 @@ flyout da bandeja nas próximas fatias). Runes do Svelte 5 (`$state`, `$props`).
 - Chave de catálogo sempre LITERAL no código (nada de `` `groups.error.${x}` ``): é o que deixa o
   verificador achar as chaves usadas.
 - O front nunca chama `invoke` direto: tudo por `lib/api.ts`.
+- Percentual nunca é calculado aqui: vem pronto do backend.

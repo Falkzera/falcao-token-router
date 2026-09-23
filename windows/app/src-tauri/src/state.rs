@@ -10,12 +10,13 @@ use router_core::engine::default_profile_guard::DefaultProfileGuard;
 use router_core::engine::provider::ProviderAdapter;
 use router_core::engine::router_config_store::RouterConfigStore;
 use router_core::engine::router_paths::RouterPaths;
-use serde::Serialize;
+use router_core::Id;
+use serde::{Deserialize, Serialize};
 
 use crate::locale::{self, Locale};
 
 /// As abas da janela única.
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum HomeTab {
     Groups,
@@ -30,6 +31,9 @@ pub struct AppState {
     /// A aba pedida para a PRÓXIMA abertura da janela (quem pede é a bandeja,
     /// antes de a janela existir).
     pending_tab: Mutex<Option<HomeTab>>,
+    /// O grupo que a sonda está medindo agora (fora da trava do store: a
+    /// sonda leva segundos por conta e a bandeja segue respondendo).
+    measuring: Mutex<Option<Id>>,
 }
 
 /// Um `Mutex` envenenado (pânico noutra thread) não pode derrubar a bandeja:
@@ -58,7 +62,12 @@ impl AppState {
             locale: locale::system(),
             home,
             pending_tab: Mutex::new(None),
+            measuring: Mutex::new(None),
         }
+    }
+
+    pub fn measuring(&self) -> Option<Id> {
+        *lock(&self.measuring)
     }
 
     pub fn store(&self) -> MutexGuard<'_, RouterConfigStore> {
