@@ -21,12 +21,13 @@ desconhecido sai com 2.
   liga o compartilhamento; ambiente direto; sobe o `claude` como FILHO ignorando Ctrl+C no router
   e repassa o código de saída), `is-group` (mudo, só o código) e `rotate` (mudo).
 - `measure.rs` — a sonda por conta (ativa pelo perfil do grupo), saída igual à do macOS.
-- `doctor.rs` — as checagens do macOS + as do Windows (scripts, `$PROFILE` das duas edições e
-  `.bashrc`, `.bash_profile`, política de execução sem o escopo Process, sensor de cada grupo
-  rodando DE VERDADE pelo shell e do jeito do Claude Code — só o sensor: com a marca de
-  encadeado, e vale o código 0, porque a linha pode sair vazia —, a escolha da status line (no
-  modo comando, o comando do usuário roda com a sessão de exemplo), statusLine de projeto
-  competindo, links quebrados, variáveis que desviam a sessão, `claude` e versão).
+- `doctor/` — as checagens do macOS + as do Windows, uma família por arquivo: `mod.rs` (o
+  `Report` e a ordem em que tudo corre, único lugar que decide o código de saída),
+  `terminal.rs` (scripts, os dois `$PROFILE`, `.bashrc`, política de execução),
+  `status_line.rs` (o sensor rodando de verdade pelo shell do Claude Code, a escolha da aba
+  Ajustes, a `statusLine` de projeto que vence a do grupo), `accounts.rs` (quem serve cada
+  grupo, sessões vivas, conta em dois grupos, links) e `environment.rs` (variáveis que
+  desviam, e o `claude`). Quebrado em 24/09/2026 (régua de 600 linhas).
 
 ## Decisões
 - 22/09/2026 (spike): stdin da status line **nunca fecha** → leitor com prazo; 1º render vem sem
