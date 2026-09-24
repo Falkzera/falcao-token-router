@@ -53,7 +53,24 @@ contribuir.
 - **Nunca escrever `@State`.** Do SDK do macOS 26 em diante ele é macro do SwiftUI e o plugin `SwiftUIMacros` só vem no Xcode — sob Command Line Tools o alvo do app não compila (60 erros, 18/09/2026). Usar **`@ViewState`** (`Sources/FalcaoTokenRouter/ViewState.swift`), typealias de `SwiftUICore.State`, que é a property wrapper real e está no SDK.
 - Trocar `CFBundleIdentifier` **perde as preferências**: `UserDefaults.standard` é indexado por ele. Há migração do domínio antigo em `AppSettings.migrateLegacyDefaults` — se o id mudar de novo, acrescente o anterior lá.
 - Nada de chamada de rede no app.
+- **Nenhum arquivo passa de 600 linhas de código de produção.** Não contam: teste
+  inline (`#[cfg(test)] mod tests`), suíte dedicada (`Tests/`, `tests/`), fixtures
+  e mocks. Passou, quebra — o alvo real é **um motivo de mudança por tipo** (SRP);
+  o número é só o alarme. O resto de SOLID não se persegue aqui: inversão de
+  dependência já vale onde importa (`CredentialStore`, `ProviderAdapter`), e
+  perseguir OCP/LSP/ISP nesta escala produz abstração especulativa. Interface com
+  uma implementação se justifica quando a segunda implementação é o teste.
+  Detalhe e racional: `CONTRIBUTING.md`, seção *A unit over 600 lines*.
 - Datas/decisões do domínio (credencial, chaveiro, medição) têm comentário explicando o PORQUÊ — quase tudo aqui foi descoberto por observação e custa caro redescobrir.
+
+## Se existir um `NOTAS-INTERNAS.md` na raiz, leia primeiro
+
+Ele está no `.gitignore` e é do mantenedor: contexto operacional que não pode
+entrar num repo público (decisões em aberto, o porquê de escolhas que o código
+não explica, armadilhas que já custaram caro, a doutrina de engenharia por
+extenso). Não existe num clone; existe na máquina de quem mantém. Quando existir,
+é a fonte mais completa — e **nada dali é copiado para commit, issue ou PR sem
+conferir se nomeia uma pessoa, uma conta ou um empregador.**
 
 ## Documentação por pasta (agent.md)
 

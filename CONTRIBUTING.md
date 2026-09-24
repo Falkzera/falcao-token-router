@@ -136,6 +136,40 @@ continue.
 UI-only changes are exempt; there's no view test harness, and adding one isn't a
 prerequisite for fixing a label.
 
+### A unit over 600 lines
+
+No file goes past **600 lines of production code**. Past it, the file gets split.
+
+What counts is the code that ships: logic, UI, CLI. What doesn't: a `#[cfg(test)]
+mod tests` at the end of a Rust module, a dedicated suite (`tests/*.rs`,
+`Tests/*.swift`), fixtures and mocks. The exception for inline tests is not a
+loophole — in Rust the unit test lives in the module by convention, and counting
+it would push you to move the suite out of the module to satisfy a number. That
+is the opposite of what the rule is for.
+
+The line count is the symptom; the thing being enforced is **one reason to change
+per type**. A file gets long in two different ways, and only one of them is a
+problem. A long list of cases — a probe parser, a status-line renderer, a table of
+scenarios — is long because the domain is wide, and splitting it buys nothing. A
+type that is the store *and* the usage snapshot *and* the session registry *and*
+the login flow is long because it is four things, and there the split is the whole
+point. Look at which one you have before you reach for a knife.
+
+The rest of SOLID is not enforced here. Dependency inversion already holds where
+it matters — the engine talks to `CredentialStore` and `ProviderAdapter`, never to
+the disk, which is what lets the suite run without a keychain. Open/closed,
+substitution and interface segregation are not chased: on a codebase this size,
+chasing them produces the speculative abstraction that costs more than it saves.
+An interface with one implementation is worth having when the second
+implementation is the test. It is not worth having for a variation nobody asked
+for.
+
+Measuring a Rust file's production lines:
+
+```bash
+awk '/#\[cfg\(test\)\]/{print NR-1; exit} END{print NR}' path/to/file.rs | head -1
+```
+
 ### Real accounts in the diff
 
 Tests and examples use `conta1@exemplo.com`, `/Users/exemplo`, organization
