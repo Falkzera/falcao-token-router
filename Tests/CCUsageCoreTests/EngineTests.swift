@@ -424,6 +424,12 @@ struct ProviderEnvTests {
             "ANTHROPIC_BASE_URL": "https://gateway.interno/v1",
             "ANTHROPIC_CUSTOM_HEADERS": "Authorization: Bearer x",
             "CLAUDE_CODE_USE_BEDROCK": "1",
+            // Os do porte Windows (issue #5): token pelo ambiente e o
+            // redirecionamento do lugar da credencial.
+            "CLAUDE_CODE_OAUTH_TOKEN": "sk-ant-oat-TESTE",
+            "CLAUDE_CODE_SESSION_ACCESS_TOKEN": "sess",
+            "CLAUDE_SECURESTORAGE_CONFIG_DIR": "/outro/lugar",
+            "ANTHROPIC_PROFILE": "outro",
             "ANTHROPIC_MODEL": "claude-opus-5", "PATH": "/usr/bin",
         ]
         let direct = ProviderEnv.direct(env)
