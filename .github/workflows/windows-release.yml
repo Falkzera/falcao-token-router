@@ -1,0 +1,117 @@
+name: Windows Release
+
+# Uma tag `windows-v*` produz a release do porte Windows: a suíte do zero, o
+# instalador NSIS, e a página no GitHub como rascunho.
+#
+# Por que a tag tem prefixo: um repo, duas plataformas, um namespace de tags.
+# Sem prefixo, `v1.1.0` não diria qual das duas saiu — e prender as duas ao
+# mesmo número faria uma correção de Windows esperar a próxima release de macOS.
+# O macOS usa `macos-v*` (ver release.yml); a tag `v*` antiga não dispara mais
+# nada, e a release `v1.0.0` de 22/09 continua publicada como está.
+#
+# ⚠️ `releases/latest` é AMBÍGUO neste repo: aponta para a mais recente das duas
+# plataformas. Todo link de download tem de citar a tag, nunca `/latest`.
+#
+# Como cortar: suba "version" em windows/app/src-tauri/tauri.conf.json, escreva
+# a seção no windows/CHANGELOG.md, mergeie, e empurre a tag windows-vX.Y.Z.
+on:
+  push:
+    tags: ["windows-v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    # O build de release do app (LTO, um codegen unit) sozinho leva ~7 min; com
+    # a suíte e o instalador, 45 ficaria justo. Mesmo teto do windows.yml.
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: windows
+
+    steps:
+      - uses: actions/checkout@v5
+
+      # A tag e a versão do app têm de concordar. A versão mora no
+      # tauri.conf.json e em nenhum outro lugar: é ela que nomeia o instalador
+      # (`FalcaoTokenRouter_X.Y.Z_x64-setup.exe`) e a que aparece em "Sobre".
+      # Um segundo arquivo de versão só criaria uma cópia para divergir.
+      - name: Versão bate com a tag
+        shell: pwsh
+        run: |
+          $conf = Get-Content app\src-tauri\tauri.conf.json -Raw | ConvertFrom-Json
+          $tag = "${{ github.ref_name }}" -replace '^windows-v', ''
+          if ($conf.version -ne $tag) {
+            Write-Host "::error::tauri.conf.json diz $($conf.version), a tag diz $tag"
+            exit 1
+          }
+          "VERSION=$($conf.version)" | Out-File -Append $env:GITHUB_ENV -Encoding utf8
+
+      - name: Toolchain
+        run: |
+          rustup show
+          cargo --version
+
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            windows/target
+            ~/AppData/Local/tauri
+          key: windows-cargo-${{ hashFiles('windows/Cargo.lock') }}
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: windows/app/package-lock.json
+
+      - name: Dependências do front
+        working-directory: windows/app
+        run: npm ci --no-fund --no-audit
+
+      # A release não confia que a CI da main passou: é o artefato que o usuário
+      # instala, então prova de novo, do zero. (Mesma regra do release.yml.)
+      - name: Testes
+        shell: pwsh
+        run: ./scripts/test.ps1
+
+      # O mesmo script da máquina do contribuidor: router.exe de release como
+      # sidecar, front + app em release, instalador NSIS — e ele confere que o
+      # sidecar, o nome do exe e os ganchos entraram no .nsi que o NSIS compilou.
+      - name: Instalador
+        shell: pwsh
+        run: ./scripts/build.ps1
+
+      # Uma cópia com nome FIXO ao lado da versionada: quem escreve documentação
+      # não precisa trocar o link a cada release. (O `/latest` do GitHub não
+      # serve aqui — ver o aviso no topo.)
+      - name: Artefatos
+        shell: pwsh
+        run: |
+          $setup = "target\release\bundle\nsis\FalcaoTokenRouter_${env:VERSION}_x64-setup.exe"
+          if (-not (Test-Path $setup)) {
+            Write-Host "::error::o instalador não apareceu em $setup"
+            exit 1
+          }
+          Copy-Item $setup "target\release\bundle\nsis\FalcaoTokenRouter-setup.exe" -Force
+          Get-ChildItem target\release\bundle\nsis\*.exe | Select-Object Name, Length
+
+      # Rascunho de propósito: a página existe mas não aparece na lista nem
+      # dispara notificação até o mantenedor ler as notas e publicar. É a pausa
+      # entre "o build passou" e "está no ar".
+      - name: Release no GitHub (rascunho)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" `
+            "target\release\bundle\nsis\FalcaoTokenRouter_${env:VERSION}_x64-setup.exe" `
+            "target\release\bundle\nsis\FalcaoTokenRouter-setup.exe" `
+            --title "Windows ${env:VERSION}" `
+            --generate-notes `
+            --draft
+          Write-Host "::notice::Rascunho criado — revise e publique em releases/tag/${{ github.ref_name }}"

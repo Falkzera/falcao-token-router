@@ -7,7 +7,7 @@ set -euo pipefail
 
 APP_NAME="FalcaoTokenRouter"
 BUNDLE_ID="com.synqo.falcao-token-router"
-# Fonte única da versão. Com ela fixa aqui, uma tag v1.0.1 podia publicar um app
+# Fonte única da versão. Com ela fixa aqui, uma tag macos-v1.0.1 podia publicar um app
 # que se diz 1.0.0 — e o único lugar onde isso apareceria seria em "Sobre" na
 # máquina de quem instalou.
 VERSION="$(tr -d '[:space:]' < "$(dirname "${BASH_SOURCE[0]}")/../VERSION")"

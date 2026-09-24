@@ -1,15 +1,19 @@
 name: Release
 
-# Uma tag `v*` produz a release: build universal, DMG, zip, e a página no GitHub
-# com as notas geradas dos commits. Roda na nuvem porque o build universal
+# Uma tag `macos-v*` produz a release: build universal, DMG, zip, e a página no
+# GitHub com as notas geradas. Roda na nuvem porque o build universal
 # (arm64 + x86_64) precisa do xcbuild, que só vem com o Xcode completo — e a
 # máquina do mantenedor tem só o Command Line Tools. O runner tem o Xcode.
 #
-# Como cortar uma release: suba o número em VERSION, mergeie, e rode
+# Como cortar: suba o número em VERSION, mergeie, e rode
 # `./Scripts/release.sh` — ele confere, cria a tag e empurra. O resto é aqui.
+# O prefixo existe porque o repo tem duas plataformas e um namespace de tags só:
+# sem ele, `v1.1.0` não diria qual das duas saiu. O Windows usa `windows-v*`
+# (windows-release.yml). ⚠️ A tag `v*` NÃO dispara mais nada — a release `v1.0.0`
+# de 22/09 continua publicada, mas uma `v1.0.1` hoje passaria em silêncio.
 on:
   push:
-    tags: ["v*"]
+    tags: ["macos-v*"]
 
 permissions:
   contents: write
@@ -22,13 +26,13 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      # A tag e o arquivo VERSION têm de concordar. Sem isto, uma tag v1.0.1
+      # A tag e o arquivo VERSION têm de concordar. Sem isto, uma tag macos-v1.0.1
       # podia publicar um app que se diz 1.0.0 — e o único lugar onde isso
       # apareceria seria em "Sobre", na máquina de quem instalou.
       - name: Versão bate com a tag
         run: |
           VERSION="$(tr -d '[:space:]' < VERSION)"
-          TAG="${GITHUB_REF_NAME#v}"
+          TAG="${GITHUB_REF_NAME#macos-v}"
           if [ "$VERSION" != "$TAG" ]; then
             echo "::error::VERSION diz $VERSION, a tag diz $TAG"
             exit 1
@@ -67,8 +71,11 @@ jobs:
           done
           codesign -v "$APP"
           ditto -c -k --keepParent --sequesterRsrc "$APP" "$ZIP"
-          # Uma cópia com nome FIXO: `releases/latest/download/FalcaoTokenRouter.dmg`
-          # resolve sempre para a mais nova, e o README nunca precisa mudar.
+          # Uma cópia com nome FIXO, para quem quiser um link estável por tag:
+          # `releases/download/macos-vX.Y.Z/FalcaoTokenRouter.dmg`. ⚠️ NÃO usar
+          # `releases/latest/download/...` — com duas plataformas no mesmo repo,
+          # `latest` é a release mais recente de QUALQUER uma das duas, e o link
+          # apontaria para um instalador do Windows sem aviso nenhum.
           cp "$DMG" dist/FalcaoTokenRouter.dmg
           ls -la dist/*.dmg dist/*.zip
 

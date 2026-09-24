@@ -4,6 +4,27 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+
+- **Releases are tagged per platform.** The macOS app releases on `macos-v*` and
+  the Windows port on `windows-v*`; a fix on one no longer waits for the other's
+  calendar. `Scripts/release.sh` creates `macos-v<VERSION>`.
+
+  Two consequences worth knowing. A bare `v*` tag **no longer triggers anything**
+  — the `v1.0.0` release of 2026-09-22 stays published, but a `v1.0.1` pushed
+  today would go by in silence. And GitHub's `releases/latest` is now
+  **ambiguous**, because it resolves to whichever platform released last: links
+  to a download have to name a tag.
+
+### Added
+
+- **A Windows port**, in [`windows/`](windows/README.md) — Rust + Tauri, reading
+  and writing the same files as the macOS app. It has its own README, CHANGELOG
+  and release tags. Contributed by [@viniventur](https://github.com/viniventur)
+  in [#8](https://github.com/Falkzera/falcao-token-router/pull/8).
+
 ## [1.0.0] — 2026-09-22
 
 First stable release of the router. Version numbers restart at 1.0.0 because
