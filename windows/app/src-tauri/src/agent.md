@@ -82,15 +82,10 @@
   o código colado vai como linha + `\r`; o fim do processo só é contado depois de toda a saída
   lida; `cancel_and_wait` espera o `claude` sair antes de alguém mexer na casa. Testado no
   ConPTY de verdade com o `fake-claude`.
-- `login.rs` — o fluxo do login no app: fases (iniciando, link, conferindo, adicionada,
-  renovada, duplicada, conta errada, falha com motivo, tempo esgotado), a conferência NO DISCO
-  (12×400 ms, numa thread), comandos (`start_login`, `start_relogin`, `current_login`,
-  `login_submit_code`, `login_retry`, `login_recheck`, `login_close`) e o evento
-  `login-changed` com revisão crescente (a resposta de um comando pode chegar depois do evento
-  de uma mudança posterior). A transição de fase, a limpeza ao fechar e o plano do "Tentar de
-  novo" são funções puras testadas: conta nova que não virou conta → a casa reservada sai;
-  relogin nunca apaga a casa, só tira o login estranho de um relogin que voltou com outra conta;
-  "Tentar de novo" da conta nova é numa casa NOVA.
+- `login/` — o login no app. `flow.rs` é a máquina de estados PURA (fases, `advance`,
+  limpeza ao fechar, plano de repetição) com os testes dela — sem Tauri, sem ConPTY, sem
+  disco; `mod.rs` é o que a move: a sessão, a conferência no disco e os comandos que a
+  janela chama. Quebrado em 24/09/2026 (régua de 600 linhas).
 - `i18n.rs` — os MESMOS catálogos do front (`include_str!`), com o mesmo preenchimento de
   placeholder (`%@`, `%d`, `%1$@`, `%%`); `t(idioma, chave, args)`.
 - `status_line.rs` — a seção da status line nos Ajustes: `get_status_line`/`set_status_line`
