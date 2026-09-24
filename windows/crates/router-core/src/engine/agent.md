@@ -31,9 +31,11 @@ Modelos, formato da amostra, leitor de uso, credencial, rotação e o store. Sem
   grupo, nunca a casa); `next_account`/`rotation_target` (sem amostra = fresca; limiar estrito).
 - `account_login_service.rs` — `login_result`: identidade no `.claude.json` **e** credencial
   completa na casa; uma sem a outra é login pela metade.
-- `router_config_store.rs` — ≙ `RouterConfigStore` (sem UI): grupos, contas, login/relogin,
-  remoção, ativar, `refresh_usage` (uso, ativa e sessões vivas por grupo — leitor de sessões
-  injetável), `rotate_all`. Erros tipados em `StoreError`.
+- `router_config_store/` — ≙ `RouterConfigStore` (sem UI). Um tipo só, a fachada que a UI
+  chama, dividido por motivo de mudança: `mod.rs` (tipos, construção, leitura do estado,
+  persistência), `groups.rs`, `accounts.rs` (login/relogin), `rotation.rs` (o que toca
+  credencial) e `terminal.rs` (integração de shell). Era um arquivo de 869 linhas — quebrado
+  em 24/09/2026 pela régua de 600 linhas de produção (ver `CONTRIBUTING.md`).
 - `engine_lock.rs` — trava entre processos (mutex nomeado `Local\com.synqo.falcao-router.engine.<fnv>`,
   nome derivado da base) em volta de toda escrita de credencial do store e da CLI.
 - `session_launcher.rs` — ≙ `SessionLauncher`: `group_named` (sem caixa, sem espaço nas pontas) e
