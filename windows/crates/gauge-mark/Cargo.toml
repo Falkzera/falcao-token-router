@@ -1,0 +1,16 @@
+[package]
+name = "gauge-mark"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "A marca do Falcão Token Router: o anel-medidor da bandeja e do ícone do app."
+publish = false
+
+[dependencies]
+# png-format: o `icongen` grava o ícone do app em PNG.
+tiny-skia = { version = "0.12", default-features = false, features = ["std", "simd", "png-format"] }
+
+[[bin]]
+name = "icongen"
+path = "src/bin/icongen.rs"

@@ -1,0 +1,172 @@
+/* Os tokens do app, num lugar só. O WebView2 segue o tema de apps do Windows
+   (claro/escuro) pelo `prefers-color-scheme`. As cores de uso são as do painel
+   do macOS (UsageColor) — as mesmas que a bandeja desenha. */
+
+:root {
+  color-scheme: light dark;
+
+  --font: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Cascadia Mono", Consolas, monospace;
+  --font-body: 13px;
+  --font-caption: 12px;
+  --font-small: 11px;
+
+  --bg: #f3f3f3;
+  --flyout-bg: #f3f3f3;
+  --surface: #ffffff;
+  --card-bg: #fbfbfb;
+  --text: #1b1b1b;
+  --text-secondary: #5c5c5c;
+  --text-tertiary: #8a8a8a;
+  --text-quaternary: #b8b8b8;
+  --border: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.16);
+  --track: rgba(0, 0, 0, 0.1);
+  --row-hover: rgba(0, 0, 0, 0.04);
+  --row-active: rgba(0, 0, 0, 0.055);
+  --row-selected: rgba(47, 107, 79, 0.16);
+  --focus: #2f6b4f;
+  --accent: #2f6b4f;
+  --accent-text: #ffffff;
+
+  --calm: #5c9e73;
+  --warning: #e0b840;
+  /* O âmbar da barra, escurecido para texto sobre fundo claro (contraste). */
+  --warning-text: #9a7a12;
+  --critical: #d95247;
+
+  --radius: 8px;
+
+  /* As margens laterais das páginas da janela Grupos/Ajustes: 16 px no
+     tamanho de sempre (520); numa janela larga o conteúdo para em 880 px e
+     fica centrado — uma linha de conta (rótulo … números) de ponta a ponta de
+     uma tela cheia não se lê. Usada em `padding`, onde o `100%` é a largura
+     do bloco que contém a página: a da janela. */
+  --page-inline: max(16px, calc((100% - 880px) / 2));
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #202020;
+    --flyout-bg: #242424;
+    --surface: #2b2b2b;
+    --card-bg: #2c2c2c;
+    --text: #ffffff;
+    --text-secondary: #c8c8c8;
+    --text-tertiary: #8f8f8f;
+    --text-quaternary: #5e5e5e;
+    --border: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.16);
+    --track: rgba(255, 255, 255, 0.12);
+    --row-hover: rgba(255, 255, 255, 0.05);
+    --row-active: rgba(255, 255, 255, 0.07);
+    --row-selected: rgba(107, 179, 133, 0.22);
+    --focus: #6bb385;
+    --accent: #6bb385;
+    --accent-text: #0f2419;
+    --warning-text: #e0b840;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+/* O flyout tem a altura do conteúdo (a janela acompanha); nada de rolagem. */
+html[data-view="flyout"],
+html[data-view="flyout"] body {
+  background: var(--flyout-bg);
+  overflow: hidden;
+}
+
+/* A largura de cada janela — no navegador (backend simulado) a página inteira
+   seria larga demais para conferir o layout. No app o flyout já tem essa
+   largura, e a janela Grupos/Ajustes é do usuário (abre em 520×620 e
+   redimensiona): lá o corpo a acompanha, e a moldura fica só no navegador. */
+html[data-view="flyout"] body {
+  max-width: 330px;
+}
+html[data-view="home"][data-host="browser"] body {
+  max-width: 520px;
+  height: 620px;
+  outline: 1px solid var(--border);
+}
+
+p {
+  margin: 0;
+}
+
+/* Botões e campo no estilo do Windows 11 (os mesmos em todas as telas). */
+button.primary,
+button.secondary,
+button.danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font: inherit;
+  font-size: var(--font-caption);
+  cursor: pointer;
+}
+button.small {
+  min-height: 24px;
+  padding: 2px 10px;
+}
+button.primary {
+  border: 1px solid transparent;
+  background: var(--accent);
+  color: var(--accent-text);
+}
+button.secondary {
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+}
+button.secondary:hover {
+  background: var(--row-hover);
+}
+button.danger {
+  border: 1px solid transparent;
+  background: var(--critical);
+  color: #ffffff;
+}
+button.primary:disabled,
+button.secondary:disabled,
+button.danger:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+input.field {
+  min-height: 30px;
+  padding: 4px 10px;
+  border: 1px solid var(--border-strong);
+  border-bottom-color: var(--text-tertiary);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+input.field:focus {
+  outline: none;
+  border-bottom: 2px solid var(--accent);
+}

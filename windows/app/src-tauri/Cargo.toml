@@ -1,0 +1,39 @@
+[package]
+name = "falcao-token-router"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Falcão Token Router para Windows: a bandeja, a janela de Grupos e o login oficial."
+publish = false
+
+[lib]
+# Só desktop: `staticlib`/`cdylib` do modelo do Tauri são para mobile.
+name = "falcao_token_router_lib"
+crate-type = ["rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.6", features = [] }
+
+[dependencies]
+tauri = { version = "2.11", features = ["tray-icon"] }
+tauri-plugin-single-instance = "2.4"
+tauri-plugin-autostart = "2.5"
+tauri-plugin-opener = "2.5"
+tauri-plugin-clipboard-manager = "2.3"
+# O login oficial (`claude auth login`) roda num ConPTY: sob um pipe simples o
+# link não sai e o navegador não abre (o `claude` se comporta como terminal).
+portable-pty = "0.9"
+regex.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+windows-sys = { workspace = true, features = [
+    "Win32_UI_HiDpi",
+    "Win32_UI_WindowsAndMessaging",
+] }
+router-core = { path = "../../crates/router-core" }
+gauge-mark = { path = "../../crates/gauge-mark" }
+
+[dev-dependencies]
+tempfile = "3"

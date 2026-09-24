@@ -1,0 +1,22 @@
+[package]
+name = "router-cli"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "A CLI `router` do Falcão Token Router (porte Windows)."
+
+[[bin]]
+name = "router"
+path = "src/main.rs"
+
+[dependencies]
+router-core = { path = "../router-core" }
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+
+[dev-dependencies]
+tempfile = "3"
+assert_cmd = "2"
+regex.workspace = true

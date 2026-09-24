@@ -1,0 +1,29 @@
+[package]
+name = "router-core"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Motor do Falcão Token Router (porte Windows): modelos, sensor, leitor de uso."
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+thiserror.workspace = true
+# Globalization: o idioma da interface (`platform::ui_language`). JobObjects e
+# ToolHelp: a árvore do comando de status line do usuário (`platform::job`).
+windows-sys = { workspace = true, features = [
+    "Win32_Globalization",
+    "Win32_System_JobObjects",
+    "Win32_System_Diagnostics_ToolHelp",
+] }
+junction.workspace = true
+regex.workspace = true
+chrono-tz.workspace = true
+
+[dev-dependencies]
+tempfile = "3"
+serde_json.workspace = true
+chrono.workspace = true

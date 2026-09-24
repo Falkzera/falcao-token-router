@@ -1,0 +1,326 @@
+# Windows: verified facts
+
+What the Windows port relies on, and how each fact was checked. Verified on
+Windows 11 with the native install of Claude Code **2.1.280**, on 2026-09-22, in
+isolated profiles (never the machine's own `%USERPROFILE%\.claude`). Paths, names
+and numbers below are anonymized.
+
+None of this is documented by Anthropic. Where a fact came from reading the
+JavaScript embedded in `claude.exe`, it says so — treat those as "true for this
+version" and re-check on upgrades.
+
+## The table from `docs/PORTING.md`
+
+| Question | Windows answer | How it was checked |
+|---|---|---|
+| Where does a profile keep its credential? | A file, `<profile>\.credentials.json` (default profile: `%USERPROFILE%\.claude\.credentials.json`). Nothing in Credential Manager. | `claude auth login` into empty profiles; official docs agree |
+| Is the credential a file? | **Yes** — a JSON blob `{claudeAiOauth: {…}, mcpOAuth: {…}?}` | Only key names were inspected, never values |
+| `.claude.json` beside the default profile, inside a dedicated one? | **Yes**, same asymmetry as macOS | `%USERPROFILE%\.claude.json` vs `<profile>\.claude.json` |
+| Does the status line receive `rate_limits`? | **Yes**: `five_hour`/`seven_day` with `used_percentage` and `resets_at` (epoch s) — but **not** on the first render of a session | A logging status line in a dedicated profile |
+| Is `<profile>\sessions\<pid>.json` written? | **Yes**. `procStart` is a **FILETIME** (100 ns since 1601 UTC, as a string) that matches the process start exactly; `pidDomain` is `win32:<host>` with the DNS host name in lowercase (e.g. `win32:exemplo-pc`) | Compared with `Process.StartTime` of the live process |
+| What does `claude --print "/usage"` print? | Three `Current …` lines, CRLF, `·` (U+00B7), dates **with a comma**: `resets Sep 22, 8:40pm (America/Sao_Paulo)` / `resets Sep 23, 4am (…)` — macOS prints `Sep 22 at 8:40pm` | Captured and turned into a fixture (`probe_tests.rs`) |
+| Logged-out profile? | Exit code **0** and no `Current` line at all — only the `--print` cost summary. "Not signed in" is decided by the absence of the lines, not the exit code | Probe against an empty profile |
+| `CLAUDE_CONFIG_DIR` set to the default path vs unset? | An empty dedicated profile comes up logged out. The exact "unset vs explicitly `~\.claude`" pair was not tested (it would mean touching the real default profile); the port keeps the macOS rule: the default profile exports **no** variable | — |
+
+## The hot swap
+
+**Confirmed end to end.** A live session in a dedicated profile, served by account
+A: `<profile>\.credentials.json` was replaced by B's (temp file + rename, so a new
+mtime) and B's identity written to `<profile>\.claude.json`, without restarting the
+session. On the next request carrying `rate_limits`, the status line reported B's
+windows (the `resets_at` values changed to B's). Claude Code did not write A's
+token or identity back.
+
+Why it works (read in the JS of 2.1.280): before deciding whether to refresh, Claude
+Code `stat`s `.credentials.json` and drops its cached credential when the **mtime**
+changed. So every write of a credential must produce a new mtime — temp + rename of
+freshly written bytes, never `CopyFile` (which keeps the source's mtime). Writing the
+same bytes again is skipped on purpose: a new mtime for nothing makes every live
+session re-read.
+
+Claude Code itself writes the credential by staging + rename, with an in-place
+fallback. The port only propagates a blob that parses as complete JSON with a
+`claudeAiOauth` object (a structural check that skips every value), and re-reads
+briefly when it finds a partial file.
+
+`CLAUDE_SECURESTORAGE_CONFIG_DIR` is consulted **before** `CLAUDE_CONFIG_DIR` to find
+the credential (JS of 2.1.280), so the port strips it — with the rest of the
+credential/endpoint overrides the binary accepts — from every process it launches,
+and `router doctor` reports it when set.
+
+## The status line
+
+- It runs through **Git Bash** when Git for Windows is installed, PowerShell
+  otherwise. Claude Code looks for bash in this order: `CLAUDE_CODE_GIT_BASH_PATH`
+  (ignored unless it names a `bash`/`sh` that exists), `%ProgramFiles%\Git\bin\bash.exe`,
+  `%ProgramFiles(x86)%\Git\bin\bash.exe`, then the `git.exe` on `PATH`.
+- How Claude Code runs the command (JS of 2.1.280, read on 2026-09-23 — the status
+  line goes through the same executor as command hooks):
+  - Git Bash: `spawn(command, {shell: <bash.exe>})`, i.e. `bash -c <command>`, with the
+    bash folder prepended to `PATH`; a command whose first word ends in `.sh` becomes
+    `bash <command>`.
+  - PowerShell: `pwsh` on `PATH`, then PowerShell 7's install folders (including the
+    Store alias), then `powershell` on `PATH`, then Windows PowerShell 5.1 in
+    `System32` — run as `-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command
+    <command>`, without `Bypass` when `CLAUDE_CODE_POWERSHELL_RESPECT_EXECUTION_POLICY`
+    is set.
+  - No window (`windowsHide`); the environment gains `CLAUDE_PROJECT_DIR`, `COLUMNS`
+    and `LINES`; stdin gets the JSON plus a newline, then `end()` is called on it.
+  - The output is shown only when the command exits with 0; each line is trimmed and
+    empty lines are dropped. The timeout is the hooks' (10 minutes), and the run is
+    aborted when the next update starts.
+- A path with **forward slashes and no quotes** works in both shells; quoted, it
+  breaks in PowerShell. The port writes `C:/…/router.exe statusline`, falls back to
+  the 8.3 short name when the path has a space, and only then to shell-specific
+  quoting (`& '…'` for PowerShell).
+- **stdin may never be closed.** Dozens of hung status-line processes were observed.
+  The sensor parses the first complete JSON value, has a 250 ms deadline and always
+  exits. (The 2.1.280 executor calls `end()` on stdin after the JSON, yet the spike
+  never saw an EOF arrive; the deadline stays.)
+- The **first render has no `rate_limits`** (they arrive after the first API
+  response). The macOS sensor writes an empty sample there, which erases the last
+  reading; the port writes nothing without a window.
+- `CLAUDE_CONFIG_DIR` reaches the status line process (it is not scrubbed by
+  default). The port still embeds `--profile <dir>` in each dedicated group's
+  command, used only when the variable is missing.
+- A **project** `.claude\settings.json` overrides the group's status line — and when
+  the working directory is the user's home, `~\.claude\settings.json` counts as
+  project settings. `router doctor` warns about a competing project status line.
+- Claude Code rewrites `<profile>\.claude.json` many times per session (always a new
+  file), but keeps the identity the router wrote.
+- What the group's line shows comes from the stdin JSON as the status line docs
+  describe it (`model`, `effort.level`, `workspace`, `context_window`, `rate_limits`,
+  `cost`), plus the group from `config.json` and the account from the profile's
+  `.claude.json`. `effort` is absent when the model doesn't take it,
+  `context_window.used_percentage` may be `null` early in a session, and each
+  `rate_limits` window may be missing on its own; the line leaves out whatever
+  didn't come. The branch is read from `.git/HEAD` (a `.git` file points to a
+  worktree's gitdir), so a render doesn't start a `git` process. Claude Code
+  debounces updates at 300 ms and cancels a status line still running when the next
+  one starts.
+- Secondary text uses an explicit light gray (`ESC[38;2;153;153;153m`) where the
+  terminal has truecolor: Windows Terminal renders "faint" (`ESC[2m`) by halving the
+  color, which disappears on a dark background.
+
+## The user's choice of status line
+
+Windows only (the macOS app always shows its own line). **Settings → Status line**
+writes `<data dir>\statusline.json`, and `router statusline` reads it on every render,
+after recording the sample — the sensor is the same in every mode:
+
+```json
+{"mode": "app", "hidden": ["context", "cost"], "command": ""}
+```
+
+- `mode: "app"` (the default) draws the full line minus the `hidden` items: `group`,
+  `model`, `effort`, `place`, `context`, `fiveHour`, `sevenDay`, `resets`, `cost`,
+  `email`. The file keeps the items taken **out**, so an item added later shows up
+  for everyone. With all of them out, the line is empty.
+- `mode: "command"` runs the user's `command` with the same JSON, the way Claude Code
+  would (above), and prints its output. The router does close the command's stdin
+  after the JSON, so a script that reads to the end finishes. A failure — the command can't start, exits
+  with non-zero, prints nothing or takes longer than **5 s** — prints the app's line
+  instead. A blank command is the app's line too.
+- The command's whole process tree runs in a **Job Object** with
+  `KILL_ON_JOB_CLOSE`: the process is created suspended, assigned to the job, then
+  resumed, so no grandchild escapes. The tree ends at the deadline, and when the
+  router exits or dies (the job's last handle closes with it); `TerminateProcess` on
+  the shell alone would leave, say, a hung `node` behind on every render. A child the
+  command left in the background holding stdout gets 150 ms after the shell exits.
+- The command runs with `ROUTER_STATUSLINE_CHAINED=1`: a `router statusline` inside it
+  (the router set as the user's own command, or a script that calls it) draws the
+  app's line instead of running the command again. `CLAUDE_CODE_SHELL_PREFIX` is not
+  applied a second time.
+- A missing, unreadable or unexpected file means the full line; an unknown item or
+  mode is ignored without discarding the rest. The app writes the file atomically.
+- `router doctor` runs each group's sensor with `ROUTER_STATUSLINE_CHAINED` set (it
+  checks the sensor runs, and an empty line passes), reports the choice, and in
+  command mode runs the user's command against a sample session.
+
+## PowerShell and Git Bash
+
+- A literal `--` reaches a native executable, but a PowerShell **function** drops it
+  from `$args` (5.1 and 7). `router launch` accepts both `<group> -- args` and
+  `<group> args`.
+- Windows PowerShell 5.1 reads a script without a BOM as ANSI, and saves profiles
+  as UTF-16LE ("Unicode"). `shell.ps1` is UTF-8 **with** BOM; the line added to a
+  profile is ASCII and is appended in the profile's own encoding and line ending.
+- `$PROFILE` lives under the real Documents folder, which OneDrive may redirect
+  (`SHGetKnownFolderPath`, not `%USERPROFILE%\Documents`).
+- A user's profile may already define `function claude` (it did on the test machine).
+  The integration saves it and calls it for `claude` without a group, instead of
+  replacing it.
+- Execution policy: the effective one must be computed **ignoring the Process
+  scope** — the shell Claude Code runs commands in inherits `Bypass`. `Restricted`
+  (the Windows PowerShell 5.1 default on client editions) keeps the profile from
+  running, and `claude <group>` silently falls through to plain `claude`.
+- Git Bash prints a red warning and creates a `~/.bash_profile` when it finds a
+  `~/.bashrc` without one; the port creates the same file first.
+
+## Sharing the profile
+
+- **Directories** (`skills`, `commands`, `agents`, and `projects` with shared
+  history) are **junctions** — no privilege needed. A transcript written through
+  the group's `projects` junction lands in `~\.claude\projects`.
+- **File** symlinks need Developer Mode (or admin). Without them, `CLAUDE.md` and
+  `keybindings.json` are synced copies (newest wins, the overwritten side is backed
+  up) and `history.jsonl` stays per group. **No hardlinks:** 2.1.280 prunes
+  `history.jsonl` by rewriting it when it is a regular file (and skips links), so a
+  hardlink would silently diverge.
+- Deleting a folder that holds these junctions leaves their targets alone with
+  `cmd /c rd /s /q`, and also with `Remove-Item -Recurse -Force` in PowerShell 7.6
+  and in Windows PowerShell 5.1.26100 — checked on 2026-09-23 against a junction to
+  a nested throwaway folder. Other builds of 5.1 weren't tried, so the README points
+  to `rd`, which doesn't depend on the PowerShell version.
+
+## Signing in
+
+The app runs the official `claude auth login` in a **ConPTY** (through
+`portable-pty` 0.9), in the account's own profile, and only reads the output to
+find the link and to know when it ended; the outcome is then confirmed on disk
+(identity in `.claude.json` **and** a credential). macOS does the same with a pty
+(`docs/PORTING.md`: without a terminal the link doesn't come out in time).
+
+What `claude auth login` prints (read in the JS of 2.1.280): `Opening browser to
+sign in…`, then `If the browser didn't open, visit: <URL>` — the URL wrapped in an
+OSC 8 hyperlink when stdout is a terminal — and `Paste code here if prompted > `.
+It succeeds with `Login successful.` and **exits 0 by itself** (the "Press Enter to
+continue" belongs to the interactive `/login`); it fails with `Login failed:
+<reason>` on stderr and exit code 1. A pasted code must look like `code#state`;
+anything else prints `Invalid code. …` and the login keeps waiting. `--email`
+pre-fills the account, which the port passes when re-logging an existing account.
+
+What the ConPTY does, recorded on Windows 11 (2026-09-23) with a stand-in `claude`
+that prints the same text:
+
+- `portable-pty` creates the ConPTY with `PSEUDOCONSOLE_INHERIT_CURSOR`, so the very
+  first bytes are a cursor-position request, `ESC[6n`; with that flag the ConPTY
+  waits for the terminal's answer. The port answers `ESC[1;1R`, as a terminal would.
+- The ConPTY re-renders the output instead of passing the child's bytes through: a
+  window-title OSC, `ESC[?9001h` (win32-input-mode), focus reporting, colours — and
+  the OSC 8 hyperlink **re-emitted** as `ESC]8;id=<n>;<URL>ESC\`. The port strips
+  VT/ANSI as a stream (a sequence may be cut between two reads) and takes the link
+  from the hyperlink, or from the visible text only once it's complete, and only
+  for `https://claude.com/` and `https://platform.claude.com/`. The pseudo-console
+  is 2048 columns wide so the visible link doesn't wrap.
+- Plain text followed by `\r` still arrives as a typed line, despite the
+  win32-input-mode request.
+- `portable-pty` builds the child's base environment from the process **and the
+  registry** (user and system variables). The port clears it and passes only the
+  filtered environment (no proxies or alternative credentials, none of a
+  surrounding Claude Code session's variables, the account's `CLAUDE_CONFIG_DIR`).
+
+## Packaging
+
+An NSIS installer built by the Tauri CLI 2.11.5. Checked on 2026-09-23 in the
+`installer.nsi` that the build generates (`target\release\nsis\x64\`):
+
+- It installs **per user**, in `%LOCALAPPDATA%\FalcaoTokenRouter`, without
+  administrator rights. The folder takes its name from `productName`, which is plain
+  ASCII so that the path the status line cites gains no space or accent.
+- `router.exe` ships as a **sidecar** (`bundle.externalBin`), and lands **beside the
+  app's exe** under its name without the target triple
+  (`File /a "/oname=router.exe"`). The app finds it there, next to its own
+  executable, and on every start points the terminal integration at it — so a
+  reinstall in another folder heals itself.
+- The sidecar is declared in a config that only the installer build merges
+  (`tauri build --config src-tauri/tauri.installer.conf.json`). The Tauri build
+  script copies every `externalBin` into `target\<profile>\` on **every** cargo build
+  of the app: declared in `tauri.conf.json`, it would break a clean build (the file
+  doesn't exist yet) and overwrite the workspace's freshly built `router.exe` — the
+  one the CLI tests run — with the last installer's copy.
+- Without `mainBinaryName`, the installed exe keeps cargo's name
+  (`falcao-token-router.exe`); the port sets it to `FalcaoTokenRouter`.
+- The installer is in English and Brazilian Portuguese; with no language selector,
+  NSIS picks the one that matches the Windows display language. WebView2 comes
+  through the embedded bootstrapper, which downloads the runtime only when it is
+  missing.
+- The installer and the uninstaller close a running app first (the silent ones
+  without asking).
+- The uninstaller removes the app's exe, `router.exe`, `uninstall.exe`, the
+  shortcuts, the uninstall key and the `FalcaoTokenRouter` value under
+  `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` (the name the autostart
+  plugin uses). It never touches `%LOCALAPPDATA%\com.synqo.falcao-router`, where the
+  accounts' credentials are. Only with *Delete the application data* checked does it
+  also remove `%APPDATA%` and `%LOCALAPPDATA%\com.synqo.falcao-token-router` (the
+  app's settings and WebView2 cache) and `HKCU\Software\synqo\FalcaoTokenRouter`
+  (the install location, kept for a reinstall).
+- The installer isn't code-signed, so SmartScreen stops it once. A build made on the
+  same machine carries no Mark of the Web and isn't stopped.
+
+**`router.exe` in use.** Every session opened with `claude <group>` keeps a
+`router launch` process alive until the session ends. Windows refuses to overwrite
+or delete a running executable, but it lets you **rename** it, and the process keeps
+running from the image it already loaded. Installed and updated for real on
+2026-09-23, with a stand-in process holding `router.exe`:
+
+- With Tauri's stock template, a silent update **skipped** the file and exited 0: the
+  new app ended up with the old `router.exe`, and nothing said so. An interactive
+  update stops at NSIS's "Error opening file for writing" instead.
+- The port's NSIS hooks (`app/src-tauri/installer-hooks.nsh`) move a `router.exe`
+  in use out of the way before install and uninstall: to `%TEMP%` under a unique
+  name, or renamed in place if that fails. The update then wrote the new file (the
+  session kept running), the uninstall removed the whole folder, and the next run
+  deleted the leftover from the previous one once nothing held it.
+
+**WebView2's fallback folder.** Tauri points each webview's data at
+`%LOCALAPPDATA%\<identifier>`. When that path can't be resolved, WebView2 falls back
+to `<exe>.WebView2` **next to the executable**. `SHGetKnownFolderPath` fails when the
+folder doesn't exist, and that happened in a test sandbox whose fake `USERPROFILE`
+had no `AppData\Local` yet: the first webview's data landed inside the install
+folder. A real profile always has the folder, and the sandbox now creates it.
+
+## Mapping from macOS
+
+| Piece | macOS | Windows |
+|---|---|---|
+| Credential store | Keychain item via `/usr/bin/security` | `<profile>\.credentials.json`, opaque blob, temp + rename |
+| Process liveness | `kill(pid,0)` + `sysctl` start time | `OpenProcess` + `GetProcessTimes` vs `procStart` FILETIME (same 300 s tolerance; "can't prove it, trust the pid") |
+| `launch` | `execvp` | spawn inheriting the console, own Ctrl+C handler, wait, forward the exit code |
+| Shell integration | zsh function in `~/.zshrc` | `shell.ps1` in both `$PROFILE`s, `shell.sh` in `~/.bashrc` (Git Bash) |
+| Data directory | `~/Library/Application Support/com.synqo.falcao-router` | `%LOCALAPPDATA%\com.synqo.falcao-router` (Local, not Roaming) |
+| Finding `claude` | three separate searches | one resolver: `ROUTER_CLAUDE_BIN`, `~\.local\bin\claude.exe`, `PATH`, `%APPDATA%\npm` (an npm `claude.cmd` shim is read and run as `node cli.js`, never through `cmd.exe`); Claude Desktop's copy and WindowsApps aliases are skipped |
+| Group status line | always the router's line | the router's line with the items the user keeps, or the user's own command after the sensor (`statusline.json`) |
+
+## Deliberate differences
+
+The port does not reproduce these macOS behaviours (each has a regression test):
+
+- an empty sample written on the first status-line render;
+- an unreadable `.claude.json` or `settings.json` replaced by `{}`;
+- `exec` in the shell function, which closes an interactive shell when the session
+  ends, and a silent fall-through when the `router` binary is gone;
+- three different searches for the `claude` binary;
+- the sensor ignoring `ROUTER_APP_SUPPORT`;
+- `ProviderEnv` letting through `ANTHROPIC_CONFIG_DIR`, `ANTHROPIC_IDENTITY_TOKEN(_FILE)`,
+  `ANTHROPIC_FEDERATION_RULE_ID`, `ANTHROPIC_ORGANIZATION_ID`, `CLAUDE_CODE_USE_FOUNDRY`,
+  `ANTHROPIC_FOUNDRY_*`, `ANTHROPIC_AWS_*` and `AWS_BEARER_TOKEN_BEDROCK` (all read in the
+  JS of 2.1.280). The token and credential-redirect variables — `CLAUDE_CODE_OAUTH_TOKEN`
+  and its variants, `CLAUDE_SECURESTORAGE_CONFIG_DIR` — are stripped on macOS too since #6;
+- no lock between the app and the CLI (the port uses a named mutex around every
+  credential write);
+- a group's status line reduced to `account 5h 7d`, which replaced whatever status
+  line the user had with less than it showed. The port's line shows the group, the
+  model and its effort, the branch, the context window, both windows with the time
+  they reset, the session's cost and the active account's e-mail; each item can be
+  turned off in Settings, or the user's own status line command can run instead,
+  after the sensor (the sensor behind it is unchanged);
+- reordering accounts dropping one that the requested order forgot.
+
+And these in the app (checked in the browser against the mocked backend, and in the
+app itself inside a sandbox):
+
+- "Installed ✓" shown even when writing the terminal integration failed;
+- reordering accounts in the Groups window doing nothing (`onMove` outside a `List`);
+- the threshold saved on every step of the slider, instead of when it's released;
+- the "delete group" confirmation counting accounts that other groups keep;
+- `lastError` written in Portuguese by the engine (the port returns facts with a
+  code, and the text comes from the UI's catalogs);
+- a login spinner that never stops when the account doesn't show up on disk (the
+  port shows a named state with "Check again");
+- a relogin that comes back as **another** account leaving that account's
+  credential in this account's home, where "Use" would serve the other account
+  under this one's name (the port removes it);
+- the rotation pass running during a sign-in, where mirroring an active account
+  (group → home) could overwrite the credential a relogin just wrote (the port
+  waits until the sign-in ends).

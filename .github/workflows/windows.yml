@@ -1,0 +1,89 @@
+name: Windows
+
+# O porte Windows (Rust + Tauri) mora inteiro em `windows/`. Este workflow só
+# roda quando algo dali (ou ele mesmo) muda; o CI do macOS continua sendo o
+# portão do resto. Além dos testes, ele gera o instalador e o publica como
+# artefato da execução: enquanto o Windows não tem release, é dali que se
+# baixa o app (o `windows/README.md` aponta para cá).
+on:
+  pull_request:
+    paths:
+      - "windows/**"
+      - ".github/workflows/windows.yml"
+  push:
+    branches: [main]
+    paths:
+      - "windows/**"
+      - ".github/workflows/windows.yml"
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Tests and installer
+    runs-on: windows-latest
+    # Só o build de release do app (LTO, um codegen unit) levou ~7 min na
+    # máquina de desenvolvimento; somado aos testes, 45 ficaria justo.
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: windows
+
+    steps:
+      - uses: actions/checkout@v5
+
+      # O `rust-toolchain.toml` fixa o canal e os componentes; o rustup do
+      # runner instala o que faltar.
+      - name: Toolchain
+        run: |
+          rustup show
+          cargo --version
+
+      # Com o `target` vão o debug dos testes e o release do instalador; o
+      # `%LOCALAPPDATA%\tauri` guarda o que o `tauri build` baixa (o NSIS e o
+      # bootstrapper do WebView2).
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            windows/target
+            ~/AppData/Local/tauri
+          key: windows-cargo-${{ hashFiles('windows/Cargo.lock') }}
+
+      # O front do app (Svelte + Vite): o `test.ps1` roda o svelte-check e o
+      # verificador de strings, e o `build.ps1` o compila para o instalador.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: windows/app/package-lock.json
+
+      - name: Dependências do front
+        working-directory: windows/app
+        run: npm ci --no-fund --no-audit
+
+      # O mesmo script da máquina: fmt --check, clippy -D warnings, a suíte
+      # (que roda o shell.ps1 no Windows PowerShell 5.1 e o shell.sh no Git
+      # Bash de verdade — os dois existem no runner) e as checagens do front.
+      - name: Testes
+        shell: pwsh
+        run: ./scripts/test.ps1
+
+      # Também o da máquina: o router.exe e o app em release, o instalador NSIS
+      # com o router.exe dentro — e o script confere o resultado.
+      - name: Instalador
+        shell: pwsh
+        run: ./scripts/build.ps1
+
+      - name: Artefato do instalador
+        uses: actions/upload-artifact@v6
+        with:
+          name: FalcaoTokenRouter-setup
+          path: windows/target/release/bundle/nsis/*-setup.exe
+          if-no-files-found: error
