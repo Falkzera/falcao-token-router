@@ -59,13 +59,18 @@ enum Statusline {
                                       in: GroupUsageStore.directory(bundleID: RouterPaths.bundleID))
         }
 
-        var parts: [String] = []
-        let label = email.map { String($0.prefix(while: { $0 != "@" })) } ?? "?"
-        parts.append("\u{1b}[1m\(label)\u{1b}[0m")
-        if let f = five.pct { parts.append(colored(f, "5h \(bar(f)) \(pct(f))%")) }
-        if let s = seven.pct { parts.append(colored(s, "7d \(pct(s))%")) }
-        if parts.count == 1 { parts.append("\u{1b}[90msem uso ainda\u{1b}[0m") }
-        print(parts.joined(separator: "  "))
+        // A LINHA. Até 24/09/2026 daqui saía `conta 5h 7d` — e como o router é
+        // dono da `statusLine` do perfil (a linha é o sensor), quem tinha a sua
+        // a perdia ao ativar a integração. Agora sai a completa, com o grupo na
+        // frente e o e-mail da conta ativa no fim, que é onde a troca aparece.
+        let config = Launcher.loadConfig()
+        let view = StatusLineSession.view(from: input, dir: dir, config: config, email: email)
+        let style = StatusLineView.Style(
+            trueColor: StatusLineSource.trueColor(),
+            portuguese: Locale.current.language.languageCode?.identifier == "pt",
+            // A fase das animações vem do relógio: uma volta por segundo.
+            phase: UInt64(Date().timeIntervalSince1970))
+        print(view.render(style))
     }
 
     static func readStdin() -> [String: Any] {
@@ -89,18 +94,6 @@ enum Statusline {
                 (w["resets_at"] as? Double).map { Date(timeIntervalSince1970: $0) })
     }
 
-    static func pct(_ f: Double) -> Int { UsagePercent.value(f) }
-
-    static func bar(_ f: Double?, width: Int = 8) -> String {
-        guard let f else { return String(repeating: "?", count: width) }
-        let filled = min(width, Int((f * Double(width)).rounded()))
-        return String(repeating: "█", count: filled) + String(repeating: "░", count: width - filled)
-    }
-
-    static func colored(_ f: Double, _ text: String) -> String {
-        let code = f >= 0.90 ? 31 : f >= 0.70 ? 33 : 32
-        return "\u{1b}[\(code)m\(text)\u{1b}[0m"
-    }
 }
 
 // MARK: - Lançador e rotação

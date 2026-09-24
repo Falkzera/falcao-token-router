@@ -25,6 +25,25 @@ All notable changes to this project are documented here. The format follows
   and release tags. Contributed by [@viniventur](https://github.com/viniventur)
   in [#8](https://github.com/Falkzera/falcao-token-router/pull/8).
 
+## [Unreleased]
+
+### Changed
+
+- **A status line de um grupo passa a ser a linha completa.** Antes o router
+  escrevia `conta 5h 7d` e nada mais. Como ele é dono da `statusLine` do perfil
+  — a linha **é** o sensor —, ele a escrevia por cima da que você tivesse,
+  inclusive no grupo padrão, que é o seu `~/.claude`: ativar a integração de
+  terminal custava sua status line. Agora sai
+
+      ● grupo │ Modelo effort │ branch │ contexto │ 5h … ↻ 14:05  7d … ↻ seg (28) 9:00 │ $custo │ e-mail
+
+  com o grupo na frente e o e-mail da conta ativa no fim, que é onde a troca de
+  conta aparece. Tudo vem do JSON que o Claude Code já entrega; o branch é lido
+  do `.git/HEAD`, sem gastar um processo por render. Escolher quais itens
+  aparecem — ou rodar o seu próprio comando depois do sensor — vem em seguida.
+
+  Encontrado pelo porte Windows no primeiro teste real, e portado dele.
+
 ## [1.0.0] — 2026-09-22
 
 First stable release of the router. Version numbers restart at 1.0.0 because
