@@ -189,3 +189,19 @@
 "panel.accounts.origin.probe" = "Medido por sondagem: uma consulta direta ao Claude Code, feita quando você pediu. Vale para conta ociosa, que nunca atendeu nada.";
 "settings.system.dock" = "Mostrar no Dock";
 "settings.system.dock.detail" = "O app nasce só na barra de menus. Numa barra cheia o macOS esconde o que não cabe sem avisar, e aí não há por onde abri-lo. No Dock, ele responde ao ⌘-Tab e o ícone abre a janela.";
+
+/* Status line dos grupos */
+"settings.statusline.section" = "Status line";
+"settings.statusline.explain" = "O que as sessões de um grupo mostram embaixo. O router é dono desta linha — ela é o sensor —, então escolha o que ela diz.";
+"settings.statusline.restore" = "Restaurar a linha completa";
+"settings.statusline.empty" = "Nada — uma linha vazia";
+"settings.statusline.item.group" = "Grupo";
+"settings.statusline.item.model" = "Modelo";
+"settings.statusline.item.effort" = "Esforço";
+"settings.statusline.item.place" = "Branch ou pasta";
+"settings.statusline.item.context" = "Janela de contexto";
+"settings.statusline.item.fiveHour" = "Uso de 5 horas";
+"settings.statusline.item.sevenDay" = "Uso de 7 dias";
+"settings.statusline.item.resets" = "Quando cada janela reseta";
+"settings.statusline.item.cost" = "Custo da sessão";
+"settings.statusline.item.email" = "Conta ativa";

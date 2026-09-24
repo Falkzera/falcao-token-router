@@ -53,6 +53,9 @@ private struct Chip: View {
 /// única a seção some: o rodízio é a aba ao lado.
 struct SettingsView: View {
     @Bindable var settings: AppSettings
+    /// Entra porque a escolha da status line mora no store, e não no
+    /// `AppSettings`: a CLI a lê a cada render e não enxerga o `UserDefaults`.
+    @Bindable var router: RouterConfigStore
     @Bindable var form: SettingsFormState
     let loginItem: LoginItem
     let alerts: AlertCoordinator
@@ -97,6 +100,8 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(settings.liveUsageEnabled ? .secondary : UsageColor.warning)
             }
+
+            StatusLineSection(store: router)
 
             Section("settings.section.alerts") {
                 ControlRow(help: "settings.alerts.thresholds.help") {

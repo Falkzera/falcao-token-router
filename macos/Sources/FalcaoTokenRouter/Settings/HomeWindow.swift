@@ -48,7 +48,7 @@ struct HomeWindow: View {
                 .tabItem { Label("home.tab.groups", systemImage: "rectangle.stack") }
                 .tag(HomeTab.groups)
 
-            SettingsView(settings: settings, form: form, loginItem: loginItem,
+            SettingsView(settings: settings, router: router, form: form, loginItem: loginItem,
                          alerts: alerts, calibratedCeiling: calibratedCeiling)
                 .tabItem { Label("home.tab.meter", systemImage: "gauge.with.needle") }
                 .tag(HomeTab.meter)

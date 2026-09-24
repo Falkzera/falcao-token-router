@@ -42,6 +42,11 @@ public final class RouterConfigStore {
     /// lendo o disco, e computado não dispara re-render — o clique em "Ativar"
     /// funcionava e a tela ficava parada, parecendo botão morto.
     public private(set) var integrationInstalled = false
+
+    /// O que a status line dos grupos mostra. **Observável e em memória**: uma
+    /// computada que lesse o disco não re-renderizaria a tela ao mudar — foi
+    /// exatamente o bug do botão "Ativar". O disco é a cópia, não a fonte da UI.
+    public private(set) var statusLineChoice = StatusLineChoice()
     /// Caminho do binário `router` empacotado, que a integração de shell e a
     /// status line apontam. Setado pelo app ao iniciar; `nil` fora do app.
     @ObservationIgnored public var routerPath: String?
@@ -62,6 +67,7 @@ public final class RouterConfigStore {
         self.usage = GroupUsageReader(usageDir: paths.usageDir)
         self.config = Self.load(from: paths.configFile) ?? RouterConfig()
         self.integrationInstalled = shellIntegrationInstalled
+        self.statusLineChoice = StatusLineChoice.load(from: StatusLineChoice.fileURL(base: paths.base))
         // Publica o quadro completo aqui, e não só no primeiro laço.
         //
         // A etiqueta do menu bar é desenhada no lançamento, antes de qualquer
@@ -509,6 +515,31 @@ public final class RouterConfigStore {
             guard let target = engine.rotationTarget(
                 for: group, config: config, usage: usageSnapshot) else { continue }
             activate(target, in: group)
+        }
+    }
+
+    // MARK: - A escolha da status line
+
+    /// Liga ou desliga um item da linha. Grava na hora: a CLI relê a escolha a
+    /// cada render, então o efeito aparece na próxima atualização da sessão,
+    /// sem reabrir nada e sem reinstalar a integração.
+    public func setStatusLineItem(_ item: StatusLineChoice.Item, shown: Bool) {
+        statusLineChoice.setShown(item, shown)
+        saveStatusLineChoice()
+    }
+
+    /// Volta à linha completa.
+    public func restoreStatusLine() {
+        statusLineChoice = StatusLineChoice()
+        saveStatusLineChoice()
+    }
+
+    private func saveStatusLineChoice() {
+        do {
+            try statusLineChoice.save(to: StatusLineChoice.fileURL(base: paths.base))
+            lastError = nil
+        } catch {
+            lastError = "não foi possível salvar a escolha da status line: \(error)"
         }
     }
 }
