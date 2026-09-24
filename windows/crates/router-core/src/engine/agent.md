@@ -1,4 +1,4 @@
-# engine — o motor (≙ Sources/CCUsageCore/Engine)
+# engine — o motor (≙ macos/Sources/CCUsageCore/Engine)
 
 Modelos, formato da amostra, leitor de uso, credencial, rotação e o store. Sem UI, sem rede.
 

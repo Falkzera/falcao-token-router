@@ -1,4 +1,4 @@
-# router-core/src — o motor do porte (≙ Sources/CCUsageCore, parte do router)
+# router-core/src — o motor do porte (≙ macos/Sources/CCUsageCore, parte do router)
 
 Sem UI e sem rede. Lê e escreve os MESMOS arquivos do app macOS (`config.json`,
 `usage/<email>.json`) e reproduz as regras do motor uma a uma.

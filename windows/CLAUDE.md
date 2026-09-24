@@ -19,13 +19,13 @@ O instalador sai em `target\release\bundle\nsis\`; o 1º build baixa o NSIS e o 
 do WebView2 para `%LOCALAPPDATA%\tauri`. `README.md` (inglês) é o guia de quem instala.
 
 ## Mapa
-- `crates/router-core` = ≙ `Sources/CCUsageCore` (parte do router). Sem UI, sem rede.
-- `crates/router-cli`  = ≙ `Sources/router` → `router.exe`.
+- `crates/router-core` = ≙ `macos/Sources/CCUsageCore` (parte do router). Sem UI, sem rede.
+- `crates/router-cli`  = ≙ `macos/Sources/router` → `router.exe`.
 - `crates/fake-claude` = `claude` de mentira dos testes de integração.
 - `crates/gauge-mark`  = o anel (bandeja + ícone do app), testado por pixel.
-- `app/`               = ≙ `Sources/FalcaoTokenRouter`: Tauri v2 (`src-tauri/`) + Svelte 5 (`src/`).
-- Fonte macOS portada: `Sources/CCUsageCore/{Engine,Usage}`, `Sources/router/main.swift`,
-  `Tests/CCUsageCoreTests/*`. Fatos do Windows: `docs/PLATFORM.md`.
+- `app/`               = ≙ `macos/Sources/FalcaoTokenRouter`: Tauri v2 (`src-tauri/`) + Svelte 5 (`src/`).
+- Fonte macOS portada: `macos/Sources/CCUsageCore/{Engine,Usage}`, `macos/Sources/router/main.swift`,
+  `macos/Tests/CCUsageCoreTests/*`. Fatos do Windows: `docs/PLATFORM.md`.
 
 ## Regras de código
 - Comentários e `agent.md` em **pt-BR**; identificadores em inglês; strings de UI (fase 5)

@@ -1,4 +1,4 @@
-# app — o app Tauri (≙ Sources/FalcaoTokenRouter)
+# app — o app Tauri (≙ macos/Sources/FalcaoTokenRouter)
 
 Tauri v2 + Svelte 5 + TypeScript + Vite. Apresentação e orquestração: a regra de negócio vem do
 `router-core`, a marca do `gauge-mark`. Fase 5 do porte, em fatias.

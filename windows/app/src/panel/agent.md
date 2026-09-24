@@ -1,4 +1,4 @@
-# app/src/panel — o flyout da bandeja (≙ Sources/FalcaoTokenRouter/Panel)
+# app/src/panel — o flyout da bandeja (≙ macos/Sources/FalcaoTokenRouter/Panel)
 
 O painel do clique esquerdo no ícone: a tabela de contas por grupo, o detalhamento da conta
 tocada e o rodapé. Sem as seções do medidor (sessão local, valor): o porte é só o router.

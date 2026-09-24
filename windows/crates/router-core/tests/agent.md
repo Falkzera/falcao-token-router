@@ -1,6 +1,6 @@
 # router-core/tests — testes do motor
 
-Portados de `Tests/CCUsageCoreTests` com os mesmos cenários e fixtures anonimizadas
+Portados de `macos/Tests/CCUsageCoreTests` com os mesmos cenários e fixtures anonimizadas
 (`conta1@exemplo.com`, `C:\Users\exemplo`, org `Acme`), mais as regressões do Windows.
 Credencial/adapter falsos em memória ou pastas temporárias — nada toca o sistema real.
 
