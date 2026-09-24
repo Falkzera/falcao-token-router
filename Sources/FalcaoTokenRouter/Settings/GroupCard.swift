@@ -1,8 +1,6 @@
 import SwiftUI
 import CCUsageCore
 
-// MARK: - Cartão de um grupo
-
 struct GroupCard: View {
     @Bindable var store: RouterConfigStore
     let group: AccountGroup

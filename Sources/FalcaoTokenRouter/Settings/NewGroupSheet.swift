@@ -1,8 +1,6 @@
 import SwiftUI
 import CCUsageCore
 
-// MARK: - Folha de novo grupo
-
 struct NewGroupSheet: View {
     let onCreate: (String) -> Void
     @Environment(\.dismiss) private var dismiss
@@ -32,7 +30,3 @@ struct NewGroupSheet: View {
         onCreate(trimmed); dismiss()
     }
 }
-
-// MARK: - Folha de login, dentro do app
-
-/// Conduz o login oficial sem Terminal: mostra o link no próprio modal, o

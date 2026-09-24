@@ -36,9 +36,6 @@ const CANCEL_WAIT: Duration = Duration::from_secs(5);
 /// O evento que leva a fase do login à janela (`null` = fechado).
 pub const LOGIN_CHANGED: &str = "login-changed";
 
-/// Adicionar uma conta nova (numa casa reservada) ou relogar uma existente
-/// (na casa dela, com o e-mail no `--email`).
-#[derive(Clone, PartialEq, Eq, Debug)]
 // A máquina de estados (fases, `advance`, limpeza, repetição) é lógica pura e
 // mora em `flow.rs`; daqui para baixo é o que a move no app: a sessão ConPTY,
 // a conferência no disco e os comandos que a janela chama.

@@ -1,8 +1,6 @@
 import SwiftUI
 import CCUsageCore
 
-// MARK: - Uma conta na lista
-
 struct AccountRow: View {
     let account: Account
     let isActive: Bool

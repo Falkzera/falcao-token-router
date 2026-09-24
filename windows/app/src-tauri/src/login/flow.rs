@@ -7,6 +7,9 @@
 
 use super::*;
 
+/// Adicionar uma conta nova (numa casa reservada) ou relogar uma existente
+/// (na casa dela, com o e-mail no `--email`).
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum LoginKind {
     Add {
         group: Id,

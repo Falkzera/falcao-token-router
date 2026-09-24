@@ -1,6 +1,7 @@
 import SwiftUI
 import CCUsageCore
 
+/// Conduz o login oficial sem Terminal: mostra o link no próprio modal, o
 /// navegador abre no fluxo da Anthropic, e a folha fecha sozinha quando a conta
 /// entra. Um campo de código fica à mão para o raro caso do callback não voltar.
 struct LoginSheet: View {
