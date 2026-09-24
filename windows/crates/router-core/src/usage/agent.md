@@ -1,4 +1,4 @@
-# usage — uso (≙ Sources/CCUsageCore/Usage)
+# usage — uso (≙ macos/Sources/CCUsageCore/Usage)
 
 ## Arquivos
 - `claude_binary.rs` — o resolvedor ÚNICO do `claude`: `ROUTER_CLAUDE_BIN` →

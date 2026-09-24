@@ -1,4 +1,4 @@
-# router-cli — a CLI `router` (≙ Sources/router)
+# router-cli — a CLI `router` (≙ macos/Sources/router)
 
 Binário `router.exe`. Sem argumento, o comando é `statusline` (igual ao macOS). Mensagens
 em pt-BR, como as da CLI do macOS; `router: <msg>` no stderr e código 1 nas falhas; uso
