@@ -6,7 +6,7 @@ name: Release
 # máquina do mantenedor tem só o Command Line Tools. O runner tem o Xcode.
 #
 # Como cortar: suba o número em VERSION, mergeie, e rode
-# `./Scripts/release.sh` — ele confere, cria a tag e empurra. O resto é aqui.
+# `macos/Scripts/release.sh` — ele confere, cria a tag e empurra. O resto é aqui.
 # O prefixo existe porque o repo tem duas plataformas e um namespace de tags só:
 # sem ele, `v1.1.0` não diria qual das duas saiu. O Windows usa `windows-v*`
 # (windows-release.yml). ⚠️ A tag `v*` NÃO dispara mais nada — a release `v1.0.0`
@@ -22,6 +22,11 @@ jobs:
   release:
     runs-on: macos-26
     timeout-minutes: 40
+    # O projeto macOS mora em `macos/` (par do `windows/`); `VERSION`,
+    # `CHANGELOG.md`, `Scripts/` e `dist/` são todos relativos a ele.
+    defaults:
+      run:
+        working-directory: macos
 
     steps:
       - uses: actions/checkout@v5

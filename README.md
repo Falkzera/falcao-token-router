@@ -2,8 +2,12 @@
 
 # Falcão Token Router
 
-A macOS menu bar app that keeps several Claude Code accounts in **groups** and
-switches the active one for you when it runs out — without ending your session.
+Keeps several Claude Code accounts in **groups** and switches the active one for
+you when it runs out — without ending your session.
+
+**macOS and Windows.** Not a platform with a port: one solution, two native
+apps, reading and writing the same files. A group you set up on one means the
+same thing on the other.
 
 ```
 ◐ 81%  equipe-2   ← which account is serving you, and how much of it is spent
@@ -45,11 +49,17 @@ rather than inventing a percentage.
 ## How the swap works
 
 Each account has a **home** — `accounts/<uuid>`, its own config profile, its own
-keychain item, written by Claude Code at login. Each group has a **profile**,
-where its sessions run.
+credential, written by Claude Code at login. Each group has a **profile**, where
+its sessions run.
 
-Activating an account in a group copies the secret from its home into the group's
-keychain item and writes the identity into the group's `.claude.json`.
+Activating an account in a group copies the secret from its home into the
+group's credential and writes the identity into the group's `.claude.json`.
+
+Where that credential lives is the one thing the two platforms disagree on, and
+it is the whole of the platform seam: on macOS it is a **keychain item**, read
+and written through `/usr/bin/security`; on Windows it is a **file**,
+`<profile>\.credentials.json`. Claude Code picks up the change either way — on
+the next request on macOS, and on Windows when the file's mtime changes.
 
 Two rules are what separate this from a shell script that gets it wrong:
 
@@ -104,51 +114,28 @@ drop the live session into "Login expired".
 
 ## Install
 
-### Download
+| | | |
+|---|---|---|
+| **macOS 26+** | [`FalcaoTokenRouter-<version>.dmg`](../../releases?q=macos-v) | [install guide](macos/README.md) |
+| **Windows 10/11** | [`FalcaoTokenRouter_<version>_x64-setup.exe`](../../releases?q=windows-v) | [install guide](windows/README.md) |
 
-Grab `FalcaoTokenRouter-<version>.dmg` from the
-[latest macOS release](../../releases?q=macos-v), open it, and drag the app onto
-*Applications*. The binary is universal — Apple Silicon and Intel.
+Neither build is signed by a paid developer account yet, so each system stops it
+once on first run — macOS with the quarantine flag, Windows with SmartScreen.
+Each platform's guide says exactly what to click.
 
-> Each platform releases on its own tag — `macos-v*` and `windows-v*` — so a fix
-> on one never waits for the other's calendar. The consequence: GitHub's
-> *latest release* link is **ambiguous** here, because it resolves to whichever
-> platform released last. Always follow a tag.
+> **Releases are tagged per platform** — `macos-v*` and `windows-v*` — so a fix
+> on one never waits for the other's calendar. The consequence: GitHub's *latest
+> release* link is **ambiguous** here, because it resolves to whichever platform
+> released last. Follow a tag, and read the release title: it names the system.
 
-The app is **ad-hoc signed, not notarized** (that needs a paid Apple Developer
-account, which is on the roadmap). macOS will refuse to open it the first time.
-Clear the quarantine flag once, after copying it to *Applications*:
-
-```bash
-xattr -dr com.apple.quarantine /Applications/FalcaoTokenRouter.app
-```
-
-Or open it, let macOS block it, then **System Settings → Privacy & Security →
-Open Anyway**. If macOS says the app is *damaged*, that is the quarantine flag,
-not a bad download — the command above fixes it.
-
-Then open the window (the app shows in the menu bar; **Settings → System → Show
-in Dock** makes it a regular app), create a group, add accounts, and click
-**Activate** under *Terminal integration*.
+After installing, the shape is the same on both: create a group, sign accounts
+in through Anthropic's own flow inside the app, turn on the terminal
+integration, and run `claude <group>`.
 
 > **Open a new terminal afterwards.** The integration is a shell function that
 > shadows the binary. In a terminal opened before the install, `claude trabalho`
-> is just an argument to `claude` and your session silently opens in `~/.claude`,
-> on the wrong account. `source ~/.zshrc` fixes an already-open terminal;
-> `router doctor` tells you what's wrong.
-
-### From source
-
-No Xcode needed — Command Line Tools with Swift 6.4+ is enough.
-
-```bash
-git clone https://github.com/Falkzera/falcao-token-router.git
-cd falcao-token-router
-./Scripts/bundle.sh --native --install   # builds and copies to /Applications
-```
-
-An app you assembled yourself never carries the quarantine flag. Requires
-**macOS 26+** and Swift 6.4+ — Command Line Tools is enough, Xcode is not needed.
+> is just an argument to `claude`, and your session silently opens on the wrong
+> account. `router doctor` names that and every other failure mode this app has.
 
 ## Languages
 
@@ -165,55 +152,49 @@ Code wrote there), the status-line samples this app itself writes under
 `Application Support`, and `~/.claude/projects/**/*.jsonl` (read-only, for the
 token and cost meter).
 
-**Keychain:** the `Claude Code-credentials` items, through `/usr/bin/security` —
-the same binary Claude Code uses to write them, which is what keeps macOS from
-prompting on every read. The app copies the blob between profiles. It never
-decodes it to use a token, and `ClaudeCredentials` has no field for a refresh
-token, so no code path can reach one.
+**The credential:** on macOS the `Claude Code-credentials` keychain items,
+through `/usr/bin/security` — the same binary Claude Code uses to write them,
+which is what keeps macOS from prompting on every read. On Windows the
+`.credentials.json` file of each profile. Either way the app copies the blob
+between profiles and **never decodes it to use a token**: neither engine has a
+type with a field for one, so no code path can reach a refresh token.
 
 ## Development
 
-```bash
-./Scripts/test.sh          # core suite (245 tests) + string catalog check
-./Scripts/check-strings.sh # keys vs. catalogs, and loose literals in views
-./Scripts/icon.sh          # draws the .icns, installer art, banner, social card
-./Scripts/bundle.sh        # assembles dist/FalcaoTokenRouter.app
-./Scripts/dmg.sh           # builds dist/FalcaoTokenRouter-<version>.dmg
-./Scripts/release.sh       # checks, tags and pushes; CI builds the universal DMG
-```
+Two projects, two toolchains, no shared build. Each one's README has its
+commands, and each folder has an `agent.md`.
 
-**Plain `swift test` does not work** in this toolchain: Command Line Tools ships
-swift-testing but doesn't wire it up — the macro plugin sits outside the plugin
-path, and `Testing.framework` / `lib_TestingInterop.dylib` sit outside the test
-bundle's rpath. `Scripts/test.sh` injects all three and forwards arguments, so
-`./Scripts/test.sh --filter PricingTable` works normally.
+| | | |
+|---|---|---|
+| [`macos/`](macos/README.md) | Swift 6 / SwiftUI, SPM | `./Scripts/test.sh` |
+| [`windows/`](windows/README.md) | Rust / Tauri 2 / Svelte 5 | `.\scripts\test.ps1` |
 
-For a related reason the app does not write `@State` directly: from the macOS 26
-SDK it is a SwiftUI macro, and the `SwiftUIMacros` plugin ships only with Xcode —
-under Command Line Tools every use of it is a compile error. `ViewState` (see
-`Sources/FalcaoTokenRouter/ViewState.swift`) is a typealias to
-`SwiftUICore.State`, the property wrapper the macro wraps, which *is* in the SDK.
+What they share is not code — it is the **file format on disk**. `config.json`,
+the per-account homes and `usage/<email>.json` are written by whichever app is
+running, and read by the other. That is the contract a third platform would
+implement; [`docs/PORTING.md`](docs/PORTING.md) writes it down.
 
-Code comments are in Portuguese, by choice — it is the maintainers' language, and
-`CCUsageCore` is mostly comments explaining decisions that were discovered by
-observation and are expensive to rediscover.
+Code comments are in Portuguese on both sides, by choice — it is the
+maintainers' language, and both engines are mostly comments explaining decisions
+that were discovered by observation and are expensive to rediscover.
 
 ### Architecture
 
-The full map is [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). In short:
-three targets, and `CCUsageCore` imports no SwiftUI — all logic is testable
-without instantiating a window.
+The full map is [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Both platforms
+are built the same way — an engine with no UI, the app, and a CLI the app ships
+— which is what lets every rule be tested without instantiating a window.
 
-| Target | What it is |
-|---|---|
-| `CCUsageCore` | The engine: groups, rotation, credential mirroring, the sensor's store, the meter. No UI. |
-| `FalcaoTokenRouter` | The SwiftUI app: menu bar, panel, groups, settings. |
-| `router` | The CLI the app bundles: `statusline` (the sensor), `launch <grupo>`, `is-group`, `rotate`. |
+| | macOS | Windows |
+|---|---|---|
+| **Engine** — groups, rotation, credential mirroring, the sensor's store | `CCUsageCore` | `router-core` |
+| **App** — tray/menu bar, panel, groups, settings, every user-facing string | `FalcaoTokenRouter` | `falcao-token-router` (Tauri + Svelte) |
+| **CLI** the app ships — `statusline` (the sensor), `launch`, `is-group`, `rotate`, `measure`, `doctor` | `router` | `router.exe` |
 
-Everything provider-specific sits behind `ProviderAdapter` — the keychain item
-name derived from the config directory, the `.claude.json` beside or inside it,
-the launch command. `RotationEngine` talks only to the protocol, so a second
-provider is a new adapter, not a new engine.
+Everything provider-specific sits behind `ProviderAdapter` on both sides — where
+the credential lives for a given profile, the `.claude.json` beside or inside
+it, the launch command. `RotationEngine` talks only to that interface, so a
+second provider is a new adapter, not a new engine — and it is the same seam a
+third platform implements.
 
 `AlertPolicy` is pure and takes no clock: the same sequence of snapshots produces
 the same alerts, which is what makes rearming testable at all. The `Alert` type
@@ -222,34 +203,45 @@ lives in the app target with every other user-facing string.
 
 ## Platforms
 
-| | |
-|---|---|
-| **macOS 26+** | the app in this repository's root — Swift 6 / SwiftUI, menu bar. Tags `macos-v*`. |
-| **Windows 10/11** | a full port in [`windows/`](windows/README.md) — Rust + Tauri, notification area, NSIS installer. Tags `windows-v*`. Contributed by [@viniventur](https://github.com/viniventur). |
+Two first-class platforms. Neither is the project and neither is a guest: the
+repository root holds what belongs to the product, and each system gets a folder
+of its own.
 
-The Windows port reads and writes the **same files** as the macOS app, so a
-group and its accounts mean the same thing on both. It has its own
-[README](windows/README.md), its own [CHANGELOG](windows/CHANGELOG.md), and
-[`windows/docs/PLATFORM.md`](windows/docs/PLATFORM.md) records every Windows
-fact it relies on and how each was verified.
+```
+falcao-token-router/
+├─ macos/     Swift 6 / SwiftUI · menu bar · tags macos-v*
+├─ windows/   Rust / Tauri 2 / Svelte 5 · notification area · tags windows-v*
+├─ docs/      what is true regardless of system
+└─ README · CONTRIBUTING · CLAUDE.md
+```
 
-**More ports are welcome.** Everything platform-specific sits behind a few small
-seams — the credential store, process liveness, the sign-in terminal, the shell
-hook, the tray UI — and the files the app reads and writes are the ones Claude
-Code writes the same way everywhere. [`docs/PORTING.md`](docs/PORTING.md) maps
-each piece to what a Linux or Windows port needs to replace, what it can keep,
-and what it must verify first. Open a [port issue](../../issues/new?template=port.yml)
-to start one.
+The Windows app is not a wrapper or a subset — it is a full native
+implementation with its own engine, its own 392 tests and its own installer,
+contributed by [@viniventur](https://github.com/viniventur). It reads and writes
+the **same files** as the macOS app, which is what makes them one product rather
+than two programs with the same name. Each has its own README, CHANGELOG and
+release tags, and [`windows/docs/PLATFORM.md`](windows/docs/PLATFORM.md) records
+every Windows fact it relies on and how each was verified.
+
+**A third platform is welcome, and the seam is small.** Everything
+system-specific sits behind a few points — where the credential lives, process
+liveness, the sign-in terminal, the shell hook, the tray UI — and the files the
+app reads and writes are the ones Claude Code writes the same way everywhere.
+[`docs/PORTING.md`](docs/PORTING.md) maps each piece to what a Linux port needs
+to replace, what it can keep, and what it must verify first; the Windows port is
+a worked example of answering that document. Open a
+[port issue](../../issues/new?template=port.yml) to start one.
 
 ## Contributing
 
 Issues and pull requests are welcome, and the project is set up for it:
 
-- [`CONTRIBUTING.md`](CONTRIBUTING.md) — building without Xcode, the branch and
-  PR workflow, the two checks that fail a PR, and the invariants a change near
-  credentials has to preserve.
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — how to build each platform, the branch
+  and PR workflow, what fails a PR, and the invariants a change near credentials
+  has to preserve.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — how the swap, the sensor, the
-  probe and the sessions registry actually work, and what's macOS-specific.
+  probe and the sessions registry actually work, and which parts are decided by
+  the system you are on.
 - Every folder has an `agent.md`: what it's for, what each file does, the
   decisions taken there and why. Read it before touching the folder.
 - Issue templates for [bugs](../../issues/new?template=bug_report.yml),

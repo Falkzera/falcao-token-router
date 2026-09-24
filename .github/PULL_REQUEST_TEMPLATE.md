@@ -19,7 +19,7 @@ problem and left it alone on purpose, say so here so nobody re-derives it later.
 
 ## Checks
 
-- [ ] `./Scripts/test.sh` passes (string catalogs + core suite)
+- [ ] The suite of the platform you touched passes — `macos/Scripts/test.sh`, `windows/scripts/test.ps1`, or both
 - [ ] `swift build -c release` passes
 - [ ] New user-facing strings have keys in **both** `en.lproj` and `pt-BR.lproj`
 - [ ] Logic changes in `CCUsageCore` come with tests
