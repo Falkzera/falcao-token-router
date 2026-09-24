@@ -11,12 +11,16 @@ reason worth arguing with. Arguing is welcome; that's what issues are for.
 
 ## Setting up
 
-You need **macOS 26+** and **Swift 6.4+**. Command Line Tools is enough; Xcode is
-not required, and the project is deliberately built so it never becomes required.
+Two platforms, two toolchains, no shared build. Pick the one you are changing —
+you do not need the other installed.
+
+**macOS** needs **macOS 26+** and **Swift 6.4+**. Command Line Tools is enough;
+Xcode is not required, and the project is deliberately built so it never becomes
+required.
 
 ```bash
 git clone https://github.com/Falkzera/falcao-token-router.git
-cd falcao-token-router
+cd falcao-token-router/macos
 ./Scripts/test.sh                       # should end with "262 tests ... passed"
 ./Scripts/bundle.sh --native --install  # builds and copies to /Applications
 ```
@@ -24,12 +28,25 @@ cd falcao-token-router
 An app you built yourself never carries the quarantine flag, so Gatekeeper stays
 out of your way while developing.
 
+**Windows** needs the Rust toolchain pinned in `windows/rust-toolchain.toml` and
+Node 24.
+
+```powershell
+cd falcao-token-router\windows
+.\scripts\test.ps1    # fmt, clippy -D warnings, 392 tests, svelte-check, strings
+.\scripts\build.ps1   # the NSIS installer, then checks what came out
+```
+
+Details for each are in [`macos/README.md`](macos/README.md) and
+[`windows/README.md`](windows/README.md).
+
 ### `swift test` does not work here, and that is not your setup
 
 Command Line Tools ships swift-testing but doesn't wire it up: the macro plugin
 sits outside the plugin path, and `Testing.framework` / `lib_TestingInterop.dylib`
-sit outside the test bundle's rpath. `Scripts/test.sh` injects all three and
-forwards arguments, so `./Scripts/test.sh --filter Probe` works normally.
+sit outside the test bundle's rpath. `macos/Scripts/test.sh` injects all three
+and forwards arguments, so `./Scripts/test.sh --filter Probe` works normally
+from inside `macos/`.
 
 ### Never write `@State`
 
@@ -38,7 +55,7 @@ plugin only ships with Xcode. Under Command Line Tools every use of it is a
 compile error, and the whole app target stops building — that happened once, and
 cost two weeks of commits that were never compiled.
 
-Write **`@ViewState`** instead (`Sources/FalcaoTokenRouter/ViewState.swift`): a
+Write **`@ViewState`** instead (`macos/Sources/FalcaoTokenRouter/ViewState.swift`): a
 typealias to `SwiftUICore.State`, the property wrapper the macro wraps, which *is*
 in the SDK. Same type, same `$binding`, no plugin. CI builds without Xcode, so a
 PR that reintroduces `@State` fails there too.
@@ -47,13 +64,28 @@ PR that reintroduces `@State` fails there too.
 
 ## How the code is laid out
 
-Three targets, and the split is load-bearing:
+The repository root holds what belongs to the product — this file, the README,
+`docs/`, the workflows. Each platform gets a folder, and neither is the root:
 
-| Target | What it is | Imports SwiftUI? |
-|---|---|---|
-| `CCUsageCore` | The engine: groups, rotation, credential mirroring, the sensor and the probe, the meter. | **No.** All logic lives here, which is what makes it testable without a window. |
-| `FalcaoTokenRouter` | The SwiftUI app: menu bar, panel, groups, settings — and **every user-facing string**. | Yes |
-| `router` | The CLI the app bundles: `statusline` (the sensor), `launch`, `is-group`, `rotate`, `measure`, `doctor`. | No |
+```
+macos/     Swift 6 / SwiftUI · tags macos-v*
+windows/   Rust / Tauri 2 / Svelte 5 · tags windows-v*
+docs/      what is true regardless of system
+```
+
+There is no shared code between them, and that is deliberate — what they share
+is the **file format on disk** (`config.json`, the per-account homes,
+`usage/<email>.json`). Each is written by whichever app is running and read by
+the other. A change to that format is a change to both platforms, and
+[`docs/PORTING.md`](docs/PORTING.md) is where it is written down.
+
+Inside each platform the same three-way split, and it is load-bearing:
+
+| | macOS | Windows | Imports UI? |
+|---|---|---|---|
+| **Engine** — groups, rotation, credential mirroring, the sensor and the probe | `CCUsageCore` | `router-core` | **No.** All logic lives here, which is what makes it testable without a window. |
+| **App** — panel, groups, settings, and **every user-facing string** | `FalcaoTokenRouter` | `falcao-token-router` | Yes |
+| **CLI** the app ships — `statusline` (the sensor), `launch`, `is-group`, `rotate`, `measure`, `doctor` | `router` | `router.exe` | No |
 
 If you want to put a sentence in the core, that's the signal you're putting
 presentation in the wrong place. `AlertPolicy` returns the fact — which window,
@@ -98,9 +130,12 @@ except through a pull request with green CI.
    left alone. Keep PRs to one concern: a PR that fixes a bug and reorganizes
    three files is two PRs that are harder to review and harder to revert.
 
-5. **CI has to be green.** It runs the string check, the suite and a release
-   build on `macos-26`. You can run the same thing locally with
-   `./Scripts/test.sh && swift build -c release`.
+5. **CI has to be green.** The `test` check (string catalogs, the Swift suite, a
+   release build on `macos-26`) is required on every PR, whichever platform you
+   touched — a path filter there would leave a Windows-only PR pending forever.
+   The Windows workflow runs on changes under `windows/`. Locally that is
+   `cd macos && ./Scripts/test.sh && swift build -c release`, or
+   `cd windows && .\scripts\test.ps1`.
 
 6. **Squash merge.** Your commits become one on `main`, with the PR title as the
    subject — so make the title a good Conventional Commit line.
@@ -112,12 +147,12 @@ not even for the maintainer.
 
 ### The string check
 
-Every user-facing string is a key resolved against `Resources/en.lproj` and
-`Resources/pt-BR.lproj`. Adding a raw literal to a view compiles, passes tests,
+Every user-facing string is a key resolved against `macos/Resources/en.lproj` and
+`macos/Resources/pt-BR.lproj`. Adding a raw literal to a view compiles, passes tests,
 and ships a broken UI to whoever isn't reading your language — the compiler has
 no way to know.
 
-`Scripts/check-strings.sh` runs first in `Scripts/test.sh` and in CI. It fails
+`macos/Scripts/check-strings.sh` runs first in `macos/Scripts/test.sh` and in CI. It fails
 on a key missing from any catalog, an orphan translation, or a loose literal in a
 view. `Text(verbatim:)` is the explicit way out for what genuinely isn't
 translated (an account name, a number). Keys are namespaced: `panel.`, `settings.`,

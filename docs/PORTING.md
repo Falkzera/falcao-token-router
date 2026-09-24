@@ -38,7 +38,7 @@ platform, and the macOS answer may not transfer.
 | Does `.claude.json` live beside the default profile and inside a dedicated one? | Yes | `ls -la ~ ~/.claude /tmp/p` after signing in to each |
 | Does the status line receive `rate_limits`? | Yes | Set `statusLine` to a script that dumps stdin to a file; send one message |
 | Is `<profile>/sessions/<pid>.json` written? | Yes | Open a session, `ls <profile>/sessions/`. The record's `pidDomain` field names the platform |
-| What does `claude --print "/usage"` print? | Three `Current …` lines | Run it; compare with the fixture in `Tests/CCUsageCoreTests/ProbeTests.swift` |
+| What does `claude --print "/usage"` print? | Three `Current …` lines | Run it; compare with the fixture in `macos/Tests/CCUsageCoreTests/ProbeTests.swift` |
 | Does setting `CLAUDE_CONFIG_DIR` to the default path differ from unsetting it? | Yes (logged out) | Try both |
 
 Write what you find in the port issue. Even "same as macOS" is a finding.

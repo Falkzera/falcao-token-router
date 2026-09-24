@@ -3,6 +3,12 @@ name: CI
 # Num repositório aberto a contribuição, isto é o portão: um PR só é mergeável
 # se a suíte e o verificador de catálogos passarem aqui. Rodar na `main` também
 # pega o caso em que dois PRs verdes conflitam depois do merge.
+#
+# 🚨 NÃO acrescentar `paths: macos/**` aqui. O check `test` é OBRIGATÓRIO na
+# `main`; filtrado por caminho, um PR que só toca `windows/` nunca o dispara, e
+# no GitHub um check obrigatório que não roda fica PENDENTE PARA SEMPRE. O PR
+# trava sem mensagem que explique. Este workflow roda em tudo de propósito: é
+# barato, e a alternativa falha em silêncio.
 on:
   pull_request:
   push:
@@ -26,6 +32,11 @@ jobs:
     # não suporta a plataforma.
     runs-on: macos-26
     timeout-minutes: 20
+    # O projeto macOS mora em `macos/`, par do `windows/` — nenhuma plataforma é
+    # a raiz. Os scripts se localizam sozinhos; o que muda é de onde se chama.
+    defaults:
+      run:
+        working-directory: macos
 
     steps:
       - uses: actions/checkout@v5

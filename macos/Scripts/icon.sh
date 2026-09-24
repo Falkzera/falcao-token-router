@@ -13,6 +13,9 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# A arte entra no repositório, não no projeto macOS: o banner e o card social
+# são do produto inteiro, e o README que os aponta mora na raiz de cima.
+REPO="$(cd "$ROOT/.." && pwd)"
 OUT="$ROOT/dist"
 BUILD="$(mktemp -d)"
 trap 'rm -rf "$BUILD"' EXIT
@@ -34,8 +37,8 @@ iconutil --convert icns "$OUT/AppIcon.iconset" --output "$OUT/AppIcon.icns"
 # Banner e card social entram no repo: o README aponta para o banner, e o card
 # social é enviado ao GitHub à mão nas configurações. dist/ é ignorado, então
 # ficar só lá significaria README quebrado para quem clona.
-mkdir -p "$ROOT/docs/art"
-cp "$OUT/banner.png" "$OUT/social-preview.png" "$ROOT/docs/art/"
-[ -f "$OUT/panel.png" ] && cp "$OUT/panel.png" "$ROOT/docs/art/"
+mkdir -p "$REPO/docs/art"
+cp "$OUT/banner.png" "$OUT/social-preview.png" "$REPO/docs/art/"
+[ -f "$OUT/panel.png" ] && cp "$OUT/panel.png" "$REPO/docs/art/"
 
 echo "==> Done: $OUT/AppIcon.icns ($(du -h "$OUT/AppIcon.icns" | cut -f1))"

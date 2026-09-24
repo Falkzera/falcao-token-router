@@ -1,6 +1,6 @@
 # falcao-token-router
 
-App de menu bar para macOS que gerencia **grupos de contas do Claude Code** com rodízio automático: o usuário cria grupos (ex.: trabalho, pessoal), loga contas pelo fluxo oficial da Anthropic dentro do app, define ordem e limiar — e o motor troca a conta ativa sozinho quando o limiar bate, sem encerrar a sessão. Nasceu como fork do medidor de tokens `Ulpio/ClaudeTokenCounter` (MIT) e está virando produto pago.
+App que gerencia **grupos de contas do Claude Code** com rodízio automático, **em macOS e Windows**: o usuário cria grupos (ex.: trabalho, pessoal), loga contas pelo fluxo oficial da Anthropic dentro do app, define ordem e limiar — e o motor troca a conta ativa sozinho quando o limiar bate, sem encerrar a sessão. Nasceu como fork do medidor de tokens `Ulpio/ClaudeTokenCounter` (MIT) e está virando produto pago.
 
 **Nomes, e por que são três.** O produto é **Falcão Token Router** (exibição), `falcao-token-router` (repo e pasta), `FalcaoTokenRouter` (target SPM, `.app`, módulo), `com.synqo.falcao-token-router` (bundle id). O namespace de dados em disco é **`com.synqo.falcao-router`** e **fica como está**: a casa de cada conta é `<base>/accounts/<uuid>` e o item de chaveiro é `Claude Code-credentials-<sha256(caminho)[:8]>` — mudar a base muda o hash e deixa toda credencial inalcançável de uma vez. O nome comercial **não pode conter "Claude"/"Anthropic"**.
 
@@ -13,25 +13,41 @@ App de menu bar para macOS que gerencia **grupos de contas do Claude Code** com 
 | App | Swift 6 / SwiftUI, MenuBarExtra, macOS 26 (Tahoe) |
 | Motor | `CCUsageCore` (SPM target puro, sem UI) |
 | CLI | `router` (launch/statusline/is-group/rotate), embutido no .app |
-| Testes | swift-testing (`@Test`/`@Suite`) — **via `./Scripts/test.sh`, nunca `swift test`** (ver CONTRIBUTING.md) |
-| Build | SPM + `Scripts/bundle.sh` (empacota .app, assina ad-hoc) |
+| Testes | swift-testing (`@Test`/`@Suite`) — **via `macos/Scripts/test.sh`, nunca `swift test`** (ver CONTRIBUTING.md) |
+| Build | SPM + `macos/Scripts/bundle.sh` (empacota .app, assina ad-hoc) |
 
 ## Comandos
 
 ```bash
-./Scripts/test.sh                     # roda os testes (swift test NÃO funciona aqui)
-./Scripts/check-strings.sh            # chaves de localização × catálogos
-./Scripts/bundle.sh --native --install  # builda o .app e instala em /Applications
+./macos/Scripts/test.sh              # roda os testes (swift test NÃO funciona aqui)
+./macos/Scripts/check-strings.sh     # chaves de localização × catálogos
+./macos/Scripts/bundle.sh --native --install  # builda o .app e instala em /Applications
 ```
 
 ## Estrutura
 
-- `Sources/CCUsageCore/` — motor: engine de grupos/rotação, medição, store. Sem UI.
-- `Sources/FalcaoTokenRouter/` — o app SwiftUI (painel, grupos, ajustes).
-- `Sources/router/` — a CLI `router` embutida no bundle.
-- `Tests/CCUsageCoreTests/` — testes do motor e do store.
-- `Resources/{pt-BR,en}.lproj/` — catálogos de strings (checados por script).
-- `docs/` — `ARCHITECTURE.md` (o mapa, em inglês, para quem chega de fora) e `PORTING.md` (o que uma porta Linux/Windows precisa trocar).
+**Duas plataformas, nenhuma é a raiz.** Desde 24/09/2026 a raiz guarda o que é
+do produto, e cada sistema tem sua pasta. Não existe "plataforma principal":
+quem acrescentar `linux/` entra do mesmo jeito.
+
+```
+macos/     Swift 6 / SwiftUI · tags macos-v*
+windows/   Rust / Tauri 2 / Svelte 5 · tags windows-v*
+docs/      o que vale independente do sistema
+```
+
+- `macos/Sources/CCUsageCore/` — motor: engine de grupos/rotação, medição, store. Sem UI.
+- `macos/Sources/FalcaoTokenRouter/` — o app SwiftUI (painel, grupos, ajustes).
+- `macos/Sources/router/` — a CLI `router` embutida no bundle.
+- `macos/Tests/CCUsageCoreTests/` — testes do motor e do store.
+- `macos/Resources/{pt-BR,en}.lproj/` — catálogos de strings (checados por script).
+- `macos/{VERSION,CHANGELOG.md,README.md}` — a versão, o histórico e o guia da plataforma.
+- `windows/` — o mesmo desenho em Rust: `crates/router-core` (motor), `app/` (Tauri+Svelte), `crates/router-cli` (o `router.exe`). Tem `README.md`, `CHANGELOG.md` e `docs/PLATFORM.md` próprios.
+- `docs/` — `ARCHITECTURE.md` (o mapa, em inglês, para quem chega de fora) e `PORTING.md` (o que uma porta nova precisa trocar).
+
+O que as duas compartilham **não é código — é o formato em disco**: `config.json`,
+as casas por conta e `usage/<email>.json`. É esse contrato que faz delas um
+produto só, e é ele que uma terceira plataforma implementa.
 
 ## 🚨 Este repositório é público
 
@@ -50,7 +66,7 @@ contribuir.
 - Comentários e strings de UI em **pt-BR**; identificadores em inglês.
 - Toda string de UI vem do catálogo com prefixo `panel|settings|alerts|format|groups` — `check-strings.sh` bloqueia órfãs, faltantes e literais soltos (`Text(verbatim:)` é a saída para o que não se traduz).
 - Estado que a UI precisa ver ao vivo mora em propriedade **observável** do store — propriedade computada que lê disco não re-renderiza (bug real do botão "Ativar").
-- **Nunca escrever `@State`.** Do SDK do macOS 26 em diante ele é macro do SwiftUI e o plugin `SwiftUIMacros` só vem no Xcode — sob Command Line Tools o alvo do app não compila (60 erros, 18/09/2026). Usar **`@ViewState`** (`Sources/FalcaoTokenRouter/ViewState.swift`), typealias de `SwiftUICore.State`, que é a property wrapper real e está no SDK.
+- **Nunca escrever `@State`.** Do SDK do macOS 26 em diante ele é macro do SwiftUI e o plugin `SwiftUIMacros` só vem no Xcode — sob Command Line Tools o alvo do app não compila (60 erros, 18/09/2026). Usar **`@ViewState`** (`macos/Sources/FalcaoTokenRouter/ViewState.swift`), typealias de `SwiftUICore.State`, que é a property wrapper real e está no SDK.
 - Trocar `CFBundleIdentifier` **perde as preferências**: `UserDefaults.standard` é indexado por ele. Há migração do domínio antigo em `AppSettings.migrateLegacyDefaults` — se o id mudar de novo, acrescente o anterior lá.
 - Nada de chamada de rede no app.
 - **Nenhum arquivo passa de 600 linhas de código de produção.** Não contam: teste
@@ -89,5 +105,5 @@ Ao entrar numa pasta pra trabalhar, leia o `agent.md`. Ao sair com mudança sign
 Conventional Commits, uma branch por assunto saindo da `main`, PR com squash.
 Comentário explica o PORQUÊ; o QUÊ o código já diz.
 
-O que trava um PR: `./Scripts/test.sh` vermelho, `check-strings.sh` reclamando,
+O que trava um PR: `macos/Scripts/test.sh` vermelho, `check-strings.sh` reclamando,
 ou `@State` reintroduzido (ver acima). Ver `CONTRIBUTING.md`.
