@@ -181,3 +181,120 @@ struct StatusLinePaintTests {
         #expect(StatusLineFormat.shortenPath("/opt/x", home: "/Users/exemplo") == "/opt/x")
     }
 }
+
+@Suite("Status line — a escolha do usuário")
+struct StatusLineChoiceTests {
+    private func semCor(_ view: StatusLineView) -> String {
+        view.render(.init(trueColor: false, portuguese: false, phase: 0, calendar: utc))
+            .replacingOccurrences(of: "\u{1b}\\[[0-9;]*m", with: "", options: .regularExpression)
+    }
+
+    @Test("de fábrica, mostra tudo")
+    func fabricaMostraTudo() {
+        let choice = StatusLineChoice()
+        #expect(StatusLineChoice.Item.allCases.allSatisfy { choice.shows($0) })
+        #expect(choice.hiddenItems.isEmpty)
+    }
+
+    @Test("o item tirado some da linha")
+    func tiraItem() {
+        var choice = StatusLineChoice()
+        choice.setShown(.cost, false)
+        choice.setShown(.email, false)
+        #expect(semCor(choice.apply(cheia())).contains("$2.81") == false)
+        #expect(semCor(choice.apply(cheia())).contains("conta1@exemplo.com") == false)
+        // O que ficou continua lá, e os separadores não sobram.
+        #expect(semCor(choice.apply(cheia())).hasSuffix("7d ██░░░ 38% ↻ Mon (28) 9:00"))
+    }
+
+    @Test("tirar os resets tira os DOIS — um só seria uma linha que mente")
+    func resetsVaoJuntos() {
+        var choice = StatusLineChoice()
+        choice.setShown(.resets, false)
+        let line = semCor(choice.apply(cheia()))
+        #expect(!line.contains("↻"))
+        // As janelas em si ficam.
+        #expect(line.contains("5h ██░░░ 42%") && line.contains("7d ██░░░ 38%"))
+    }
+
+    @Test("tirar tudo dá linha vazia, não uma fileira de separadores")
+    func tudoFora() {
+        var choice = StatusLineChoice()
+        for item in StatusLineChoice.Item.allCases { choice.setShown(item, false) }
+        #expect(semCor(choice.apply(cheia())) == "")
+    }
+
+    @Test("guarda os ESCONDIDOS, para um item novo aparecer para quem já tem o arquivo")
+    func guardaOsEscondidos() throws {
+        var choice = StatusLineChoice()
+        choice.setShown(.cost, false)
+        let url = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appending(path: UUID().uuidString).appending(path: "statusline.json")
+        try choice.save(to: url)
+        let root = try JSONSerialization.jsonObject(
+            with: Data(contentsOf: url)) as? [String: Any]
+        #expect(root?["hidden"] as? [String] == ["cost"])
+        try? FileManager.default.removeItem(at: url.deletingLastPathComponent())
+    }
+
+    @Test("os escondidos ficam na ordem da linha, não na ordem do clique")
+    func ordemEstavel() {
+        var choice = StatusLineChoice()
+        choice.setShown(.email, false)
+        choice.setShown(.group, false)
+        choice.setShown(.cost, false)
+        #expect(choice.hiddenItems == [.group, .cost, .email])
+    }
+
+    @Test("religar um item o tira dos escondidos")
+    func religa() {
+        var choice = StatusLineChoice()
+        choice.setShown(.model, false)
+        choice.setShown(.model, true)
+        #expect(choice.hiddenItems.isEmpty)
+        #expect(choice.shows(.model))
+    }
+
+    @Test("arquivo ausente, ilegível ou com chave estranha vale a completa")
+    func leituraTolerante() {
+        // A linha é o SENSOR: ela não pode falhar por causa da escolha.
+        let ausente = StatusLineChoice.load(from: URL(fileURLWithPath: "/nao/existe.json"))
+        #expect(ausente.hiddenItems.isEmpty)
+
+        let lixo = StatusLineChoice.load(from: URL(fileURLWithPath: "/x")) { _ in Data("nao é json {{".utf8) }
+        #expect(lixo.hiddenItems.isEmpty)
+
+        // Chave desconhecida (versão futura) é ignorada sem levar o resto.
+        let futuro = StatusLineChoice.load(from: URL(fileURLWithPath: "/x")) { _ in
+            Data(#"{"mode":"app","hidden":["cost","coisaNova"],"command":""}"#.utf8)
+        }
+        #expect(futuro.hiddenItems == [.cost])
+    }
+
+    @Test("ida e volta pelo disco preserva a escolha")
+    func idaEVolta() throws {
+        var choice = StatusLineChoice()
+        choice.setShown(.place, false)
+        choice.setShown(.effort, false)
+        choice.command = "meu-comando --x"
+        let url = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appending(path: UUID().uuidString).appending(path: "statusline.json")
+        try choice.save(to: url)
+        let lida = StatusLineChoice.load(from: url)
+        #expect(lida.hiddenItems == [.effort, .place])
+        #expect(lida.command == "meu-comando --x")
+        #expect(lida.mode == .app)
+        try? FileManager.default.removeItem(at: url.deletingLastPathComponent())
+    }
+
+    @Test("o comando só vale no modo comando, e não em branco")
+    func comandoSoNoModoDele() {
+        var choice = StatusLineChoice()
+        choice.command = "meu"
+        #expect(choice.commandToRun == nil)      // modo app
+        choice.mode = .command
+        #expect(choice.commandToRun == "meu")
+        choice.command = "   "
+        #expect(choice.commandToRun == nil)      // em branco vale a linha do app
+    }
+}

@@ -65,12 +65,17 @@ enum Statusline {
         // frente e o e-mail da conta ativa no fim, que é onde a troca aparece.
         let config = Launcher.loadConfig()
         let view = StatusLineSession.view(from: input, dir: dir, config: config, email: email)
+        // A escolha é relida a CADA render, de propósito: mudar um item nos
+        // Ajustes tem efeito na próxima atualização da sessão, sem reabrir nada.
+        // Ausente ou ilegível vale a completa — a linha nunca falha por causa
+        // dela, porque sem a linha não há sensor.
+        let choice = StatusLineChoice.load(from: StatusLineChoice.fileURL(base: RouterPaths().base))
         let style = StatusLineView.Style(
             trueColor: StatusLineSource.trueColor(),
             portuguese: Locale.current.language.languageCode?.identifier == "pt",
             // A fase das animações vem do relógio: uma volta por segundo.
             phase: UInt64(Date().timeIntervalSince1970))
-        print(view.render(style))
+        print(choice.apply(view).render(style))
     }
 
     static func readStdin() -> [String: Any] {

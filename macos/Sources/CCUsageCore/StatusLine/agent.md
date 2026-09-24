@@ -13,6 +13,7 @@ Par do `windows/crates/router-core/src/statusline/`, portado dele.
 - `StatusLineFormat.swift` — texto: `resetWhen` (o "quando" de um reset), nome do modelo, tokens, caminho encurtado.
 - `StatusLineSource.swift` — o que vem do ambiente: o branch pelo `.git/HEAD` e se o terminal aceita truecolor.
 - `StatusLineSession.swift` — o JSON do Claude Code → `View`, e a sessão de EXEMPLO (`sample`) para a prévia e o `doctor`.
+- `StatusLineChoice.swift` — a ESCOLHA do usuário, em `<base>/statusline.json`: os itens tirados da linha e (a partir do PR seguinte) o comando próprio. Leitura TOLERANTE, gravação atômica.
 
 ## Padrões
 - **Puro.** Relógio (a fase), idioma, suporte a cor e calendário entram como `Style`. A mesma `View` com a mesma fase dá sempre a mesma linha — é o que torna a suíte determinística e a prévia reprodutível.
@@ -24,5 +25,8 @@ Par do `windows/crates/router-core/src/statusline/`, portado dele.
 - **24/09/2026 — o Terminal.app NÃO entra na lista de truecolor.** Ele faz 256 cores; a animação do `effort` sairia como lixo nele.
 - **24/09/2026 — `resetWhen` é pública** para a janela de Grupos escrever o reset com ela quando essa tela ganhar os resets (PR seguinte). Duas superfícies escrevendo a mesma hora de dois jeitos é o tipo de divergência que faz o usuário desconfiar do número.
 
+- **24/09/2026 — a escolha guarda os ESCONDIDOS, não os mostrados.** É de propósito: um item novo numa versão futura aparece para todos, como "a completa menos o que eu tirei". Guardar os mostrados esconderia toda novidade de quem já tem o arquivo.
+- **24/09/2026 — a escolha mora em arquivo, não no `UserDefaults`.** A CLI roda fora do app e não lê o `UserDefaults`; e ela não entra no `config.json`, que é o formato combinado com o Windows.
+
 ## Pendências
-- A ESCOLHA do usuário (quais itens aparecem, ou rodar o comando dele) — é o próximo PR, par do `choice.rs` e do `command.rs` do Windows.
+- O modo "meu comando" (roda o comando do usuário depois do sensor, com botão Testar) — próximo PR, par do `command.rs` do Windows. O `StatusLineChoice` já carrega `mode` e `command` para não precisar migrar arquivo depois.

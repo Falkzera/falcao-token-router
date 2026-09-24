@@ -189,3 +189,19 @@
 "panel.accounts.origin.probe" = "Measured by probe: a direct query to Claude Code, made when you asked. This is what works for an idle account, which has never served anything.";
 "settings.system.dock" = "Show in Dock";
 "settings.system.dock.detail" = "The app lives in the menu bar only. On a crowded bar macOS hides what does not fit, without saying so, and then there is no way in. In the Dock it answers ⌘-Tab and its icon opens the window.";
+
+/* Status line dos grupos */
+"settings.statusline.section" = "Status line";
+"settings.statusline.explain" = "What a group's sessions show at the bottom. The router owns this line — it is the sensor — so pick what it says.";
+"settings.statusline.restore" = "Restore the full line";
+"settings.statusline.empty" = "Nothing — an empty line";
+"settings.statusline.item.group" = "Group";
+"settings.statusline.item.model" = "Model";
+"settings.statusline.item.effort" = "Effort";
+"settings.statusline.item.place" = "Branch or folder";
+"settings.statusline.item.context" = "Context window";
+"settings.statusline.item.fiveHour" = "5-hour usage";
+"settings.statusline.item.sevenDay" = "7-day usage";
+"settings.statusline.item.resets" = "When each window resets";
+"settings.statusline.item.cost" = "Session cost";
+"settings.statusline.item.email" = "Active account";

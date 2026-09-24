@@ -28,3 +28,5 @@ A janela única, em duas abas: **Grupos** (o produto — rodízio, contas, integ
 ## Pendências conhecidas
 - O comentário de `SettingsFormState` justifica sua existência por `@State` ser inatingível; desde `ViewState.swift` isso deixou de valer. A razão que sobrevive é a outra que ele já dá: rascunho não é preferência.
 - `setNickname` existe no store sem UI correspondente.
+- `StatusLineSection.swift` — a seção dos Ajustes que escolhe o que a status line dos grupos mostra: a prévia ao vivo e um toggle por item, com "Restaurar a linha completa".
+- `ANSIText.swift` — converte a linha com escapes ANSI em `AttributedString`. Existe por correção, não enfeite: a prévia é desenhada pelo MESMO `StatusLineView.render` da sessão, então ela não pode discordar do que a sessão mostra.
