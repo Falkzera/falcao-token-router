@@ -16,7 +16,8 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VERSION="$(tr -d '[:space:]' < "$ROOT/VERSION")"
-TAG="v$VERSION"
+# O prefixo distingue das tags do porte Windows (`windows-v*`).
+TAG="macos-v$VERSION"
 DRY_RUN=false
 for arg in "$@"; do
     case "$arg" in

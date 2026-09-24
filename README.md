@@ -107,8 +107,13 @@ drop the live session into "Login expired".
 ### Download
 
 Grab `FalcaoTokenRouter-<version>.dmg` from the
-[latest release](../../releases/latest), open it, and drag the app onto
+[latest macOS release](../../releases?q=macos-v), open it, and drag the app onto
 *Applications*. The binary is universal — Apple Silicon and Intel.
+
+> Each platform releases on its own tag — `macos-v*` and `windows-v*` — so a fix
+> on one never waits for the other's calendar. The consequence: GitHub's
+> *latest release* link is **ambiguous** here, because it resolves to whichever
+> platform released last. Always follow a tag.
 
 The app is **ad-hoc signed, not notarized** (that needs a paid Apple Developer
 account, which is on the roadmap). macOS will refuse to open it the first time.
@@ -217,9 +222,18 @@ lives in the app target with every other user-facing string.
 
 ## Platforms
 
-macOS 26+ today, because that's what the maintainer runs and can test.
+| | |
+|---|---|
+| **macOS 26+** | the app in this repository's root — Swift 6 / SwiftUI, menu bar. Tags `macos-v*`. |
+| **Windows 10/11** | a full port in [`windows/`](windows/README.md) — Rust + Tauri, notification area, NSIS installer. Tags `windows-v*`. Contributed by [@viniventur](https://github.com/viniventur). |
 
-**Ports are welcome.** Everything platform-specific sits behind a few small
+The Windows port reads and writes the **same files** as the macOS app, so a
+group and its accounts mean the same thing on both. It has its own
+[README](windows/README.md), its own [CHANGELOG](windows/CHANGELOG.md), and
+[`windows/docs/PLATFORM.md`](windows/docs/PLATFORM.md) records every Windows
+fact it relies on and how each was verified.
+
+**More ports are welcome.** Everything platform-specific sits behind a few small
 seams — the credential store, process liveness, the sign-in terminal, the shell
 hook, the tray UI — and the files the app reads and writes are the ones Claude
 Code writes the same way everywhere. [`docs/PORTING.md`](docs/PORTING.md) maps

@@ -30,13 +30,17 @@ claude            → plain Claude Code, as before
 
 ## Install
 
-There is no Windows release yet. Until there is one, take the installer from CI or
-[build it yourself](#building-it-yourself).
+Download `FalcaoTokenRouter_<version>_x64-setup.exe` from the
+[latest Windows release](../../../releases/tag/windows-v1.0.0) and run it.
 
-**From CI.** Open the latest successful run of the
+> This repository releases each platform on its own tag, so the GitHub
+> *latest release* link is ambiguous here — it may point at a macOS release.
+> [All Windows releases](../../../releases?q=windows-v) are tagged `windows-v*`.
+
+To try an unreleased change instead, open the latest successful run of the
 [*Windows* workflow](../../../actions/workflows/windows.yml) and download the
 **FalcaoTokenRouter-setup** artifact at the bottom of the run's page (GitHub asks
-you to sign in for that). Unzip it and run `FalcaoTokenRouter_<version>_x64-setup.exe`.
+you to sign in for that), or [build it yourself](#building-it-yourself).
 
 The installer is **not code-signed**, so Windows SmartScreen stops it the first
 time: click **More info → Run anyway**. It installs for your user only, in
