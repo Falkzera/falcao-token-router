@@ -29,4 +29,3 @@ A janela única, em duas abas: **Grupos** (o produto — rodízio, contas, integ
 
 ## Pendências conhecidas
 - O comentário de `SettingsFormState` justifica sua existência por `@State` ser inatingível; desde `ViewState.swift` isso deixou de valer. A razão que sobrevive é a outra que ele já dá: rascunho não é preferência.
-- `setNickname` existe no store sem UI correspondente.
