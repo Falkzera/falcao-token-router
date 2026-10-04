@@ -144,6 +144,11 @@ fn a_bash_alias_named_claude_is_chained_not_fatal() {
     let w = world(1);
     let (_, sh) = write_scripts(&w);
     let sh = sh.to_string_lossy().replace('\\', "/");
+    // O `claude` puro, que o alias chama: o `PATH` da sandbox só tem o System32.
+    // Sem extensão, o Git Bash o executa pelo `#!`.
+    let bin = w.sandbox.cwd.join("bin");
+    fs::create_dir_all(&bin).unwrap();
+    fs::write(bin.join("claude"), "#!/bin/sh\necho \"puro:$*\"\n").unwrap();
     let test = w.sandbox.cwd.join("teste.sh");
     // Script não interativo: o alias só é expandido com `expand_aliases`, como
     // num `.bashrc` lido pelo Git Bash interativo.
@@ -151,9 +156,13 @@ fn a_bash_alias_named_claude_is_chained_not_fatal() {
         &test,
         format!(
             "shopt -s expand_aliases\n\
+             PATH=\"$PWD/bin:$PATH\"\n\
              alias claude='claude --extra'\n\
              . '{sh}'\n\
-             claude oi\n"
+             claude trabalho --resume abc\n\
+             primeiro=$?\n\
+             claude oi\n\
+             exit $primeiro\n"
         ),
     )
     .unwrap();
@@ -165,10 +174,16 @@ fn a_bash_alias_named_claude_is_chained_not_fatal() {
         .output()
         .unwrap();
 
-    let text = stderr(&out);
-    assert!(out.status.success(), "{}\n{text}", stdout(&out));
-    assert!(!text.contains("syntax error"), "{text}");
-    assert_eq!(args_of_single_run(&w), serde_json::json!(["--extra", "oi"]));
+    let (text, errors) = (stdout(&out), stderr(&out));
+    assert!(out.status.success(), "{text}\n{errors}");
+    assert!(!errors.contains("syntax error"), "{errors}");
+    // Com grupo, a função existe e chega ao `router launch`…
+    assert_eq!(
+        args_of_single_run(&w),
+        serde_json::json!(["--resume", "abc"])
+    );
+    // …e sem grupo o alias continua valendo.
+    assert!(text.contains("puro:--extra oi"), "{text}\n{errors}");
 }
 
 /// O `router.exe` sumiu (app desinstalado ou movido): a função avisa ALTO e o
