@@ -26,7 +26,9 @@ for arg in "$@"; do
     esac
 done
 
-echo "==> Release $TAG${DRY_RUN:+ (simulação)}"
+# `${DRY_RUN:+…}` não serve: "false" não é vazio, e a release de verdade se
+# anunciava como simulação logo antes de empurrar a tag.
+if $DRY_RUN; then echo "==> Release $TAG (simulação)"; else echo "==> Release $TAG"; fi
 
 # A main é protegida e é dela que o workflow constrói; uma tag em outra branch
 # publicaria um commit que a página do projeto não mostra.

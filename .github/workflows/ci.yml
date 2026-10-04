@@ -52,6 +52,18 @@ jobs:
       - name: Catálogos de string
         run: ./Scripts/check-strings.sh
 
+      # Este runner tem Xcode, e com Xcode o `@State` COMPILA (o plugin
+      # SwiftUIMacros vem com ele). Sob Command Line Tools — a máquina do
+      # mantenedor e a de quem contribui sem Xcode — ele derruba o alvo do app
+      # inteiro (60 erros em 18/09/2026). Sem este passo a CI aprovaria
+      # exatamente o que quebra o build deles. Comentário (`//`, `///`) não conta.
+      - name: Sem @State
+        run: |
+          if grep -rnE --include='*.swift' '^[^/]*@State[[:space:]]' Sources Tests; then
+            echo "::error::@State não compila sob Command Line Tools — use @ViewState (ver CONTRIBUTING.md)"
+            exit 1
+          fi
+
       # `swift test` sozinho NÃO funciona nesta toolchain: o Command Line Tools
       # traz o swift-testing mas não o conecta (plugin de macro fora do plugin
       # path, `Testing.framework` fora do rpath do bundle de teste). O script

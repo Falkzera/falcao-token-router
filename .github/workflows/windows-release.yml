@@ -100,6 +100,24 @@ jobs:
           Copy-Item $setup "target\release\bundle\nsis\FalcaoTokenRouter-setup.exe" -Force
           Get-ChildItem target\release\bundle\nsis\*.exe | Select-Object Name, Length
 
+      # As notas são a seção desta versão no windows/CHANGELOG.md. O
+      # `--generate-notes` de antes comparava com a tag anterior de QUALQUER
+      # plataforma: a windows-v1.0.0 saiu com "compare/v1.0.0...windows-v1.0.0",
+      # a release do macOS. Pelo bash do runner (o Git Bash), que tem `awk`.
+      - name: Notas da release
+        shell: bash
+        run: |
+          awk -v v="$VERSION" '
+            $0 ~ "^## \\[" v "\\]" { f = 1; next }
+            f && /^## \[/ { exit }
+            f && /^\[[^]]+\]: / { exit }
+            f { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "::error::windows/CHANGELOG.md não tem a seção [$VERSION]"
+            exit 1
+          fi
+
       # Rascunho de propósito: a página existe mas não aparece na lista nem
       # dispara notificação até o mantenedor ler as notas e publicar. É a pausa
       # entre "o build passou" e "está no ar".
@@ -112,6 +130,6 @@ jobs:
             "target\release\bundle\nsis\FalcaoTokenRouter_${env:VERSION}_x64-setup.exe" `
             "target\release\bundle\nsis\FalcaoTokenRouter-setup.exe" `
             --title "Windows ${env:VERSION}" `
-            --generate-notes `
+            --notes-file release-notes.md `
             --draft
           Write-Host "::notice::Rascunho criado — revise e publique em releases/tag/${{ github.ref_name }}"

@@ -37,8 +37,15 @@ iconutil --convert icns "$OUT/AppIcon.iconset" --output "$OUT/AppIcon.icns"
 # Banner e card social entram no repo: o README aponta para o banner, e o card
 # social é enviado ao GitHub à mão nas configurações. dist/ é ignorado, então
 # ficar só lá significaria README quebrado para quem clona.
-mkdir -p "$REPO/docs/art"
-cp "$OUT/banner.png" "$OUT/social-preview.png" "$REPO/docs/art/"
-[ -f "$OUT/panel.png" ] && cp "$OUT/panel.png" "$REPO/docs/art/"
+#
+# Só quando este script é chamado de propósito. O `bundle.sh` o roda em todo
+# build (precisa do .icns) e passa `ICON_SKIP_REPO_ART=1`: o texto da arte é
+# rasterizado pelo sistema, e um macOS de outra versão desenha pixels diferentes
+# — cada build sujava `docs/art/`, e o `release.sh` recusa árvore suja.
+if [ -z "${ICON_SKIP_REPO_ART:-}" ]; then
+    mkdir -p "$REPO/docs/art"
+    cp "$OUT/banner.png" "$OUT/social-preview.png" "$REPO/docs/art/"
+    if [ -f "$OUT/panel.png" ]; then cp "$OUT/panel.png" "$REPO/docs/art/"; fi
+fi
 
 echo "==> Done: $OUT/AppIcon.icns ($(du -h "$OUT/AppIcon.icns" | cut -f1))"
