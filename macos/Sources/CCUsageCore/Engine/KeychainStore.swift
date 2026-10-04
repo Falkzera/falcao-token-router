@@ -40,7 +40,6 @@ public struct SecurityCLIKeychain: KeychainStore {
     /// processo. Precisa bater exatamente, ou apontaríamos para outro item.
     private let account: String
     private static let security = "/usr/bin/security"
-    private static let timeout: TimeInterval = 5
 
     public init(account: String = SecurityCLIKeychain.currentUser()) {
         self.account = account
