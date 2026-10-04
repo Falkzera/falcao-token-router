@@ -48,7 +48,8 @@ echo "==> Checking strings"
 "$ROOT/Scripts/check-strings.sh" >/dev/null
 
 echo "==> Generating icon"
-"$ROOT/Scripts/icon.sh" >/dev/null
+# Só o .icns; a arte versionada em docs/art/ fica como está (ver icon.sh).
+ICON_SKIP_REPO_ART=1 "$ROOT/Scripts/icon.sh" >/dev/null
 
 echo "==> Assembling $APP"
 rm -rf "$APP"

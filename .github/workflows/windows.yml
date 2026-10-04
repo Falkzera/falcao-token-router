@@ -1,10 +1,14 @@
 name: Windows
 
-# O porte Windows (Rust + Tauri) mora inteiro em `windows/`. Este workflow só
+# O app Windows (Rust + Tauri) mora inteiro em `windows/`. Este workflow só
 # roda quando algo dali (ou ele mesmo) muda; o CI do macOS continua sendo o
 # portão do resto. Além dos testes, ele gera o instalador e o publica como
-# artefato da execução: enquanto o Windows não tem release, é dali que se
-# baixa o app (o `windows/README.md` aponta para cá).
+# artefato da execução — é dali que se baixa uma mudança ainda não lançada (o
+# `windows/README.md` explica). As releases saem do `windows-release.yml`.
+#
+# ⚠️ Não é check obrigatório: um vermelho aqui não trava o merge. Torná-lo
+# obrigatório com este filtro de caminho deixaria um PR só de macOS pendente
+# para sempre — a mesma armadilha que o comentário do ci.yml descreve.
 on:
   pull_request:
     paths:
