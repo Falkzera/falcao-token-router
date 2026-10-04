@@ -1,16 +1,12 @@
 import Foundation
 
-/// De onde veio o número que está na tela, e o que fazer se não for o ideal.
+/// De onde veio o número que está na tela.
 ///
-/// Cada caso é uma frase diferente na UI porque cada um pede uma ação diferente
-/// do usuário — ou nenhuma.
+/// Cada caso é uma frase diferente na UI, porque cada um diz uma coisa
+/// diferente sobre a idade do número.
 public enum UsageSourceStatus: Sendable, Equatable {
     case live(at: Date)
     case cached(age: TimeInterval)
-    /// Cache em uso porque o token não serve. Saída: rodar o Claude Code.
-    case credentialExpired(age: TimeInterval)
-    /// Cache em uso porque a chamada falhou. Saída: esperar.
-    case liveUnavailable(age: TimeInterval)
     /// Nenhuma fonte oficial; o `SnapshotBuilder` segue pelo caminho derivado.
     case derivedOnly
 }
@@ -26,41 +22,28 @@ public struct OfficialSource: Sendable, Equatable {
     }
 }
 
-/// Escolhe entre a busca ao vivo e o cache.
+/// Escolhe entre o número ao vivo (a amostra recente do sensor) e o cache.
 ///
-/// Função pura, sem relógio próprio e sem I/O: `now` entra por parâmetro. É o
-/// que torna as cinco combinações testáveis sem rede e sem keychain.
+/// Função pura, sem relógio próprio e sem I/O: `now` entra por parâmetro.
+///
+/// Ao vivo ligado e sem amostra recente é o caso COMUM — a conta do perfil
+/// padrão não serviu nada na última hora —, e não é erro de nada: o cache, com a
+/// idade dele, é a melhor fonte que existe. Até 10/2026 esse caso aparecia como
+/// "credencial expirada · rode o Claude Code", herança da época em que "ao vivo"
+/// era uma chamada de rede com token; o sensor não tem credencial para expirar.
 public enum UsageSourcePolicy {
-    /// **Primeira condição que casar vence**, de cima para baixo. O último caso
-    /// é o fundo do poço: qualquer linha acima que aponte para o cache cai nele
-    /// quando o cache também está ausente.
     public static func select(
         liveEnabled: Bool,
-        live: Result<UsageReport, LiveUsageError>?,
+        live: UsageReport?,
         cached: UsageReport?,
         now: Date
     ) -> (source: OfficialSource?, status: UsageSourceStatus) {
-        if liveEnabled, case let .success(report)? = live {
-            return (OfficialSource(report: report, isLive: true), .live(at: report.fetchedAt))
+        if liveEnabled, let live {
+            return (OfficialSource(report: live, isLive: true), .live(at: live.fetchedAt))
         }
-
         guard let cached else { return (nil, .derivedOnly) }
-        let source = OfficialSource(report: cached, isLive: false)
         // Relógio ajustado para trás não pode produzir idade negativa.
         let age = max(0, now.timeIntervalSince(cached.fetchedAt))
-
-        guard liveEnabled, case let .failure(error)? = live else {
-            // Live desligado, ou ligado mas ainda sem resposta na primeira
-            // abertura. Nos dois casos o cache é o melhor disponível e não há
-            // nada de errado a relatar.
-            return (source, .cached(age: age))
-        }
-
-        switch error {
-        case .noToken, .unauthorized:
-            return (source, .credentialExpired(age: age))
-        case .transport, .malformed:
-            return (source, .liveUnavailable(age: age))
-        }
+        return (OfficialSource(report: cached, isLive: false), .cached(age: age))
     }
 }

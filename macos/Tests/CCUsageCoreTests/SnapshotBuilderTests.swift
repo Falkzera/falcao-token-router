@@ -296,6 +296,6 @@ private func officialSource(_ limits: [UsageReport.Limit], fetchedAt: Date,
         from: [event("2026-08-17T10:30:00Z")], now: now, calendar: utc, override: nil,
         official: officialSource([limit(.session, 0.35)],
                                  fetchedAt: date("2026-08-16T23:00:00Z")),
-        status: .credentialExpired(age: 13 * 3600))
-    #expect(snapshot.sourceStatus == .credentialExpired(age: 13 * 3600))
+        status: .cached(age: 13 * 3600))
+    #expect(snapshot.sourceStatus == .cached(age: 13 * 3600))
 }

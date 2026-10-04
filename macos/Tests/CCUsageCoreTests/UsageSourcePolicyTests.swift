@@ -24,38 +24,37 @@ private let staleCache = report(fraction: 0.35, agedBy: 13 * 3600)
 
 @Test func liveEnabledAndSuccessfulUsesTheLiveReport() {
     let (source, status) = UsageSourcePolicy.select(
-        liveEnabled: true, live: .success(liveReport), cached: staleCache, now: policyNow)
+        liveEnabled: true, live: liveReport, cached: staleCache, now: policyNow)
     // O caso que motivou tudo: cache dizia 35%, ao vivo diz 6%.
     #expect(source?.report == liveReport)
     #expect(source?.isLive == true)
     #expect(status == .live(at: policyNow))
 }
 
-@Test func expiredCredentialFallsBackAndSaysSo() {
-    for error in [LiveUsageError.noToken, .unauthorized] {
-        let (source, status) = UsageSourcePolicy.select(
-            liveEnabled: true, live: .failure(error), cached: staleCache, now: policyNow)
-        #expect(source?.report == staleCache)
-        #expect(status == .credentialExpired(age: 13 * 3600))
-    }
-}
-
-@Test func networkFailureFallsBackWithADifferentStatus() {
-    // Distinto de credencial expirada porque a saída do usuário é outra:
-    // esperar, não reautenticar.
-    for error in [LiveUsageError.transport, .malformed] {
-        let (source, status) = UsageSourcePolicy.select(
-            liveEnabled: true, live: .failure(error), cached: staleCache, now: policyNow)
-        #expect(source?.report == staleCache)
-        #expect(status == .liveUnavailable(age: 13 * 3600))
-    }
+@Test("sem amostra recente do sensor é cache com idade, não credencial expirada")
+func noRecentSampleIsTheCacheNotAnExpiredCredential() {
+    // O sensor não autentica nada: faltar amostra na última hora é o caso comum
+    // de uma conta parada, e o painel mostrava "credencial expirada" por ele.
+    let (source, status) = UsageSourcePolicy.select(
+        liveEnabled: true, live: nil, cached: staleCache, now: policyNow)
+    #expect(source?.report == staleCache)
+    #expect(source?.isLive == false)
+    #expect(status == .cached(age: 13 * 3600))
 }
 
 @Test func noSourceAtAllFallsThroughToTheDerivedPath() {
     let (source, status) = UsageSourcePolicy.select(
-        liveEnabled: true, live: .failure(.transport), cached: nil, now: policyNow)
+        liveEnabled: true, live: nil, cached: nil, now: policyNow)
     #expect(source == nil)
     #expect(status == .derivedOnly)
+}
+
+@Test func liveDisabledIgnoresALiveReading() {
+    // Desligado, nem uma leitura que já chegou vence o cache.
+    let (source, status) = UsageSourcePolicy.select(
+        liveEnabled: false, live: liveReport, cached: staleCache, now: policyNow)
+    #expect(source?.report == staleCache)
+    #expect(status == .cached(age: 13 * 3600))
 }
 
 @Test func liveDisabledWithoutCacheFallsThroughToTheDerivedPath() {
