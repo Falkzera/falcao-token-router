@@ -9,7 +9,7 @@ import Foundation
 public enum Alert: Equatable, Sendable {
     /// A fração cruzou `percent` para cima, numa janela que reseta em `resetsAt`.
     case threshold(window: Window, percent: Int, resetsAt: Date?)
-    /// A janela resetou — e o usuário tinha encostado no teto antes disso.
+    /// A janela anterior chegou ao fim (o reset dela passou) e outra começou.
     case windowReset(window: Window)
     /// Alertas ligados sem busca ao vivo: nada pode ser afirmado com confiança.
     case liveRequired

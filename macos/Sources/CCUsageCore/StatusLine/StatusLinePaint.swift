@@ -29,11 +29,12 @@ enum Paint {
     /// um grupo.
     static let groupColors = [cyan, green, magenta, blue]
 
-    /// Cor por severidade, a mesma régua do resto do produto: ≥0,90 vermelho,
-    /// ≥0,70 amarelo, senão verde.
+    /// Cor por severidade, a mesma régua do painel e da bandeja: ≥0,90
+    /// vermelho, ≥0,66 amarelo, senão verde. Até 10/2026 aqui era 0,70, e uma
+    /// conta a 68% saía amarela no painel e verde no terminal e na prévia.
     static func tone(_ fraction: Double) -> String {
         if fraction >= 0.90 { return red }
-        if fraction >= 0.70 { return yellow }
+        if fraction >= 0.66 { return yellow }
         return green
     }
 

@@ -394,6 +394,9 @@ enum Measure {
             } catch ClaudeUsageProbe.ProbeError.notSignedIn {
                 print("  \(conta.label): sem login neste perfil — use Relogar no app")
                 falhas += 1
+            } catch ClaudeUsageProbe.ProbeError.failed(let status) {
+                print("  \(conta.label): o claude saiu com código \(status) — sem rede ou limite do servidor? Tente de novo antes de relogar")
+                falhas += 1
             } catch {
                 print("  \(conta.label): falhou (\(error))")
                 falhas += 1
