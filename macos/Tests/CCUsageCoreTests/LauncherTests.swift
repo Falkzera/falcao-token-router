@@ -157,6 +157,86 @@ struct ShellIntegrationTests {
     }
 }
 
+/// A função de shell EXECUTADA no zsh — com um `router` e um `claude` de
+/// mentira num PATH mínimo, `HOME` temporário e `zsh -f` (sem o `~/.zshrc` de
+/// quem roda o teste). Nada aqui alcança o `claude` de verdade.
+@Suite("ShellIntegration no zsh de verdade")
+struct ShellFunctionRunTests {
+    private func run(_ script: String) throws -> String {
+        let dir = FileManager.default.temporaryDirectory
+            .appending(path: "shellfn-\(UUID().uuidString)")
+        let bin = dir.appending(path: "bin")
+        try FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        func executable(_ name: String, _ body: String) throws {
+            let url = bin.appending(path: name)
+            try Data("#!/bin/sh\n\(body)\n".utf8).write(to: url)
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+        }
+        // O grupo é só "trabalho"; o launch e o claude dizem com o que foram chamados.
+        try executable("router", #"[ "$1" = is-group ] && { [ "$2" = trabalho ]; exit $?; }; echo "LAUNCH $*""#)
+        try executable("claude", #"echo "CLAUDE $*""#)
+
+        let shellFile = dir.appending(path: "shell.sh")
+        try Data(ShellIntegration.shellFunction(routerPath: bin.appending(path: "router").path).utf8)
+            .write(to: shellFile)
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/zsh")
+        process.arguments = ["-f", "-c", script.replacingOccurrences(of: "SHELL_SH", with: shellFile.path)]
+        process.environment = ["PATH": "\(bin.path):/usr/bin:/bin", "HOME": dir.path]
+        let out = Pipe()
+        process.standardOutput = out
+        process.standardError = out
+        try process.run()
+        process.waitUntilExit()
+        return String(decoding: out.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+    }
+
+    @Test("claude <grupo> roda como filho: o shell continua depois que a sessão sai")
+    func groupSessionDoesNotReplaceTheShell() throws {
+        // Com o `exec` de antes, o "depois" nunca era impresso: o processo do
+        // router tomava o lugar do shell, e sair da sessão fechava a aba.
+        let out = try run(#"source SHELL_SH; claude trabalho -p oi; echo "depois=$?""#)
+        #expect(out.contains("LAUNCH launch trabalho -- -p oi"))
+        #expect(out.contains("depois=0"))
+    }
+
+    @Test("sem grupo, passa direto para o claude")
+    func plainClaudePassesThrough() throws {
+        let out = try run(#"source SHELL_SH; claude --version"#)
+        #expect(out.contains("CLAUDE --version"))
+    }
+
+    @Test("um alias claude não desliga a integração, e o claude sem grupo continua passando por ele")
+    func anAliasNamedClaudeIsChainedNotFatal() throws {
+        // O instalador antigo do Claude Code deixava `alias claude=…` no .zshrc.
+        // Com ele, o zsh expandia o alias na definição da função (erro de
+        // sintaxe) e `claude trabalho` abria o claude puro, na conta errada.
+        let out = try run(#"""
+        alias claude='claude --extra'
+        source SHELL_SH
+        claude trabalho
+        claude oi
+        """#)
+        #expect(!out.contains("parse error"))
+        #expect(out.contains("LAUNCH launch trabalho --"))
+        #expect(out.contains("CLAUDE --extra oi"))
+    }
+
+    @Test("recarregar o script não esquece o alias guardado")
+    func resourcingKeepsTheChainedAlias() throws {
+        let out = try run(#"""
+        alias claude='claude --extra'
+        source SHELL_SH
+        source SHELL_SH
+        claude oi
+        """#)
+        #expect(out.contains("CLAUDE --extra oi"))
+    }
+}
+
 @Suite("ShellIntegration profile")
 struct ShellProfileTests {
     private func tempProfile(_ contents: String = "") -> URL {
