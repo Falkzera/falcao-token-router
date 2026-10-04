@@ -26,7 +26,7 @@ case "launch":
 case "is-group":
     exit(Launcher.isGroup(args.dropFirst().first) ? 0 : 1)
 case "rotate":
-    Launcher.rotate()
+    exit(Launcher.rotate() ? 0 : 1)
 case "doctor":
     exit(Doctor.run() ? 0 : 1)
 case "measure":
@@ -163,17 +163,31 @@ enum Launcher {
     }
 
     /// Uma volta da rotação em todos os grupos, para um agente periódico.
-    static func rotate() {
-        guard let config = loadConfig() else { return }
+    ///
+    /// Sai com 1 sem configuração legível ou quando uma troca falha, dizendo
+    /// qual no stderr: é o que o cabeçalho promete, e um agente que roda isto
+    /// às cegas só percebe uma troca que não aconteceu pelo código de saída.
+    static func rotate() -> Bool {
+        guard let config = loadConfig() else {
+            FileHandle.standardError.write(Data("router: sem configuração legível — nada a rotacionar\n".utf8))
+            return false
+        }
         let keychain = SecurityCLIKeychain()
         let engine = RotationEngine(keychain: keychain)
         let usage = GroupUsageReader(usageDir: RouterPaths().usageDir).usageByAccount(config)
+        var ok = true
         for group in config.groups {
             engine.mirrorActive(in: group, config: config)
             guard let target = engine.rotationTarget(for: group, config: config, usage: usage)
             else { continue }
-            try? engine.activate(target, in: group, config: config)
+            do {
+                try engine.activate(target, in: group, config: config)
+            } catch {
+                FileHandle.standardError.write(Data("router: \(group.name): não trocou para \(target.label): \(error)\n".utf8))
+                ok = false
+            }
         }
+        return ok
     }
 
     static func fail(_ message: String) -> Never {
