@@ -10,7 +10,18 @@ body:
         names the problem in most of the failure modes this app has.
 
         **Please redact account e-mails** before pasting anything. They're yours,
-        and they don't need to be public.
+        and they don't need to be public. Anything with security or privacy
+        impact goes through the Security tab instead (see `SECURITY.md`).
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - "macOS"
+        - "Windows"
+    validations:
+      required: true
 
   - type: textarea
     id: what-happened
@@ -28,8 +39,9 @@ body:
     attributes:
       label: Output of `router doctor`
       description: |
-        Run this and paste the result (e-mails redacted):
-        `'/Applications/FalcaoTokenRouter.app/Contents/MacOS/router' doctor`
+        Run this and paste the result (e-mails redacted). It prints in Portuguese.
+        macOS: `'/Applications/FalcaoTokenRouter.app/Contents/MacOS/router' doctor`
+        Windows (PowerShell): `& "$env:LOCALAPPDATA\FalcaoTokenRouter\router.exe" doctor`
       render: text
     validations:
       required: false
@@ -39,8 +51,8 @@ body:
     attributes:
       label: Where did the number come from?
       description: >
-        The panel says under each account: "measured … by the account's own
-        session" (sensor) or "probed … by asking Claude Code directly" (probe).
+        The app says it next to each account: measured by the account's own
+        session (sensor) or probed by asking Claude Code directly (probe).
       options:
         - "Sensor (the status line)"
         - "Probe (Measure accounts / router measure)"
@@ -66,7 +78,9 @@ body:
     id: app-version
     attributes:
       label: App version
-      description: Shown in the Meter tab, or `defaults read /Applications/FalcaoTokenRouter.app/Contents/Info.plist CFBundleShortVersionString`.
+      description: >
+        macOS: `defaults read /Applications/FalcaoTokenRouter.app/Contents/Info.plist CFBundleShortVersionString`.
+        Windows: shown in the app's Settings.
       placeholder: "1.0.0"
     validations:
       required: true
@@ -76,16 +90,18 @@ body:
     attributes:
       label: How did you install it?
       options:
-        - "DMG from the releases page"
+        - "DMG from the releases page (macOS)"
+        - "Installer from the releases page (Windows)"
+        - "Installer from a CI run (Windows)"
         - "Built from source"
     validations:
       required: true
 
   - type: input
-    id: macos
+    id: os
     attributes:
-      label: macOS version and hardware
-      placeholder: "macOS 26.1, Apple Silicon (M2)"
+      label: System version and hardware
+      placeholder: "macOS 26.1, Apple Silicon (M2) — or — Windows 11 24H2, x64"
     validations:
       required: true
 
@@ -102,7 +118,8 @@ body:
     attributes:
       label: Anything of these apply?
       options:
-        - label: The terminal I used was open before I installed the integration (or I hadn't run `source ~/.zshrc` in it)
+        - label: The terminal I used was open before I installed the integration (or I hadn't reloaded my shell profile in it)
+        - label: My shell profile already defines `claude` (an alias or a function)
         - label: I had just updated or moved the app
         - label: macOS asked me to authorize Keychain access
         - label: The account is shared with other people

@@ -22,4 +22,6 @@ removido (o teste pode rodar dentro de uma sessão do Claude Code, com o perfil 
   e avisa alto quando o `router.exe` sumiu.
 
 ## Padrões
-- Precisa do `fake-claude` compilado: rodar com `cargo test --workspace` (ou `scripts\test.ps1`).
+- Precisa do `fake-claude` compilado: `cargo build -p fake-claude` antes do `cargo test --workspace`
+  (o `cargo test` não gera o .exe de um pacote sem testes de integração) — ou `scripts\test.ps1`,
+  que faz os dois.

@@ -12,9 +12,10 @@ App que gerencia **grupos de contas do Claude Code** com rodízio automático, *
 |---|---|
 | App | Swift 6 / SwiftUI, MenuBarExtra, macOS 26 (Tahoe) |
 | Motor | `CCUsageCore` (SPM target puro, sem UI) |
-| CLI | `router` (launch/statusline/is-group/rotate), embutido no .app |
+| CLI | `router` (statusline/launch/is-group/rotate/measure/doctor), embutido no .app |
 | Testes | swift-testing (`@Test`/`@Suite`) — **via `macos/Scripts/test.sh`, nunca `swift test`** (ver CONTRIBUTING.md) |
 | Build | SPM + `macos/Scripts/bundle.sh` (empacota .app, assina ad-hoc) |
+| Windows | Rust / Tauri 2 / Svelte 5, em `windows/` — comandos e regras no `windows/CLAUDE.md` |
 
 ## Comandos
 
@@ -64,7 +65,7 @@ contribuir.
 ## Regras de código
 
 - Comentários e strings de UI em **pt-BR**; identificadores em inglês.
-- Toda string de UI vem do catálogo com prefixo `panel|settings|alerts|format|groups` — `check-strings.sh` bloqueia órfãs, faltantes e literais soltos (`Text(verbatim:)` é a saída para o que não se traduz).
+- Toda string de UI vem do catálogo com prefixo `panel|settings|alerts|format|groups|home` — `check-strings.sh` bloqueia órfãs, faltantes e literais soltos (`Text(verbatim:)` é a saída para o que não se traduz).
 - Estado que a UI precisa ver ao vivo mora em propriedade **observável** do store — propriedade computada que lê disco não re-renderiza (bug real do botão "Ativar").
 - **Nunca escrever `@State`.** Do SDK do macOS 26 em diante ele é macro do SwiftUI e o plugin `SwiftUIMacros` só vem no Xcode — sob Command Line Tools o alvo do app não compila (60 erros, 18/09/2026). Usar **`@ViewState`** (`macos/Sources/FalcaoTokenRouter/ViewState.swift`), typealias de `SwiftUICore.State`, que é a property wrapper real e está no SDK.
 - Trocar `CFBundleIdentifier` **perde as preferências**: `UserDefaults.standard` é indexado por ele. Há migração do domínio antigo em `AppSettings.migrateLegacyDefaults` — se o id mudar de novo, acrescente o anterior lá.
@@ -96,7 +97,7 @@ Ao entrar numa pasta pra trabalhar, leia o `agent.md`. Ao sair com mudança sign
 
 ## Roadmap curto
 
-- v1 (branch `feat/router-v1`, PR #1): grupos + rodízio + sensor + integração de terminal — **validada em uso real**.
+- v1 (release `v1.0.0`, 22/09/2026): grupos + rodízio + sensor + integração de terminal — **validada em uso real**.
 - Pré-venda: ícone definitivo, licença Ed25519 offline, Sparkle, notarização (Developer ID). Nome resolvido em 18/09/2026; Ajustes+Grupos já unificados em abas.
 - ~~Lacuna: o limite POR MODELO não chega no `rate_limits`~~ — **fechada em 18/09/2026** pela sonda ativa (`router measure` / botão "Medir contas"), que pergunta ao binário oficial. Ela também mede conta OCIOSA, que o sensor passivo nunca enxerga.
 

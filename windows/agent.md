@@ -2,12 +2,15 @@
 
 Porte do router (só do router; o medidor herdado fica de fora) para **Rust + Tauri
 v2**, lendo e escrevendo os MESMOS arquivos que o app macOS: `config.json` e
-`usage/<email>.json`. Nada aqui muda a versão macOS — tudo vive sob `windows/` (e
-um `.github/workflows/windows.yml` filtrado por caminho).
+`usage/<email>.json` (e, desde o #17, o `statusline.json`). Nada aqui muda a versão macOS —
+tudo vive sob `windows/`, mais dois workflows: `windows.yml` (filtrado por caminho) e
+`windows-release.yml` (a tag `windows-v*`).
 
 ## Estrutura
 - `README.md` — o guia de quem instala (inglês): do instalador à troca de conta, problemas
   conhecidos, onde as coisas moram, desinstalar, compilar.
+- `CHANGELOG.md` — o histórico das releases `windows-v*` (inglês).
+- `CLAUDE.md` — o mapa do porte para quem trabalha aqui (comandos, regras, achados do Windows).
 - `Cargo.toml` — workspace (resolver 2, edition 2021, rust-version 1.89) e as dependências comuns.
 - `rust-toolchain.toml` — canal stable, alvo `x86_64-pc-windows-msvc`.
 - `crates/router-core/` — o motor (modelos, credencial em arquivo, rotação, store, sessões,
@@ -39,7 +42,8 @@ um `.github/workflows/windows.yml` filtrado por caminho).
   confere o que saiu, a CI publicando o instalador como artefato, e o `README.md` em inglês
   para quem nunca viu o app (instalar → grupo → duas contas → integração → `claude <grupo>`
   → ver a troca → `router doctor`, problemas conhecidos, desinstalar).
-- Próxima: fase 7 (ponta a ponta com contas reais, grupo dedicado, seguindo o README).
+- **Release `windows-v1.0.0`** publicada em 24/09/2026 (`windows-release.yml`).
+- Em aberto: fase 7 (ponta a ponta com contas reais, grupo dedicado, seguindo o README).
 
 ## Regras (herdadas do repo + combinadas)
 - Comentários e `agent.md` em **pt-BR**; identificadores em inglês; docs/README em inglês.

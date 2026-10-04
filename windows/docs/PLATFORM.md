@@ -104,8 +104,10 @@ and `router doctor` reports it when set.
 
 ## The user's choice of status line
 
-Windows only (the macOS app always shows its own line). **Settings → Status line**
-writes `<data dir>\statusline.json`, and `router statusline` reads it on every render,
+Shared with the macOS app, which reads and writes the same file since #16 and #17 —
+it honours `mode: "app"` and `hidden`; running the user's command (`mode:
+"command"`) is Windows-only for now. **Settings → Status line** writes
+`<data dir>\statusline.json`, and `router statusline` reads it on every render,
 after recording the sample — the sensor is the same in every mode:
 
 ```json
@@ -280,7 +282,7 @@ folder. A real profile always has the folder, and the sandbox now creates it.
 | Shell integration | zsh function in `~/.zshrc` | `shell.ps1` in both `$PROFILE`s, `shell.sh` in `~/.bashrc` (Git Bash) |
 | Data directory | `~/Library/Application Support/com.synqo.falcao-router` | `%LOCALAPPDATA%\com.synqo.falcao-router` (Local, not Roaming) |
 | Finding `claude` | three separate searches | one resolver: `ROUTER_CLAUDE_BIN`, `~\.local\bin\claude.exe`, `PATH`, `%APPDATA%\npm` (an npm `claude.cmd` shim is read and run as `node cli.js`, never through `cmd.exe`); Claude Desktop's copy and WindowsApps aliases are skipped |
-| Group status line | always the router's line | the router's line with the items the user keeps, or the user's own command after the sensor (`statusline.json`) |
+| Group status line | the router's line with the items the user keeps (`statusline.json`) | the same, or the user's own command after the sensor |
 
 ## Deliberate differences
 
@@ -299,12 +301,11 @@ The port does not reproduce these macOS behaviours (each has a regression test):
   and its variants, `CLAUDE_SECURESTORAGE_CONFIG_DIR` — are stripped on macOS too since #6;
 - no lock between the app and the CLI (the port uses a named mutex around every
   credential write);
-- a group's status line reduced to `account 5h 7d`, which replaced whatever status
-  line the user had with less than it showed. The port's line shows the group, the
-  model and its effort, the branch, the context window, both windows with the time
-  they reset, the session's cost and the active account's e-mail; each item can be
-  turned off in Settings, or the user's own status line command can run instead,
-  after the sensor (the sensor behind it is unchanged);
+- a group's status line that takes the place of the user's own command. The port
+  can run that command after the sensor (the sensor behind it is unchanged). Since
+  #16 and #17 macOS draws the same full line — group, model and effort, branch,
+  context, both windows with their resets, cost, e-mail — with the same items to
+  turn off, but has no command mode yet;
 - reordering accounts dropping one that the requested order forgot.
 
 And these in the app (checked in the browser against the mocked backend, and in the
