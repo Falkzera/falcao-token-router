@@ -66,8 +66,11 @@
   unidades UTF-16 do Windows.
 - `rotation_loop.rs` — a cada 30 s relê o quadro e redesenha a bandeja; a cada 180 s (6 voltas)
   também rotaciona, como o macOS (a 1ª volta, com rotação, é na subida). Emite
-  `snapshot-changed` para as janelas. Com um login em andamento a rotação fica para a próxima
-  volta: ela espelha grupo → casa da conta ativa e pisaria na credencial nova de um relogin.
+  `snapshot-changed` para as janelas. Com um RELOGIN em andamento a rotação fica para a próxima
+  volta (ela espelha grupo → casa da conta ativa e pisaria na credencial nova); "Adicionar
+  conta" não a segura — a casa reservada não é de ninguém. Durante "Medir contas" também espera:
+  a medição decide por qual perfil sondar cada conta, e trocar a ativa no meio a faria sondar a
+  casa de uma conta ativa.
 - `login_output.rs` — o que a saída do `claude auth login` diz, lida através do ConPTY (puro,
   testado, com o fluxo REAL gravado): limpa VT/ANSI em fluxo (sequência cortada entre pedaços
   não vaza), pega o link pelo texto visível (só completo, só nos dois hosts oficiais, nunca
@@ -138,7 +141,18 @@
   e nenhum `claude` fica vivo) e relogin com outra conta (ao fechar, a credencial estranha sai
   da casa; a conta continua registrada).
 
+- 04/10/2026: `open_home` virou comando `async`. Síncrono, ele roda na thread principal dentro
+  do handler de requisição do WebView2, e com a janela de Grupos fechada `show_home` a cria de
+  novo — o que trava o app inteiro no Windows (o `WebviewWindowBuilder` do tauri 2.11 documenta
+  o deadlock e manda usar comando `async`). O caminho do menu da bandeja não passa por handler do
+  WebView2 e não travava; o do rodapé do flyout, sim. "Usar" durante "Medir contas" devolve o
+  quadro sem trocar.
+
 ## Pendências (próximas fatias)
+- `capabilities/default.json` ainda dá `core:default` às duas janelas; o front só precisa de
+  eventos e das chamadas de janela que faz. Enxugar pede rodar o app para conferir cada uma.
+- `mock.ts` entra no bundle de produção (import estático em `api.ts`); um import dinâmico sob
+  `import.meta.env.DEV` o tira — pede conferir o app rodando.
 - O login com o `claude` de verdade (navegador, conta real) é do teste ponta a ponta (fase 7).
 - Conferir à mão o flyout no clique real da bandeja (posição com a barra embaixo e no excedente
   do Windows 11, sumir ao perder o foco, clique que fecha não reabre) — o clique no ícone não

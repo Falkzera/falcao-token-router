@@ -111,6 +111,10 @@ pub fn clear_default(app: AppHandle) -> Snapshot {
 
 /// "Usar": troca manual da conta que serve o grupo. Falha vira o erro do
 /// quadro (com o motivo como fato).
+///
+/// Durante "Medir contas" não troca: a medição decide por qual perfil sondar
+/// cada conta, e ativar uma delas no meio a faria sondar a casa de uma conta
+/// ativa. O quadro volta como está; a medição leva segundos.
 #[tauri::command]
 pub fn activate_account(
     app: AppHandle,
@@ -118,6 +122,9 @@ pub fn activate_account(
     group_id: String,
 ) -> Result<Snapshot, String> {
     let (account, group) = (id(&account_id)?, id(&group_id)?);
+    if app.state::<AppState>().measuring().is_some() {
+        return Ok(publish(&app));
+    }
     Ok(mutate(&app, |store| {
         let found = (
             store.config().account(account).cloned(),

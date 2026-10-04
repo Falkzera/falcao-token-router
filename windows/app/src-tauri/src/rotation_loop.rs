@@ -25,13 +25,16 @@ const ROTATE_EVERY_TICKS: u64 = 6;
 pub const SNAPSHOT_CHANGED: &str = "snapshot-changed";
 
 /// Uma volta: relê (e, se `rotate`, roda a rotação), redesenha, avisa as janelas.
-/// Com um login em andamento a rotação fica para a próxima volta (ver
-/// `LoginState::in_progress`).
+/// A rotação fica para a próxima volta com um relogin em andamento (ver
+/// `LoginState::relogin_in_progress`) ou durante "Medir contas": a medição decide
+/// por qual perfil sondar cada conta, e trocar a ativa no meio a faria sondar a
+/// casa de uma conta ativa — o que derruba a sessão viva.
 pub fn tick(app: &AppHandle, rotate: bool) {
     let rotate = rotate
         && !app
             .try_state::<LoginState>()
-            .is_some_and(|login| login.in_progress());
+            .is_some_and(|login| login.relogin_in_progress())
+        && app.state::<AppState>().measuring().is_none();
     {
         let state = app.state::<AppState>();
         let mut store = state.store();

@@ -73,8 +73,15 @@ fn fit_flyout(app: AppHandle, height: f64) {
 }
 
 /// Uma porta do rodapé do flyout: fecha o flyout e abre a janela na aba.
+///
+/// `async` de propósito. Um comando síncrono roda na thread principal, DENTRO do
+/// handler de requisição do WebView2 — e com a janela de Grupos fechada (o
+/// estado normal depois do X), `show_home` a cria de novo. Criar janela ali
+/// trava o app inteiro no Windows: o WebView2 não roda os handlers de conclusão
+/// de forma reentrante, e a espera do controller nunca termina. A documentação
+/// do `WebviewWindowBuilder` (tauri 2.11) avisa e manda usar comando `async`.
 #[tauri::command]
-fn open_home(app: AppHandle, tab: HomeTab) {
+async fn open_home(app: AppHandle, tab: HomeTab) {
     flyout::hide(&app);
     show_home(&app, tab);
 }
