@@ -13,5 +13,8 @@ Os tipos do domínio do MEDIDOR: o que é um evento de uso, quanto ele vale, e o
 - **Desconhecido nunca vira zero nem é descartado em silêncio.** Modelo sem preço entra em `unknownModels` e a UI mostra quais são; janela sem nome de modelo é descartada em vez de virar barra anônima.
 - Gauge oficial não tem `tokens`/`ceiling`; gauge derivado não tem `severity`. Cada caminho expõe só o que de fato sabe.
 
+## Decisões recentes
+- 2026-10-04: `ModelID` conhece a geração 5.5/5.1 e ignora o sufixo entre colchetes (`claude-opus-5-5[1m]`, a janela de 1M) — sem isso o modelo padrão do Claude Code caía em `.unknown` e o total ficava parcial. Os aliases nus vão para a geração corrente. `resolved` resolve de novo um `.unknown` guardado no cache.
+
 ## Pendências conhecidas
 - Nenhuma.
