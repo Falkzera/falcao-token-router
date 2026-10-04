@@ -94,9 +94,14 @@ Two rules make it safe, and both exist because their absence killed accounts:
   the group item back to the leaving account's home. The home is the truth only
   when the account is idle; `rotateAll` also mirrors periodically so it never
   falls too far behind.
-- **One account, one place.** The same account active in two groups would be two
-  copies of a rotating refresh token, and the second renewal invalidates the
-  first — silently. The engine refuses.
+- **One account, one place.** The same account live in two profiles would be
+  two copies of a rotating refresh token, and the second renewal invalidates the
+  first — silently. The engine refuses, and the rotation skips such an account
+  instead of insisting on it. "Two profiles" includes `~/.claude` when no group
+  uses it: after the default group moves out, the account left there keeps
+  serving plain `claude`. A group that changes profile mirrors its active
+  account first and empties the dedicated profile it leaves (and the one it
+  enters), so nothing live is left behind and nothing stale comes back.
 
 Corollary: re-activating the account that is *already* active must never copy
 home → group. That would overwrite the rotated token with a stale one ("Login

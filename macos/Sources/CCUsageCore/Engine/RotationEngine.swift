@@ -25,17 +25,24 @@ public struct RotationEngine: Sendable {
         case noCredential(accountID: UUID)
         /// A conta já serve outro grupo agora. Ativar aqui duplicaria o token.
         case accountBusyElsewhere(accountID: UUID, groupID: UUID)
+        /// A conta é a do `~/.claude` e nenhum grupo dela usa esse perfil: o
+        /// `claude` puro continua servido por ela. Ativar aqui duplicaria o token.
+        case accountLiveInDefaultProfile(accountID: UUID)
         /// Falha ao escrever chaveiro ou `.claude.json`.
         case writeFailed(String)
     }
 
     private let keychain: any KeychainStore
     private let adapters: [Provider: any ProviderAdapter]
+    /// O `~/.claude` — o perfil do `claude` puro. Injetável para os testes.
+    private let defaultProfile: ConfigDir
 
     public init(keychain: any KeychainStore,
-                adapters: [any ProviderAdapter] = [AnthropicAdapter()]) {
+                adapters: [any ProviderAdapter] = [AnthropicAdapter()],
+                defaultProfile: ConfigDir = .standard()) {
         self.keychain = keychain
         self.adapters = Dictionary(uniqueKeysWithValues: adapters.map { ($0.provider, $0) })
+        self.defaultProfile = defaultProfile
     }
 
     private func adapter(for provider: Provider) -> any ProviderAdapter {
@@ -67,48 +74,111 @@ public struct RotationEngine: Sendable {
         // renovação. Copiar a casa por cima mataria o token girado (o "Login
         // expired" de 26/ago). O movimento certo é o inverso: vivo → casa.
         if let current = activeAccount(in: group, config: config), current.id == account.id {
-            mirrorGroupToHome(account, groupService: groupService)
+            try mirrorGroupToHome(account, groupService: groupService)
             return account
         }
 
-        // Recusa duplicação: a conta não pode estar ativa em OUTRO grupo.
-        for other in config.groups where other.id != group.id {
-            if let busy = activeAccount(in: other, config: config), busy.id == account.id {
-                throw RotationError.accountBusyElsewhere(accountID: account.id, groupID: other.id)
-            }
-        }
-
-        // Espelha a conta que sai: o token fresco do grupo volta para a casa
-        // dela, para nunca ativarmos uma cópia vencida mais tarde.
-        if let leaving = activeAccount(in: group, config: config), leaving.id != account.id {
-            mirrorGroupToHome(leaving, groupService: groupService)
-        }
+        // Recusa duplicação: a conta não pode estar viva em OUTRO perfil.
+        if let busy = whereElseLive(account, for: group, config: config) { throw busy }
 
         // Copia o segredo da casa da conta para o item do grupo.
         let homeService = adapter.keychainService(forConfigDir: account.home)
         guard let secret = keychain.read(service: homeService) else {
             throw RotationError.noCredential(accountID: account.id)
         }
+
+        // Espelha a conta que sai: o token fresco do grupo volta para a casa
+        // dela, para nunca ativarmos uma cópia vencida mais tarde. Se o espelho
+        // falha, a troca NÃO acontece: sobrescrever o item do grupo agora
+        // perderia o único token vivo da conta que sai.
+        if let leaving = activeAccount(in: group, config: config), leaving.id != account.id {
+            try mirrorGroupToHome(leaving, groupService: groupService)
+        }
+
+        // Segredo e identidade andam juntos. Com o segredo novo e a identidade
+        // velha, o próximo espelho gravaria a credencial desta conta na casa da
+        // que saiu — uma conta morta e outra em dois lugares. Se a identidade
+        // não grava, o item do grupo volta ao que era.
+        let previous = keychain.read(service: groupService)
         do {
             try keychain.write(secret, service: groupService)
-            try adapter.writeIdentity(account.identity, toConfigDir: group.configDir)
         } catch {
             throw RotationError.writeFailed("\(error)")
         }
+        do {
+            try adapter.writeIdentity(account.identity, toConfigDir: group.configDir)
+        } catch {
+            if let previous { try? keychain.write(previous, service: groupService) }
+            else { keychain.delete(service: groupService) }
+            throw RotationError.writeFailed("\(error)")
+        }
         return account
+    }
+
+    /// Onde mais esta conta está viva agora, fora do perfil deste grupo — ou
+    /// `nil` se em lugar nenhum.
+    ///
+    /// Dois lugares contam. O perfil de outro grupo com a identidade dela, a
+    /// regra de sempre. E o `~/.claude` quando ele não é o perfil deste grupo:
+    /// depois de "deixar o ~/.claude livre" (ou de outro grupo virar o padrão),
+    /// a conta que estava lá continua servindo o `claude` puro, com a cadeia
+    /// viva naquele item. Até 10/2026 só o primeiro contava, e a rotação ativava
+    /// a mesma conta no perfil dedicado novo, a partir da casa — duas cópias de
+    /// um refresh token que gira, e a primeira renovação mata a outra.
+    func whereElseLive(_ account: Account, for group: AccountGroup,
+                       config: RouterConfig) -> RotationError? {
+        for other in config.groups where other.id != group.id {
+            if let busy = activeAccount(in: other, config: config), busy.id == account.id {
+                return .accountBusyElsewhere(accountID: account.id, groupID: other.id)
+            }
+        }
+        let defaultIsOurs = group.configDir.raw == defaultProfile.raw
+        let defaultIsAGroups = config.groups.contains { $0.configDir.raw == defaultProfile.raw }
+        if !defaultIsOurs, !defaultIsAGroups,
+           adapter(for: account.provider).identity(inConfigDir: defaultProfile)?.email
+               == account.identity.email {
+            return .accountLiveInDefaultProfile(accountID: account.id)
+        }
+        return nil
+    }
+
+    /// `true` quando a conta pode ser ativada neste grupo agora: tem credencial
+    /// na casa e não está viva em outro perfil. A rotação só escolhe quem pode —
+    /// escolher quem não pode fazia o grupo insistir na mesma recusa a cada
+    /// volta e nunca tentar a seguinte.
+    public func canServe(_ account: Account, in group: AccountGroup,
+                         config: RouterConfig) -> Bool {
+        if activeAccount(in: group, config: config)?.id == account.id { return true }
+        guard whereElseLive(account, for: group, config: config) == nil else { return false }
+        return keychain.exists(service: homeKeychainService(for: account))
+    }
+
+    /// Esvazia um perfil DEDICADO: apaga o item de chaveiro e tira a identidade
+    /// do `.claude.json`. Chamado quando um grupo troca de perfil (ver
+    /// `RouterConfigStore.clearDefault`/`makeDefault`). Nunca toca o `~/.claude`:
+    /// lá mora o login do `claude` puro, que não é deste motor apagar.
+    public func resetProfile(_ dir: ConfigDir, provider: Provider) {
+        guard !dir.isDefault, dir.raw != defaultProfile.raw else { return }
+        let adapter = adapter(for: provider)
+        keychain.delete(service: adapter.keychainService(forConfigDir: dir))
+        try? adapter.clearIdentity(inConfigDir: dir)
     }
 
     /// Copia o segredo vivo do item do grupo de volta para a casa da conta.
     ///
     /// Chamado antes de cada troca, e também num ciclo periódico enquanto a conta
     /// está ativa, para que a casa nunca fique muito atrás do token que gira.
-    public func mirrorGroupToHome(_ account: Account, groupService: String) {
+    public func mirrorGroupToHome(_ account: Account, groupService: String) throws {
         let adapter = adapter(for: account.provider)
         let homeService = adapter.keychainService(forConfigDir: account.home)
         guard let fresh = keychain.read(service: groupService) else { return }
         // Só escreve se mudou, para não reabrir o item à toa.
         if keychain.read(service: homeService) != fresh {
-            try? keychain.write(fresh, service: homeService)
+            do {
+                try keychain.write(fresh, service: homeService)
+            } catch {
+                throw RotationError.writeFailed("\(error)")
+            }
         }
     }
 
@@ -131,7 +201,8 @@ public struct RotationEngine: Sendable {
     public func mirrorActive(in group: AccountGroup, config: RouterConfig) {
         guard let active = activeAccount(in: group, config: config) else { return }
         let service = adapter(for: group.provider).keychainService(forConfigDir: group.configDir)
-        mirrorGroupToHome(active, groupService: service)
+        // Periódico: uma falha aqui tenta de novo na próxima volta.
+        try? mirrorGroupToHome(active, groupService: service)
     }
 
     /// O item de chaveiro onde mora a credencial-mãe de uma conta.
@@ -182,7 +253,8 @@ public struct RotationEngine: Sendable {
             // usada não tem medição — exigir amostra criava um deadlock (só
             // mede quem serve; só serve quem é escolhida). Se a presunção
             // errar, a primeira mensagem dela mede e o laço seguinte corrige.
-            usage[account.id].map { $0 < threshold } ?? true
+            (usage[account.id].map { $0 < threshold } ?? true)
+                && canServe(account, in: group, config: config)
         }
     }
 
@@ -198,8 +270,20 @@ public struct RotationEngine: Sendable {
         let threshold = group.thresholdPercent / 100
         let active = activeAccount(in: group, config: config)
 
-        if let active, let used = usage[active.id], used < threshold {
+        // Ativa sem amostra conta como fresca, igual a qualquer candidata —
+        // senão um "Usar" manual numa conta ainda não medida era desfeito na
+        // volta seguinte.
+        if let active, (usage[active.id] ?? 0) < threshold {
             return nil  // ativa ainda tem folga; não mexe
+        }
+        // Perfil com um login que não é conta do router (o `~/.claude` de quem
+        // já usava o `claude` antes do app): a rotação não o troca sozinha —
+        // apagaria esse login sem cópia. Ativar ali é escolha explícita
+        // ("Usar", ou `claude <grupo>`).
+        if active == nil,
+           let present = adapter(for: group.provider).identity(inConfigDir: group.configDir),
+           !config.accounts.contains(where: { $0.identity.email == present.email }) {
+            return nil
         }
         guard let target = nextAccount(for: group, config: config, usage: usage) else {
             return nil  // ninguém qualifica; mantém a atual

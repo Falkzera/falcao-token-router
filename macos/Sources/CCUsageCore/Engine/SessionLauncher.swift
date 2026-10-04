@@ -61,8 +61,12 @@ public struct SessionLauncher: Sendable {
             chosen = next    // a melhor com folga
         } else if let active {
             chosen = active  // ninguém com folga; fica na atual
+        } else if let able = accounts.first(where: {
+            engine.canServe($0, in: group, config: config)
+        }) {
+            chosen = able    // nunca ativou nenhuma: a primeira que pode servir
         } else {
-            chosen = accounts.first!  // nunca ativou nenhuma; começa pela primeira
+            throw LaunchError.noUsableAccount(group.name)
         }
 
         do {

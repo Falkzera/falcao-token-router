@@ -163,11 +163,12 @@ public final class RouterConfigStore {
 
     /// Tira o status de padrão de todos os grupos: nenhum passa a usar o
     /// `~/.claude`, cada um fica no seu perfil dedicado. Isto protege sessões que
-    /// já rodam no `~/.claude` (o `claude` puro) — o router deixa de tocar lá.
+    /// já rodam no `~/.claude` (o `claude` puro) — o router deixa de tocar lá, e
+    /// a conta que estava lá fica fora da rotação enquanto o `~/.claude` for
+    /// dela (ver `RotationEngine.whereElseLive`).
     public func clearDefault() {
         for i in config.groups.indices where config.groups[i].configDir.isDefault {
-            config.groups[i].configDir = paths.groupConfigDir(
-                config.groups[i].id, isDefault: false)
+            moveGroup(at: i, toDefault: false)
         }
         save()
     }
@@ -179,11 +180,33 @@ public final class RouterConfigStore {
             let wasDefault = config.groups[i].configDir.isDefault
             let shouldBeDefault = config.groups[i].id == id
             if wasDefault != shouldBeDefault {
-                config.groups[i].configDir = paths.groupConfigDir(
-                    config.groups[i].id, isDefault: shouldBeDefault)
+                moveGroup(at: i, toDefault: shouldBeDefault)
             }
         }
         save()
+    }
+
+    /// Troca o perfil de um grupo sem deixar uma conta viva em dois lugares.
+    ///
+    /// Até 10/2026 trocar o padrão só mudava o caminho, e a rotação, na volta
+    /// seguinte, ativava no perfil novo a mesma conta que continuava viva no
+    /// antigo — duas cópias de um refresh token que gira. E o perfil dedicado de
+    /// um grupo é sempre o mesmo caminho: voltando a ele, a identidade velha que
+    /// ficou lá fazia o espelho gravar uma cadeia morta na casa da conta.
+    ///
+    /// Então: espelha a conta ativa (a casa fica com o token vivo); esvazia o
+    /// perfil dedicado de destino (nada velho entra) e o dedicado que fica para
+    /// trás (nada vivo sobra). O preço, deliberado: uma sessão que ainda rode
+    /// no dedicado que ficou para trás perde a credencial na próxima
+    /// requisição — melhor que uma conta morta em silêncio. O `~/.claude` nunca
+    /// é esvaziado: o login dele é do `claude` puro.
+    private func moveGroup(at i: Int, toDefault: Bool) {
+        let group = config.groups[i]
+        engine.mirrorActive(in: group, config: config)
+        let target = paths.groupConfigDir(group.id, isDefault: toDefault)
+        engine.resetProfile(target, provider: group.provider)
+        engine.resetProfile(group.configDir, provider: group.provider)
+        config.groups[i].configDir = target
     }
 
     // MARK: - Contas
@@ -322,6 +345,12 @@ public final class RouterConfigStore {
     /// Relê a conta ativa em seguida, para o indicador da UI se mover na hora —
     /// senão o clique parece não fazer nada.
     public func activate(_ account: Account, in group: AccountGroup) {
+        // Durante a medição a sonda decide, conta a conta, por qual perfil
+        // medir; ativar alguém no meio a faria sondar a casa de uma conta ativa.
+        guard measuringGroup == nil else {
+            lastError = "espere a medição terminar para trocar de conta"
+            return
+        }
         do {
             try engine.activate(account, in: group, config: config)
             lastError = nil
@@ -346,19 +375,25 @@ public final class RouterConfigStore {
         measuringGroup = group.id
         defer { measuringGroup = nil }
 
-        // O perfil de cada conta é decidido AQUI, com o config na mão: conta
-        // ativa vai pelo perfil do grupo, nunca pela casa (ver `probeConfigDir`
-        // — sondar a casa de uma conta ativa derruba a sessão viva).
-        let alvos = config.accounts(in: group).map {
-            (email: $0.identity.email, dir: engine.probeConfigDir(for: $0, config: config))
-        }
+        let contas = config.accounts(in: group)
+        let configNoClique = config
+        let engine = self.engine
         let usageDir = paths.usageDir
         let scratchBase = paths.base
 
         let falhas = await Task.detached(priority: .userInitiated) { () -> Int in
             guard let probe = ClaudeUsageProbe.system(scratchBase: scratchBase) else { return -1 }
             var erros = 0
-            for alvo in alvos {
+            for conta in contas {
+                // O perfil é decidido AGORA, conta a conta, relendo do disco
+                // quem está ativa: conta ativa vai pelo perfil do grupo, nunca
+                // pela casa (ver `probeConfigDir` — sondar a casa de uma conta
+                // ativa derruba a sessão viva). Decidido no clique, um
+                // `claude <grupo>` aberto em outro terminal no meio da medição
+                // fazia a sonda chegar na casa de uma conta que já estava ativa.
+                // Dentro do app, a rotação e o "Usar" esperam a medição.
+                let alvo = (email: conta.identity.email,
+                            dir: engine.probeConfigDir(for: conta, config: configNoClique))
                 do {
                     let leitura = try probe.read(configDir: alvo.dir)
                     let agora = Date()
@@ -508,6 +543,10 @@ public final class RouterConfigStore {
     /// passou do limiar e tem para onde ir, troca. Fail-safe: quem não tem
     /// destino fica onde está. Usa o `usageSnapshot` mais recente.
     public func rotateAll() {
+        // A sonda decide o perfil de cada conta na hora de medi-la; trocar a
+        // ativa no meio a faria medir pela casa uma conta que acabou de ficar
+        // ativa. A volta seguinte, três minutos depois, faz o que esta não fez.
+        guard measuringGroup == nil else { return }
         for group in config.groups {
             // O espelhamento periódico: a casa da conta ativa recebe o token
             // vivo do grupo, senão o refresh token dela morre na prateleira.
