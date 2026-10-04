@@ -53,6 +53,15 @@ public enum ProviderEnv {
     ///   o app escreveria o item do grupo enquanto o Claude Code lê outro.
     /// - `CLAUDE_CODE_CUSTOM_OAUTH_URL` e `ANTHROPIC_PROFILE` trocam o servidor
     ///   de autenticação e o perfil de conta, respectivamente.
+    ///
+    /// O terceiro bloco fecha a issue #11 (10/2026), também da lista do porte e
+    /// conferido no binário 2.1.281 do macOS. O que mais pesa é
+    /// `ANTHROPIC_CONFIG_DIR`: ela muda de onde o perfil é lido, num produto cujo
+    /// mecanismo inteiro é mudar o perfil. As de identidade federada
+    /// (`ANTHROPIC_IDENTITY_TOKEN[_FILE]`, `ANTHROPIC_FEDERATION_RULE_ID`,
+    /// `ANTHROPIC_ORGANIZATION_ID`) e as de endpoint alternativo (Foundry,
+    /// `AWS_BEARER_TOKEN_BEDROCK`) servem a sessão por outra credencial — e o
+    /// sensor carimbaria o consumo dela no e-mail do perfil.
     public static let credentialKeys = [
         "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_CUSTOM_HEADERS",
         "ANTHROPIC_BASE_URL", "ANTHROPIC_BEDROCK_BASE_URL", "ANTHROPIC_VERTEX_BASE_URL",
@@ -61,12 +70,28 @@ public enum ProviderEnv {
         "CLAUDE_CODE_OAUTH_REFRESH_TOKEN", "CLAUDE_CODE_API_KEY_FILE_DESCRIPTOR",
         "CLAUDE_CODE_SESSION_ACCESS_TOKEN", "CLAUDE_CODE_CUSTOM_OAUTH_URL",
         "CLAUDE_SECURESTORAGE_CONFIG_DIR", "ANTHROPIC_PROFILE",
+        "ANTHROPIC_CONFIG_DIR", "ANTHROPIC_IDENTITY_TOKEN", "ANTHROPIC_IDENTITY_TOKEN_FILE",
+        "ANTHROPIC_FEDERATION_RULE_ID", "ANTHROPIC_ORGANIZATION_ID",
+        "CLAUDE_CODE_USE_FOUNDRY", "AWS_BEARER_TOKEN_BEDROCK",
     ]
+
+    /// Famílias inteiras de endpoint alternativo, por prefixo. Uma lista de
+    /// nomes exatos perde para a próxima variável que a Anthropic lançar numa
+    /// delas — e perde calada.
+    ///
+    /// Comparação EXATA, sem ignorar caixa, de propósito: no macOS o nome de
+    /// variável de ambiente tem caixa (`anthropic_aws_x` não é
+    /// `ANTHROPIC_AWS_X`), e o Claude Code lê a grafia maiúscula. O porte
+    /// Windows ignora caixa porque lá os nomes não têm.
+    public static let credentialPrefixes = ["ANTHROPIC_FOUNDRY_", "ANTHROPIC_AWS_"]
 
     /// O ambiente sem nada que desvie a sessão da conta do grupo.
     public static func direct(_ environment: [String: String]) -> [String: String] {
         var env = environment
         for key in proxyKeys + credentialKeys { env.removeValue(forKey: key) }
+        for key in env.keys where credentialPrefixes.contains(where: { key.hasPrefix($0) }) {
+            env.removeValue(forKey: key)
+        }
         return env
     }
 }
