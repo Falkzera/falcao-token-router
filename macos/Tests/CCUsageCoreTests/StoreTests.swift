@@ -296,6 +296,32 @@ struct RouterConfigStoreTests {
 
         #expect(outcome == .wrongAccount(expected: "conta2@exemplo.com", got: "intrusa@exemplo.com"))
         #expect(store.config.account(account.id)?.identity.email == "conta2@exemplo.com")
+        // Issue #12: a credencial da intrusa não fica na casa desta conta — senão
+        // "Usar" serviria a intrusa sob o nome dela.
+        #expect(!kc.exists(service: adapter.keychainService(forConfigDir: account.home)))
+        #expect(adapter.identity(inConfigDir: account.home) == nil)
+    }
+
+    /// Issue #12: o espelho periódico (grupo → casa) no meio de um relogin
+    /// escreveria por cima da credencial NOVA a morta que motivou o relogin — e
+    /// o fim do relogin empurraria a morta de volta para o grupo.
+    @Test("durante o relogin da ativa, a rotação não espelha por cima da credencial nova")
+    func rotationDoesNotMirrorOverARelogin() throws {
+        let (store, kc, adapter, _) = makeStore()
+        let group = store.addGroup(name: "trabalho")
+        let account = try addAccount("conta1@exemplo.com", to: group, store: store, kc: kc, adapter: adapter)
+        store.activate(account, in: store.config.groups[0])
+        let groupService = adapter.keychainService(forConfigDir: group.configDir)
+        let homeService = adapter.keychainService(forConfigDir: account.home)
+        try kc.write("cred-MORTA", service: groupService)   // o que motivou o relogin
+
+        store.beginRelogin(account.id)
+        try kc.write("cred-NOVA", service: homeService)      // o login oficial gravou
+        store.rotateAll()
+        #expect(kc.read(service: homeService) == "cred-NOVA")
+
+        #expect(store.finishRelogin(accountID: account.id) == .renewed(store.config.account(account.id)!))
+        #expect(kc.read(service: groupService) == "cred-NOVA")
     }
 
     /// Apagar o grupo leva junto as contas que só existiam nele — órfãs não

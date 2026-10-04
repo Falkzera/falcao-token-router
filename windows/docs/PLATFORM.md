@@ -292,11 +292,6 @@ The port does not reproduce these macOS behaviours (each has a regression test):
   ends, and a silent fall-through when the `router` binary is gone;
 - three different searches for the `claude` binary;
 - the sensor ignoring `ROUTER_APP_SUPPORT`;
-- `ProviderEnv` letting through `ANTHROPIC_CONFIG_DIR`, `ANTHROPIC_IDENTITY_TOKEN(_FILE)`,
-  `ANTHROPIC_FEDERATION_RULE_ID`, `ANTHROPIC_ORGANIZATION_ID`, `CLAUDE_CODE_USE_FOUNDRY`,
-  `ANTHROPIC_FOUNDRY_*`, `ANTHROPIC_AWS_*` and `AWS_BEARER_TOKEN_BEDROCK` (all read in the
-  JS of 2.1.280). The token and credential-redirect variables — `CLAUDE_CODE_OAUTH_TOKEN`
-  and its variants, `CLAUDE_SECURESTORAGE_CONFIG_DIR` — are stripped on macOS too since #6;
 - no lock between the app and the CLI (the port uses a named mutex around every
   credential write);
 - a group's status line reduced to `account 5h 7d`, which replaced whatever status
@@ -318,9 +313,3 @@ app itself inside a sandbox):
   code, and the text comes from the UI's catalogs);
 - a login spinner that never stops when the account doesn't show up on disk (the
   port shows a named state with "Check again");
-- a relogin that comes back as **another** account leaving that account's
-  credential in this account's home, where "Use" would serve the other account
-  under this one's name (the port removes it);
-- the rotation pass running during a sign-in, where mirroring an active account
-  (group → home) could overwrite the credential a relogin just wrote (the port
-  waits until the sign-in ends).

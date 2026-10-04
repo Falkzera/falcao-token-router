@@ -35,6 +35,11 @@ public final class RouterConfigStore {
     public private(set) var activeByGroup: [UUID: UUID] = [:]
     /// Última falha de uma ação, para a UI mostrar. `nil` quando tudo correu bem.
     public private(set) var lastError: String?
+    /// Contas com relogin em andamento. A rotação não espelha a ativa delas
+    /// enquanto isso: o relogin grava a credencial NOVA na casa, e o espelho
+    /// (grupo → casa) escreveria por cima a MORTA que motivou o relogin — que o
+    /// fim do relogin empurraria de volta para o grupo (issue #12).
+    @ObservationIgnored private var reloginInFlight: Set<UUID> = []
     /// O grupo que está sendo sondado agora, ou `nil`. Observável porque a
     /// sondagem leva segundos — sem indicação, o clique parece não fazer nada.
     public private(set) var measuringGroup: UUID?
@@ -380,8 +385,17 @@ public final class RouterConfigStore {
 
         let expected = config.accounts[i].identity.email
         guard identity.email == expected else {
+            // O `claude auth login` já gravou a credencial da OUTRA conta na casa
+            // desta. Deixada lá, ela ficava com o nome desta: "Usar" serviria a
+            // outra conta sob este nome, e o sensor carimbaria o consumo no
+            // e-mail errado (issue #12). Credencial e identidade estranhas
+            // saem; a conta volta a pedir relogin — a credencial que havia ali
+            // era a morta que motivou este.
+            engine.resetProfile(config.accounts[i].home, provider: config.accounts[i].provider)
+            reloginInFlight.remove(accountID)
             return .wrongAccount(expected: expected, got: identity.email)
         }
+        reloginInFlight.remove(accountID)
         config.accounts[i].identity = identity  // tier/organização podem ter mudado
         save()
         // Conta ativa num grupo: o item do grupo guarda a credencial MORTA que
@@ -394,6 +408,11 @@ public final class RouterConfigStore {
         refreshUsage()
         return .renewed(config.accounts[i])
     }
+
+    /// Marca o início e o fim de um relogin, para a rotação não espelhar a conta
+    /// no meio dele (ver `reloginInFlight`). Idempotentes.
+    public func beginRelogin(_ accountID: UUID) { reloginInFlight.insert(accountID) }
+    public func endRelogin(_ accountID: UUID) { reloginInFlight.remove(accountID) }
 
     /// Remove a conta do registro **e apaga a credencial dela**.
     ///
@@ -640,6 +659,10 @@ public final class RouterConfigStore {
         // ativa. A volta seguinte, três minutos depois, faz o que esta não fez.
         guard measuringGroup == nil else { return }
         for group in config.groups {
+            // Relogin da ativa em andamento: nem espelho nem troca neste grupo
+            // até ele terminar — ver `reloginInFlight`.
+            if let active = engine.activeAccount(in: group, config: config),
+               reloginInFlight.contains(active.id) { continue }
             // O espelhamento periódico: a casa da conta ativa recebe o token
             // vivo do grupo, senão o refresh token dela morre na prateleira.
             engine.mirrorActive(in: group, config: config)

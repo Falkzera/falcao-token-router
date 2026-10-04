@@ -453,6 +453,33 @@ struct ProviderEnvTests {
         #expect(direct["ANTHROPIC_MODEL"] == "claude-opus-5")
         #expect(direct["PATH"] == "/usr/bin")
     }
+
+    /// Issue #11: o perfil lido de outro lugar, a identidade federada e os
+    /// endpoints alternativos serviam a sessão por algo que não é a conta que o
+    /// grupo ativou — e o sensor carimbava o consumo no e-mail do perfil.
+    @Test("remove o perfil alternativo, a identidade federada e as famílias Foundry/AWS")
+    func stripsTheIssue11Variables() {
+        let env = [
+            "ANTHROPIC_CONFIG_DIR": "/outro/perfil",
+            "ANTHROPIC_IDENTITY_TOKEN": "jwt", "ANTHROPIC_IDENTITY_TOKEN_FILE": "/x/jwt",
+            "ANTHROPIC_FEDERATION_RULE_ID": "r", "ANTHROPIC_ORGANIZATION_ID": "o",
+            "CLAUDE_CODE_USE_FOUNDRY": "1", "AWS_BEARER_TOKEN_BEDROCK": "b",
+            // Famílias por prefixo: inclusive um nome que ainda não existe hoje.
+            "ANTHROPIC_FOUNDRY_RESOURCE": "acme", "ANTHROPIC_FOUNDRY_ALGO_NOVO": "x",
+            "ANTHROPIC_AWS_WORKSPACE_ID": "w",
+            "PATH": "/usr/bin",
+        ]
+        let direct = ProviderEnv.direct(env)
+        #expect(direct.keys.sorted() == ["PATH"])
+    }
+
+    /// No macOS o nome de variável tem caixa, e o Claude Code lê a maiúscula —
+    /// apagar `anthropic_aws_x` mexeria no ambiente do usuário sem motivo.
+    @Test("o prefixo compara com caixa, como o sistema")
+    func prefixesAreCaseSensitive() {
+        let direct = ProviderEnv.direct(["anthropic_aws_coisa": "fica"])
+        #expect(direct["anthropic_aws_coisa"] == "fica")
+    }
 }
 
 // MARK: - O leitor de uso e o tempo
