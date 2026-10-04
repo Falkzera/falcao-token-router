@@ -12,8 +12,7 @@
   `ProbeTarget`. `parse` (linhas `Current …`, `·`=U+00B7, CRLF normalizado; `session` → 5h,
   `all models` → 7d, outro escopo → por modelo, a 1ª ocorrência vence), `reset_date` (zona IANA
   via `chrono-tz` tirada ANTES de am/pm, senão fuso local; `MMM d, h:mma`/`MMM d, ha` do Windows
-  e `MMM d 'at' …` do macOS; ano = candidato mais perto de `now`), `plan` (3 primeiras linhas,
-  palavra inteira), `interpret` (código ≠ 0 ou saída SEM linha `Current` = `NotSignedIn`; linha
+  e `MMM d 'at' …` do macOS; ano = candidato mais perto de `now`), `interpret` (código ≠ 0 ou saída SEM linha `Current` = `NotSignedIn`; linha
   `Current` ilegível = `Unrecognized`), o executor (`--print --no-session-persistence
   --strict-mcp-config /usage`, cwd `probe-scratch`, ambiente direto sem `CLAUDE_CODE*`,
   `CLAUDE_CONFIG_DIR` só no dedicado, stdin nulo, stderr descartado, `CREATE_NO_WINDOW`, prazo

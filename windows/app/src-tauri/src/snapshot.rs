@@ -83,7 +83,6 @@ pub enum Bound {
 pub struct UsageView {
     /// O número que a rotação compara com o limiar (o maior das janelas).
     pub fraction: f64,
-    pub text: String,
     pub bound: Bound,
     pub five_hour: Option<Reading>,
     pub seven_day: Option<Reading>,
@@ -96,7 +95,6 @@ impl UsageView {
     fn of(usage: &AccountUsage, locale: Locale) -> Self {
         UsageView {
             fraction: usage.fraction,
-            text: UsagePercent::text(usage.fraction),
             bound: match usage.window {
                 UsageWindow::FiveHour => Bound::FiveHour,
                 UsageWindow::SevenDay => Bound::SevenDay,
@@ -125,7 +123,6 @@ impl UsageView {
 pub struct AccountView {
     pub id: String,
     pub label: String,
-    pub email: String,
     pub organization: Option<String>,
     pub usage: Option<UsageView>,
 }
@@ -286,7 +283,6 @@ fn group_view(store: &RouterConfigStore, group: &AccountGroup, locale: Locale) -
             .map(|account| AccountView {
                 id: account.id.to_string(),
                 label: account.label().to_string(),
-                email: account.identity.email.clone(),
                 organization: account
                     .identity
                     .organization_name
@@ -431,7 +427,7 @@ mod tests {
         let usage = snapshot.groups[0].accounts[1].usage.as_ref().unwrap();
 
         assert_eq!(usage.bound, Bound::SevenDay);
-        assert_eq!(usage.text, "81%");
+        assert_eq!(usage.seven_day.as_ref().unwrap().text, "81%");
         assert_eq!(usage.five_hour.as_ref().unwrap().text, "67%");
         assert!(usage.five_hour.as_ref().unwrap().resets_at.is_some());
         assert_eq!(usage.origin, UsageOrigin::Sensor);

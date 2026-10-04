@@ -4,7 +4,7 @@ Modelos, formato da amostra, leitor de uso, credencial, rotação e o store. Sem
 
 ## Arquivos
 - `provider.rs` — `Provider` (só `.anthropic` na v1), o trait `ProviderAdapter` (≙ protocolo do
-  Swift: `credential_location`, `identity`, `write_identity`, `launch_command`) e `IdentityError`.
+  Swift: `credential_location`, `identity`, `write_identity`, `clear_identity`) e `IdentityError`.
 - `config_dir.rs` — `ConfigDir {raw, isDefault}`: o perfil; assimetria do `.claude.json`
   (ao lado do padrão, dentro do dedicado) e o valor de ambiente (`None` no padrão).
 - `account_model.rs` — `AccountIdentity` (email, org, tier, `oauthAccount` cru) e `Account`.
@@ -124,3 +124,9 @@ Modelos, formato da amostra, leitor de uso, credencial, rotação e o store. Sem
   servir.
 - 04/10/2026: o comando da status line só vai cru com letra, dígito e `-_./:~`. Olhar só o
   espaço deixava `'`, `&`, `(` passarem — um usuário `D'Angelo` ficava sem sensor.
+- 04/10/2026: saiu o que nada lia. `ProviderAdapter::launch_command` e `LaunchPlan.executable`:
+  quem acha o `claude` é o resolvedor único (`usage/claude_binary.rs`), e o plano só levava o
+  nome para um teste conferir. `usage_sampled_at` relia a pasta `usage\` inteira a cada refresh para
+  ninguém usar (a idade vem de `usage_detail`). Também `set_nickname`, `display_name`,
+  `LaunchError::UnknownGroup`, `SessionLauncher::engine` e `TerminalReport::blocked_by_policy`
+  (a tela lê o `policy_blocks` de cada shell).

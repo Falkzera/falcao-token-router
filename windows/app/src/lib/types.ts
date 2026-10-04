@@ -9,7 +9,6 @@ export type HomeTab = "groups" | "settings";
 export type View = "home" | "flyout";
 
 export interface AppInfo {
-  version: string;
   locale: Locale;
   /** A aba com que a janela abre (a bandeja pode ter pedido Ajustes). */
   initialTab: HomeTab;
@@ -38,7 +37,6 @@ export type Origin = "sensor" | "probe";
 export interface UsageView {
   /** O número que a rotação compara com o limiar (o maior das janelas). */
   fraction: number;
-  text: string;
   /** Qual janela manda nesse número. */
   bound: Bound;
   fiveHour: Reading | null;
@@ -51,7 +49,6 @@ export interface UsageView {
 export interface AccountView {
   id: string;
   label: string;
-  email: string;
   organization: string | null;
   /** `null` = sem amostra: "pronta". */
   usage: UsageView | null;
@@ -119,7 +116,6 @@ export interface TerminalView {
   shells: ShellView[];
   developerMode: boolean;
   fullyInstalled: boolean;
-  blockedByPolicy: boolean;
   /** "Ativar" resolve algo (a política e o `.bash_profile` têm correção própria). */
   needsInstall: boolean;
 }

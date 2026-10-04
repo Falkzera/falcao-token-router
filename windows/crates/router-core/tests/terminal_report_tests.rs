@@ -255,7 +255,12 @@ fn the_report_covers_each_shell_present() {
     // Uma peça faltando (o perfil do 7, o .bashrc): não está tudo pronto.
     assert!(!report.fully_installed());
     // E há um aviso a dar: a política do 5.1 impede o perfil de rodar.
-    assert!(report.blocked_by_policy());
+    assert!(
+        report
+            .shell(ShellKind::WindowsPowerShell)
+            .unwrap()
+            .policy_blocks
+    );
 }
 
 /// Sem Git Bash, ele não entra no quadro; com tudo no lugar, está pronto.
@@ -294,5 +299,5 @@ fn without_git_bash_the_report_has_only_powershell() {
     assert_eq!(report.shells[0].kind, ShellKind::PowerShell7);
     assert!(report.developer_mode);
     assert!(report.fully_installed());
-    assert!(!report.blocked_by_policy());
+    assert!(!report.shells[0].policy_blocks);
 }
