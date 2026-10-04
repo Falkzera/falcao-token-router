@@ -14,8 +14,7 @@ Nenhuma das duas fala com `api.anthropic.com`. Quem faz requisição é o client
 - `UsagePercent.swift` — a conversão fração→% **num lugar só** (o sensor arredondava e o painel truncava: 0,666 saía 67% numa tela e 66% na outra).
 - `UsageReport.swift` / `UsageReportDecoder.swift` — o payload de uso da Anthropic, decodificado a partir de `limits[]` (as chaves de topo são codinomes internos que giram a cada ciclo).
 - `CachedUsageReader.swift` — `cachedUsageUtilization` de `~/.claude.json`, o fallback do MEDIDOR (não do rodízio).
-- `UsageSourcePolicy.swift` — função pura que escolhe entre ao vivo e cache, e devolve a procedência que a UI mostra.
-- `LiveUsageError.swift` — por que a fonte oficial não pôde ser lida.
+- `UsageSourcePolicy.swift` — função pura que escolhe entre o número ao vivo (a amostra recente do sensor) e o cache, e devolve a procedência que a UI mostra: `live`, `cached(age:)` ou `derivedOnly`.
 
 ## Padrões
 - **Falha nunca vira zero.** Toda leitura que não deu certo devolve `nil` e quem chama cai para a próxima fonte ou mostra ausência. Uma barra vazia lê como "livre", que é o oposto do que se sabe.
@@ -24,6 +23,7 @@ Nenhuma das duas fala com `api.anthropic.com`. Quem faz requisição é o client
 - Endpoint e formato são indocumentados: o parser tolera o que não conhece e nunca lança por campo ausente.
 
 ## Decisões recentes
+- 2026-10-04: sem amostra recente do sensor, o painel mostra o cache com a idade — não "credencial expirada · rode o Claude Code", que era o que aparecia depois de uma hora sem usar a conta do perfil padrão. Saíram o `LiveUsageError` e os estados `credentialExpired`/`liveUnavailable` (com o ícone de "sem conexão"): eram da época em que "ao vivo" era uma chamada de rede com token, e o sensor não tem credencial para expirar nem conexão para cair. Os textos de "busca ao vivo" viraram "número ao vivo".
 - 2026-09-18: entra a **sonda ativa**. Fecha a lacuna conhecida da v1 — o limite por modelo não chega no `rate_limits`, e é ele que estoura primeiro (uma conta travou com `5h 91%` / `7d 79%` e `Fable 100%`). As bandeiras do comando não são cosméticas: `--print` evita o diálogo de confiança de diretório, `--no-session-persistence` evita gravar um transcript por sondagem, e `--strict-mcp-config` sem `--mcp-config` impede que cada medição suba os servidores MCP do usuário.
 - 2026-09-18: a telemetria fica **ligada de propósito**. `DISABLE_TELEMETRY` e `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` também desligam a consulta de feature flags, e a linha semanal por modelo está atrás de um desses portões — com qualquer um setado, `/usage` para de imprimi-la. Descoberta do `codenotch` (MIT), confirmada aqui.
 - 2026-09-18: a data de reset é parseada com **duas grafias** (`h:mma` e `ha`), porque os minutos somem na hora cheia: `Sep 18 at 7:29pm`, mas `Sep 21 at 9am`. Um padrão só perderia o reset em uma hora de cada sessenta.

@@ -14,14 +14,12 @@
 "panel.groups" = "Grupos";
 "panel.settings" = "Ajustes";
 "panel.quit" = "Sair";
-"panel.enableLive" = "Ligar ao vivo";
+"panel.enableLive" = "Usar o sensor";
 
 /* Painel — de onde veio o número */
 "panel.provenance.live" = "ao vivo";
 "panel.provenance.cached.format" = "cache do Claude Code · há %@";
 "panel.provenance.stale.format" = "cache defasada · há %@";
-"panel.provenance.expired.format" = "credencial expirada · rode o Claude Code (cache de há %@)";
-"panel.provenance.offline.format" = "sem conexão · cache de há %@";
 "panel.provenance.derived" = "estimado do seu histórico";
 
 /* Painel — reset das janelas */
@@ -43,8 +41,8 @@
 "alerts.reset.session.title" = "Janela de 5h resetou";
 "alerts.reset.weekly.title" = "Janela semanal resetou";
 "alerts.reset.body" = "Capacidade cheia de novo.";
-"alerts.liveRequired.title" = "Alertas precisam da busca ao vivo";
-"alerts.liveRequired.body" = "Sem ela o app lê o cache do Claude Code, que pode estar horas atrasado — e um alerta em cima disso erra nos dois sentidos. Ligue em Ajustes → Números de uso.";
+"alerts.liveRequired.title" = "Alertas precisam do número ao vivo";
+"alerts.liveRequired.body" = "Sem ele o app lê o cache do Claude Code, que pode estar horas atrasado — e um alerta em cima disso erra nos dois sentidos. Ligue em Ajustes → Números de uso.";
 
 /* Ajustes — plano */
 "settings.section.plan" = "Plano";
@@ -65,7 +63,7 @@
 /* Ajustes — alertas */
 "settings.section.alerts" = "Alertas";
 "settings.alerts.thresholds.toggle" = "Avisar ao aproximar do teto";
-"settings.alerts.thresholds.help" = "Notifica ao passar de um limiar de consumo. O alerta só sai com a busca ao vivo ligada: sobre o cache, ele erraria nos dois sentidos — e o pior deles é o silêncio enquanto você estoura o teto.";
+"settings.alerts.thresholds.help" = "Notifica ao passar de um limiar de consumo. O alerta só sai com o número ao vivo ligado: sobre o cache, ele erraria nos dois sentidos — e o pior deles é o silêncio enquanto você estoura o teto.";
 "settings.alerts.thresholds.label" = "Limiares";
 "settings.alerts.thresholds.empty" = "Nenhum limiar selecionado — nada será avisado.";
 "settings.alerts.reset.toggle" = "Avisar quando a janela resetar";
@@ -73,8 +71,8 @@
 "settings.alerts.windows.label" = "Janelas";
 "settings.alerts.window.session" = "5 horas";
 "settings.alerts.window.weekly" = "semanal";
-"settings.alerts.needsLive" = "Alertas precisam da busca ao vivo.";
-"settings.alerts.enableLive" = "Ligar busca ao vivo";
+"settings.alerts.needsLive" = "Alertas precisam do número ao vivo.";
+"settings.alerts.enableLive" = "Ligar o número ao vivo";
 "settings.alerts.denied" = "Notificações negadas nos Ajustes do Sistema.";
 "settings.alerts.openSystem" = "Abrir Ajustes do Sistema";
 
