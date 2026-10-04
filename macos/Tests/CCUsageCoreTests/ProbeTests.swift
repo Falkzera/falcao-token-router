@@ -174,14 +174,14 @@ struct ModelWindowRotationTests {
     func modeloVencidoDecai() throws {
         let agora = Date()
         let amostra = GroupUsageSample(
-            configDirRaw: "/tmp/g", email: "x@k.com",
+            configDirRaw: "/tmp/g", email: "x@exemplo.com",
             fiveHourPercent: 0.10, fiveHourResetsAt: agora.addingTimeInterval(3600),
             sevenDayPercent: 0.20, sevenDayResetsAt: agora.addingTimeInterval(86400),
             sampledAt: agora,
             models: ModelUsage(windows: [.init(name: "Fable", percent: 1.0,
                                                resetsAt: agora.addingTimeInterval(-60))],
                                sampledAt: agora))
-        let (reader, config, id) = try leitor(amostra, email: "x@k.com")
+        let (reader, config, id) = try leitor(amostra, email: "x@exemplo.com")
         let uso = try #require(reader.detailByAccount(config, now: agora)[id])
 
         #expect(uso.fraction == 0.20)
@@ -198,21 +198,21 @@ struct ModelWindowRotationTests {
             .appending(path: "probe-\(UUID().uuidString)")
         let sondado = Date().addingTimeInterval(-600)
         let daSonda = GroupUsageSample(
-            configDirRaw: "/tmp/g", email: "x@k.com",
+            configDirRaw: "/tmp/g", email: "x@exemplo.com",
             fiveHourPercent: 0.5, fiveHourResetsAt: nil,
             sevenDayPercent: 0.5, sevenDayResetsAt: nil, sampledAt: sondado,
             models: ModelUsage(windows: [.init(name: "Fable", percent: 0.9, resetsAt: nil)],
                                sampledAt: sondado))
-        try GroupUsageStore.write(daSonda, forEmail: "x@k.com", in: dir)
+        try GroupUsageStore.write(daSonda, forEmail: "x@exemplo.com", in: dir)
 
         // Agora o SENSOR escreve, sem saber de modelo nenhum.
         let doSensor = GroupUsageSample(
-            configDirRaw: "/tmp/g", email: "x@k.com",
+            configDirRaw: "/tmp/g", email: "x@exemplo.com",
             fiveHourPercent: 0.6, fiveHourResetsAt: nil,
             sevenDayPercent: 0.6, sevenDayResetsAt: nil, sampledAt: Date())
-        try GroupUsageStore.write(doSensor, forEmail: "x@k.com", in: dir)
+        try GroupUsageStore.write(doSensor, forEmail: "x@exemplo.com", in: dir)
 
-        let lido = try #require(GroupUsageStore.read(forEmail: "x@k.com", in: dir))
+        let lido = try #require(GroupUsageStore.read(forEmail: "x@exemplo.com", in: dir))
         #expect(lido.fiveHourPercent == 0.6)                       // o novo venceu
         #expect(lido.models?.windows.first?.percent == 0.9)        // e o Fable ficou
         // O carimbo preservado é o da SONDA, não o desta escrita: nada finge
@@ -235,7 +235,7 @@ struct UsageOriginTests {
     @Test("amostra antiga, sem a chave, é do sensor")
     func amostraAntigaEhSensor() throws {
         let antiga = """
-        {"configDirRaw":"/tmp/g","email":"x@k.com","fiveHourPercent":0.4,
+        {"configDirRaw":"/tmp/g","email":"x@exemplo.com","fiveHourPercent":0.4,
          "sevenDayPercent":0.5,"sampledAt":"2026-09-18T12:00:00Z"}
         """
         let decoder = JSONDecoder()
@@ -249,12 +249,12 @@ struct UsageOriginTests {
     func origemPersiste() throws {
         let dir = tmpDir()
         let sondada = GroupUsageSample(
-            configDirRaw: "/tmp/g", email: "x@k.com",
+            configDirRaw: "/tmp/g", email: "x@exemplo.com",
             fiveHourPercent: 0.1, fiveHourResetsAt: nil,
             sevenDayPercent: 0.2, sevenDayResetsAt: nil,
             sampledAt: Date(), origin: .probe)
-        try GroupUsageStore.write(sondada, forEmail: "x@k.com", in: dir)
-        #expect(GroupUsageStore.read(forEmail: "x@k.com", in: dir)?.origin == .probe)
+        try GroupUsageStore.write(sondada, forEmail: "x@exemplo.com", in: dir)
+        #expect(GroupUsageStore.read(forEmail: "x@exemplo.com", in: dir)?.origin == .probe)
     }
 
     /// O sensor escrevendo por cima de uma sondagem: as janelas de 5h/7d passam
@@ -265,20 +265,20 @@ struct UsageOriginTests {
         let dir = tmpDir()
         let sondado = Date().addingTimeInterval(-600)
         try GroupUsageStore.write(GroupUsageSample(
-            configDirRaw: "/tmp/g", email: "x@k.com",
+            configDirRaw: "/tmp/g", email: "x@exemplo.com",
             fiveHourPercent: 0.5, fiveHourResetsAt: nil,
             sevenDayPercent: 0.5, sevenDayResetsAt: nil, sampledAt: sondado,
             models: ModelUsage(windows: [.init(name: "Fable", percent: 0.9, resetsAt: nil)],
                                sampledAt: sondado),
-            origin: .probe), forEmail: "x@k.com", in: dir)
+            origin: .probe), forEmail: "x@exemplo.com", in: dir)
 
         try GroupUsageStore.write(GroupUsageSample(
-            configDirRaw: "/tmp/g", email: "x@k.com",
+            configDirRaw: "/tmp/g", email: "x@exemplo.com",
             fiveHourPercent: 0.6, fiveHourResetsAt: nil,
             sevenDayPercent: 0.6, sevenDayResetsAt: nil, sampledAt: Date(),
-            origin: .sensor), forEmail: "x@k.com", in: dir)
+            origin: .sensor), forEmail: "x@exemplo.com", in: dir)
 
-        let lido = try #require(GroupUsageStore.read(forEmail: "x@k.com", in: dir))
+        let lido = try #require(GroupUsageStore.read(forEmail: "x@exemplo.com", in: dir))
         #expect(lido.origin == .sensor)                       // 5h/7d são do sensor
         #expect(lido.models?.windows.first?.percent == 0.9)   // o Fable ficou
     }
@@ -290,13 +290,13 @@ struct UsageOriginTests {
         let dir = tmpDir()
         let agora = Date()
         try GroupUsageStore.write(GroupUsageSample(
-            configDirRaw: "/tmp/g", email: "ociosa@k.com",
+            configDirRaw: "/tmp/g", email: "ociosa@exemplo.com",
             fiveHourPercent: 0.26, fiveHourResetsAt: agora.addingTimeInterval(3600),
             sevenDayPercent: 0.38, sevenDayResetsAt: agora.addingTimeInterval(86400),
-            sampledAt: agora, origin: .probe), forEmail: "ociosa@k.com", in: dir)
+            sampledAt: agora, origin: .probe), forEmail: "ociosa@exemplo.com", in: dir)
 
         let conta = Account(provider: .anthropic,
-                            identity: AccountIdentity(email: "ociosa@k.com",
+                            identity: AccountIdentity(email: "ociosa@exemplo.com",
                                                       organizationName: nil,
                                                       rateLimitTier: nil, raw: [:]),
                             home: .dedicated("/tmp/c"))
