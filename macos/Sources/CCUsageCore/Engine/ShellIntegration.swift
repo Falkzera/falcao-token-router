@@ -59,20 +59,47 @@ public enum ShellIntegration {
     /// passar direto. Dinâmica: pergunta ao binário se o primeiro argumento é um
     /// grupo, então grupos novos funcionam sem reescrever isto.
     ///
-    /// `exec` no fim para a sessão herdar o PID do shell, como o `claude` normal.
+    /// Sem `exec`: o `claude <grupo>` roda como filho do shell, igual ao `claude`
+    /// puro. Com o `exec` de antes, o processo do `router` tomava o lugar do shell
+    /// interativo, e sair da sessão fechava a aba do terminal.
+    ///
+    /// Um `alias claude=…` do usuário (o instalador antigo do Claude Code punha
+    /// um `alias claude="~/.claude/local/claude"`) venceria a função: o shell
+    /// expande o alias antes de procurar função, e `claude trabalho` abria o
+    /// `claude` puro — no `~/.claude`, na conta errada, sem aviso. Pior: o zsh
+    /// expande o alias até na definição `claude() {`, que vira erro de sintaxe e
+    /// deixa a função sem existir. Então o script guarda o alias, o desfaz, e o
+    /// `claude` SEM grupo continua passando por ele. O grupo não herda o que o
+    /// alias acrescentava: quem decide o que roda num grupo é o `router launch`.
     public static func shellFunction(routerPath: String) -> String {
         let q = shellQuote(routerPath)
-        return """
+        return #"""
         # Falcão Router — roteia `claude <grupo>` para o grupo certo.
         # Gerado pelo app; não editar à mão.
+
+        # Um alias `claude` venceria a função abaixo: guarda e desfaz.
+        __falcao_alias_novo=""
+        if [ -n "${ZSH_VERSION:-}" ]; then __falcao_alias_novo="${aliases[claude]-}"
+        elif [ -n "${BASH_VERSION:-}" ]; then __falcao_alias_novo="${BASH_ALIASES[claude]-}"; fi
+        if [ -n "$__falcao_alias_novo" ]; then
+          __falcao_claude_alias="$__falcao_alias_novo"
+          unalias claude
+        fi
+        unset __falcao_alias_novo
+
         claude() {
-          if [ -n "$1" ] && command \(q) is-group "$1" >/dev/null 2>&1; then
+          if [ -n "$1" ] && command \#(q) is-group "$1" >/dev/null 2>&1; then
             local grupo="$1"; shift
-            exec command \(q) launch "$grupo" -- "$@"
+            command \#(q) launch "$grupo" -- "$@"
+            return
           fi
-          command claude "$@"
+          case "${__falcao_claude_alias-}" in
+            "") command claude "$@" ;;
+            claude|claude[[:space:]]*) eval "command ${__falcao_claude_alias} \"\$@\"" ;;
+            *) eval "${__falcao_claude_alias} \"\$@\"" ;;
+          esac
         }
-        """
+        """#
     }
 
     public enum ProfileOutcome: Sendable, Equatable { case added, alreadyPresent }

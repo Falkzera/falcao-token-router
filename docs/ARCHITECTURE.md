@@ -185,10 +185,11 @@ never `idle`.
 ## The terminal integration
 
 `claude <group>` is a shell function (`shell.sh`, sourced from `~/.zshrc`) that
-asks `router is-group` and, if yes, `exec`s `router launch <group>`, which
+asks `router is-group` and, if yes, runs `router launch <group>`, which
 activates the right account and `execvp`s the real `claude` with
 `CLAUDE_CONFIG_DIR` set (or unset, for the default group). Anything else falls
-through to the binary.
+through to the binary — or to the user's own `alias claude`, which the script
+saves and chains, since an alias would otherwise win over the function.
 
 The failure mode is silent: in a terminal opened before the integration was
 installed, `claude trabalho` is just an argument, and the session opens in
