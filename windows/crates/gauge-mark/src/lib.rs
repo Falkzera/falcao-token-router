@@ -25,9 +25,6 @@ pub const TRAY_STEPS: u32 = 20;
 pub const CALM_THRESHOLD: f64 = 0.66;
 pub const WARNING_THRESHOLD: f64 = 0.90;
 
-/// Verde dessaturado de propósito: o estado normal é a maior parte do tempo, e
-/// um verde vivo nesse papel vira ruído.
-pub const CALM: [u8; 3] = [0x5C, 0x9E, 0x73];
 pub const WARNING: [u8; 3] = [0xE0, 0xB8, 0x40];
 pub const CRITICAL: [u8; 3] = [0xD9, 0x52, 0x47];
 

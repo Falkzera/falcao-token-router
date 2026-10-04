@@ -45,16 +45,14 @@ const NAVIGATE: &str = "navigate";
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct AppInfo {
-    version: String,
     locale: locale::Locale,
     /// A aba com que a janela abre (a bandeja pode ter pedido Ajustes).
     initial_tab: HomeTab,
 }
 
 #[tauri::command]
-fn app_info(app: AppHandle, state: State<'_, AppState>) -> AppInfo {
+fn app_info(state: State<'_, AppState>) -> AppInfo {
     AppInfo {
-        version: app.package_info().version.to_string(),
         locale: state.locale,
         initial_tab: state.take_tab(),
     }

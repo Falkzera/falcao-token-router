@@ -346,9 +346,4 @@ impl TerminalReport {
                     && !matches!(s.bash_login, Some(BashLogin::Ignores(_)))
             })
     }
-
-    /// Algum PowerShell com a linha no perfil e a política recusando o script.
-    pub fn blocked_by_policy(&self) -> bool {
-        self.shells.iter().any(|s| s.policy_blocks)
-    }
 }

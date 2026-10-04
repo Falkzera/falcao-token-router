@@ -18,15 +18,6 @@ pub enum Provider {
     Anthropic,
 }
 
-impl Provider {
-    /// Nome que aparece na UI. Não traduzível: é marca.
-    pub fn display_name(&self) -> &'static str {
-        match self {
-            Provider::Anthropic => "Claude",
-        }
-    }
-}
-
 /// Por que a identidade não pôde ser gravada no perfil.
 #[derive(Debug, thiserror::Error)]
 pub enum IdentityError {
@@ -77,9 +68,4 @@ pub trait ProviderAdapter: Send + Sync {
     /// velha ali faria o espelho gravar uma credencial morta na casa de quem ela
     /// nomeia. Arquivo ausente: nada a fazer; ilegível: não é regravado.
     fn clear_identity(&self, dir: &ConfigDir) -> Result<(), IdentityError>;
-
-    /// O comando e os argumentos para iniciar uma sessão num grupo. O ambiente
-    /// (incluindo o `CLAUDE_CONFIG_DIR`, quando o grupo não é o padrão) é montado
-    /// por quem chama.
-    fn launch_command(&self) -> (String, Vec<String>);
 }
