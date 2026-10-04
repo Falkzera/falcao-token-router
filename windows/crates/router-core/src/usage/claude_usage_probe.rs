@@ -74,8 +74,6 @@ pub struct Reading {
     pub weekly_all: Option<f64>,
     pub weekly_all_resets_at: Option<DateTime<Utc>>,
     pub models: Vec<ModelWindow>,
-    /// A linha de plano do topo, copiada como veio.
-    pub plan: Option<String>,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, thiserror::Error)]
@@ -265,29 +263,7 @@ impl ClaudeUsageProbe {
             weekly_all: weekly,
             weekly_all_resets_at: weekly_reset,
             models,
-            plan: Self::plan(&text),
         })
-    }
-
-    /// A linha de plano do topo, como impressa. Só as 3 primeiras linhas não
-    /// vazias (mais abaixo "Max" aparece em prosa), e por palavra inteira — um
-    /// aviso que fale de "projects" não vira plano "pro".
-    pub fn plan(text: &str) -> Option<String> {
-        let head: Vec<&str> = text
-            .lines()
-            .map(|l| l.trim_end_matches('\r'))
-            .filter(|l| !l.trim().is_empty())
-            .take(3)
-            .collect();
-        let head = head.join("\n");
-        ["Max 20x", "Max 5x", "Pro", "Team", "subscription"]
-            .iter()
-            .find_map(|phrase| {
-                Regex::new(&format!(r"(?i)\b{}\b", regex::escape(phrase)))
-                    .ok()?
-                    .find(&head)
-                    .map(|m| m.as_str().to_string())
-            })
     }
 
     /// `Sep 22, 8:40pm (America/Sao_Paulo)` (Windows) ou `Sep 18 at 7:29pm (…)`

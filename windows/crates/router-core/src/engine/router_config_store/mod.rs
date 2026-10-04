@@ -18,7 +18,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 
 use super::account_login_service::AccountLoginService;
 use super::account_model::Account;
@@ -138,8 +138,6 @@ pub struct RouterConfigStore {
     config: RouterConfig,
     /// Uso 0–1 por conta, lido das amostras.
     usage_snapshot: HashMap<Id, f64>,
-    /// Quando a amostra de cada conta foi colhida — a idade que a UI mostra.
-    usage_sampled_at: HashMap<Id, DateTime<Utc>>,
     /// O mesmo uso, com a janela e a origem de onde o número veio.
     usage_detail: HashMap<Id, AccountUsage>,
     /// A conta ativa de cada grupo (grupo → conta).
@@ -186,7 +184,6 @@ impl RouterConfigStore {
         let mut store = RouterConfigStore {
             config,
             usage_snapshot: HashMap::new(),
-            usage_sampled_at: HashMap::new(),
             usage_detail: HashMap::new(),
             active_by_group: HashMap::new(),
             live_sessions: HashMap::new(),
@@ -220,10 +217,6 @@ impl RouterConfigStore {
 
     pub fn usage_snapshot(&self) -> &HashMap<Id, f64> {
         &self.usage_snapshot
-    }
-
-    pub fn usage_sampled_at(&self) -> &HashMap<Id, DateTime<Utc>> {
-        &self.usage_sampled_at
     }
 
     pub fn usage_detail(&self) -> &HashMap<Id, AccountUsage> {
