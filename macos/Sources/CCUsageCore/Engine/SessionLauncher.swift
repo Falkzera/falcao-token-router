@@ -18,7 +18,6 @@ public struct SessionLauncher: Sendable {
     }
 
     public enum LaunchError: Error, Equatable {
-        case unknownGroup(String)
         case emptyGroup(String)
         case noUsableAccount(String)
     }

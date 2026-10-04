@@ -5,7 +5,10 @@ Entregar ao usuário o que `CCUsageCore/Alerts` decidiu. Mora aqui porque fala c
 
 ## Arquivos
 - `AlertCoordinator.swift` — liga o store à política e a política à entrega. O `UsageStore` continua sem saber que notificação existe: publica o snapshot, e quem se interessa escuta.
-- `UserNotificationPresenter.swift` — traduz `Alert` (que carrega fato, não frase) em notificação do sistema. `AlertPresenting` é protocolo para o coordenador ser exercitável sem disparar notificação de verdade.
+- `UserNotificationPresenter.swift` — traduz `Alert` (que carrega fato, não frase) em notificação do sistema.
+
+## Decisões recentes
+- 2026-10-04: saiu o protocolo `AlertPresenting`. Dizia existir para o coordenador ser testado sem notificação de verdade, mas o alvo do app não tem testes (o `CCUsageCoreTests` só enxerga o `CCUsageCore`): era interface com uma implementação e nenhum teste.
 
 ## Padrões
 - **Toda a redação vive aqui**, junto do resto das strings de usuário. É o que permite localizar o app sem localizar o core.

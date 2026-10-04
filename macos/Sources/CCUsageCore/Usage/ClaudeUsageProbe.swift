@@ -47,8 +47,6 @@ public struct ClaudeUsageProbe: Sendable {
         public let weeklyAll: Double?
         public let weeklyAllResetsAt: Date?
         public let models: [ModelWindow]
-        /// A linha de plano que o `/usage` imprime no topo, copiada como veio.
-        public let plan: String?
     }
 
     public enum ProbeError: Error, Equatable {
@@ -220,19 +218,7 @@ public struct ClaudeUsageProbe: Sendable {
         }
         return Reading(session: session, sessionResetsAt: sessionReset,
                        weeklyAll: weekly, weeklyAllResetsAt: weeklyReset,
-                       models: models, plan: plan(in: text))
-    }
-
-    /// A linha de plano do topo, copiada como impressa. Só as primeiras linhas:
-    /// mais abaixo o texto fala de consumo, e "Max" aparece em prosa.
-    static func plan(in text: String) -> String? {
-        let head = text.split(whereSeparator: \.isNewline).prefix(3).joined(separator: "\n")
-        for frase in ["Max 20x", "Max 5x", "Pro", "Team", "subscription"] {
-            if let faixa = head.range(of: frase, options: .caseInsensitive) {
-                return String(head[faixa])
-            }
-        }
-        return nil
+                       models: models)
     }
 
     /// `Sep 18 at 7:29pm (America/Maceio)` → `Date`.

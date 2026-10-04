@@ -318,10 +318,6 @@ public final class RouterConfigStore {
         }
     }
 
-    /// Caminho do perfil onde uma conta deve logar — para o app apontar o
-    /// `CLAUDE_CONFIG_DIR` do login oficial.
-    public func homePath(_ home: ConfigDir) -> String { home.raw }
-
     /// O resultado de checar um login pendente.
     public enum LoginOutcome: Sendable, Equatable {
         /// Ainda não terminou; continue observando.
@@ -439,12 +435,6 @@ public final class RouterConfigStore {
         try? FileManager.default.removeItem(at: account.home.url)
     }
 
-    public func setNickname(_ accountID: UUID, _ nickname: String?) {
-        guard let i = config.accounts.firstIndex(where: { $0.id == accountID }) else { return }
-        config.accounts[i].nickname = nickname?.isEmpty == true ? nil : nickname
-        save()
-    }
-
     // MARK: - Rotação (ações que tocam o sistema)
 
     /// A conta que serve um grupo agora.
@@ -552,9 +542,6 @@ public final class RouterConfigStore {
         activeByGroup = active
         liveSessions = sessions
     }
-
-    /// Quantas sessões vivas um grupo tem agora.
-    public func sessionCount(in groupID: UUID) -> Int { liveSessions[groupID]?.count ?? 0 }
 
     // MARK: - Integração com o terminal
 
