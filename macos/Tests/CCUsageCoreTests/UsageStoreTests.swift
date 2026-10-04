@@ -131,8 +131,7 @@ private func liveReportSaying(_ fraction: Double) -> UsageReport {
 
 @MainActor
 @Test func theFetcherIsNeverCalledWhileTheToggleIsOff() async throws {
-    // A garantia que sustenta a promessa reescrita do PlanDetector: desligado,
-    // nada chama a rede e nada lê o token.
+    // Desligado, a fonte "ao vivo" nunca é consultada — nem ao abrir o painel.
     let root = try makeRootWithOneEvent()
     defer { try? FileManager.default.removeItem(at: root) }
     let cacheFile = root.appending(path: "claude.json")
