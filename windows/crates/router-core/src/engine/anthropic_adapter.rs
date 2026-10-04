@@ -106,6 +106,23 @@ impl ProviderAdapter for AnthropicAdapter {
         }
     }
 
+    fn clear_identity(&self, dir: &ConfigDir) -> Result<(), IdentityError> {
+        let path = dir.global_config_path();
+        if !path.exists() {
+            return Ok(());
+        }
+        edit_object(&path, |root| {
+            root.shift_remove("oauthAccount");
+            root.shift_remove("cachedUsageUtilization");
+        })
+        .map_err(|e| match e {
+            JsonFileError::Unreadable { path, reason } => {
+                IdentityError::Unreadable { path, reason }
+            }
+            JsonFileError::Io { path, source } => IdentityError::Io { path, source },
+        })
+    }
+
     fn launch_command(&self) -> (String, Vec<String>) {
         ("claude".to_string(), Vec::new())
     }

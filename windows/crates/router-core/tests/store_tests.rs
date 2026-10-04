@@ -423,6 +423,59 @@ fn clear_default_leaves_no_group_in_dot_claude() {
         .all(|g| !g.config_dir.is_default));
 }
 
+/// "Deixar o ~\.claude livre" só mudava o caminho: a conta de lá continuava
+/// servindo o `claude` puro, e a rotação seguinte a ativava também no dedicado
+/// novo — duas cópias de um refresh token que gira.
+#[test]
+fn clearing_the_default_keeps_the_live_account_in_one_place() {
+    let mut env = make_store();
+    let group = env.store.add_group("trabalho"); // padrão: o ~\.claude
+    let a = env.add_account("conta1@exemplo.com", group.id);
+    let b = env.add_account("conta2@exemplo.com", group.id);
+    env.store.activate(&a, &env.group(group.id));
+    let default_location = env
+        .adapter
+        .credential_location(&env.group(group.id).config_dir);
+    env.creds
+        .write(&cred("cred-a-RENOVADO"), &default_location)
+        .unwrap();
+
+    env.store.clear_default();
+    let moved = env.group(group.id);
+    assert!(!moved.config_dir.is_default);
+    // A casa da conta que ficou no ~\.claude recebeu o token vivo antes da troca.
+    assert_eq!(
+        env.creds.read(&env.adapter.credential_location(&a.home)),
+        Some(cred("cred-a-RENOVADO"))
+    );
+
+    env.store.rotate_all();
+    assert_eq!(
+        env.store.active_account(&env.group(group.id)).map(|x| x.id),
+        Some(b.id)
+    );
+}
+
+/// O dedicado de um grupo é sempre o mesmo caminho; saindo dele e voltando, a
+/// identidade velha fazia o espelho gravar uma cadeia morta na casa da conta.
+#[test]
+fn the_dedicated_profile_left_behind_is_emptied() {
+    let mut env = make_store();
+    env.store.add_group("pessoal"); // padrão
+    let work = env.store.add_group("trabalho"); // dedicado
+    let c = env.add_account("conta3@exemplo.com", work.id);
+    env.store.activate(&c, &env.group(work.id));
+    let dedicated = env.group(work.id).config_dir;
+    assert!(env.adapter.identity(&dedicated).is_some());
+
+    env.store.make_default(work.id);
+
+    assert!(env.adapter.identity(&dedicated).is_none());
+    assert!(!env
+        .creds
+        .exists(&env.adapter.credential_location(&dedicated)));
+}
+
 // --- Regressões do porte ---
 
 /// O limiar vive entre 50% e 100%: abaixo disso a conta troca antes de servir

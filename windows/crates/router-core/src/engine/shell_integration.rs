@@ -103,20 +103,30 @@ fn quote(text: &str, shell: StatusShell) -> String {
     }
 }
 
-/// Um caminho pronto para a linha de comando: sem espaço vai cru; com espaço,
-/// o nome 8.3 se houver; senão, entre aspas.
+/// Um caminho pronto para a linha de comando: só com caracteres inofensivos vai
+/// cru; senão, o nome 8.3 se ele for inofensivo; senão, entre aspas.
 enum Spelling {
     Plain(String),
     NeedsQuotes(String),
 }
 
+/// Pode ir cru para o `bash -c` e para o `-Command` do PowerShell: letra, dígito
+/// e `-_./:~`. Olhar só o espaço deixava passar `'`, `(`, `)`, `&`, `$`, crase e
+/// `;`, que partem ou desviam o comando nos dois shells — um usuário `D'Angelo`
+/// (ou um nome 8.3 como `JOAO(T~1`) deixava o sensor sem rodar, e a rotação às
+/// cegas.
+fn is_plain(text: &str) -> bool {
+    text.chars()
+        .all(|c| c.is_alphanumeric() || "-_./:~".contains(c))
+}
+
 fn spell(path: &Path, short: &dyn Fn(&Path) -> Option<PathBuf>) -> Spelling {
     let long = forward(path);
-    if !long.contains(' ') {
+    if is_plain(&long) {
         return Spelling::Plain(long);
     }
     if let Some(short) = short(path).map(|s| forward(&s)) {
-        if !short.contains(' ') {
+        if is_plain(&short) {
             return Spelling::Plain(short);
         }
     }
