@@ -427,6 +427,12 @@ fn the_next_account_follows_the_preference_order() {
     let s = setup();
     let c = account("conta-c@exemplo.com", "C:/Users/exemplo/.claude-c");
     let d = account("conta-d@exemplo.com", "C:/Users/exemplo/.claude-d");
+    // Só é escolhida quem tem login na casa (ver `can_serve`).
+    for x in [&c, &d] {
+        s.store
+            .write(&cred("cred"), &s.adapter.credential_location(&x.home))
+            .unwrap();
+    }
     let group = group_of(
         "g",
         ConfigDir::standard("C:/Users/exemplo"),
@@ -440,6 +446,161 @@ fn the_next_account_follows_the_preference_order() {
         &usage(&[(s.a.id, 0.95), (s.b.id, 0.99), (c.id, 0.60), (d.id, 0.0)]),
     );
     assert_eq!(next.map(|n| n.id), Some(c.id));
+}
+
+// --- Uma conta, um lugar (10/2026; ≙ a suíte homônima do macOS) ---
+
+/// O `~\.claude` destes testes; os grupos rodam em perfis dedicados.
+const HOME: &str = "C:/Users/exemplo";
+
+fn dedicated_setup() -> Setup {
+    let store = Arc::new(FakeStore::new());
+    let adapter = Arc::new(FakeAdapter::new());
+    let engine = engine_with(&store, &adapter).with_default_profile(ConfigDir::standard(HOME));
+    let a = account("conta-a@exemplo.com", "C:/Users/exemplo/casas/a");
+    let b = account("conta-b@exemplo.com", "C:/Users/exemplo/casas/b");
+    for (x, tag) in [(&a, "cred-a"), (&b, "cred-b")] {
+        store
+            .write(&cred(tag), &adapter.credential_location(&x.home))
+            .unwrap();
+    }
+    let group = group_of(
+        "trabalho",
+        ConfigDir::dedicated("C:/Users/exemplo/grupos/t"),
+        &[&a, &b],
+    );
+    let config = config_of(&[&a, &b], &[&group]);
+    Setup {
+        engine,
+        store,
+        adapter,
+        config,
+        a,
+        b,
+        group,
+    }
+}
+
+/// Depois de "deixar o ~\.claude livre", a conta que estava lá continua
+/// servindo o `claude` puro; ativá-la no dedicado, a partir da casa, deixava a
+/// cadeia em dois lugares.
+#[test]
+fn the_account_live_in_the_default_profile_is_busy() {
+    let s = dedicated_setup();
+    s.adapter
+        .write_identity(&s.a.identity, &ConfigDir::standard(HOME))
+        .unwrap();
+
+    let err = s.engine.activate(&s.a, &s.group, &s.config).unwrap_err();
+    assert_eq!(
+        err,
+        RotationError::AccountLiveInDefaultProfile { account_id: s.a.id }
+    );
+    let next = s.engine.next_account(&s.group, &s.config, &HashMap::new());
+    assert_eq!(next.map(|n| n.id), Some(s.b.id));
+}
+
+#[test]
+fn an_account_without_a_home_credential_is_skipped() {
+    let s = dedicated_setup();
+    s.store.delete(&s.adapter.credential_location(&s.a.home));
+    let next = s.engine.next_account(&s.group, &s.config, &HashMap::new());
+    assert_eq!(next.map(|n| n.id), Some(s.b.id));
+}
+
+/// A conta ativa noutro grupo era a escolhida a cada volta: a troca recusava, e
+/// o grupo ficava preso na conta estourada.
+#[test]
+fn an_account_active_elsewhere_is_skipped() {
+    let s = dedicated_setup();
+    let other = group_of(
+        "pessoal",
+        ConfigDir::dedicated("C:/Users/exemplo/grupos/p"),
+        &[&s.a],
+    );
+    let config = config_of(&[&s.a, &s.b], &[&s.group, &other]);
+    s.adapter
+        .write_identity(&s.a.identity, &other.config_dir)
+        .unwrap();
+    let next = s.engine.next_account(&s.group, &config, &HashMap::new());
+    assert_eq!(next.map(|n| n.id), Some(s.b.id));
+}
+
+/// Um "Usar" manual numa conta ainda não medida (que não é a primeira da ordem)
+/// era desfeito na volta seguinte: a ativa sem amostra contava como estourada.
+#[test]
+fn an_unmeasured_active_account_that_is_not_first_stays() {
+    let s = dedicated_setup();
+    s.engine.activate(&s.b, &s.group, &s.config).unwrap();
+    assert!(s
+        .engine
+        .rotation_target(&s.group, &s.config, &HashMap::new())
+        .is_none());
+}
+
+/// Login que não é conta do router (o `~\.claude` de quem já usava o `claude`):
+/// a rotação não o troca sozinha; o "Usar" troca.
+#[test]
+fn a_foreign_login_is_not_rotated_away() {
+    let s = dedicated_setup();
+    s.adapter
+        .write_identity(&ident("fora@exemplo.com"), &s.group.config_dir)
+        .unwrap();
+    assert!(s
+        .engine
+        .rotation_target(&s.group, &s.config, &HashMap::new())
+        .is_none());
+    s.engine.activate(&s.a, &s.group, &s.config).unwrap();
+    assert_eq!(s.active_id(), Some(s.a.id));
+}
+
+/// Com a credencial nova e a identidade velha, o próximo espelho gravaria a
+/// credencial da conta nova na casa da que saiu.
+#[test]
+fn a_failed_identity_write_rolls_the_credential_back() {
+    let s = dedicated_setup();
+    s.engine.activate(&s.a, &s.group, &s.config).unwrap();
+    let group_location = s.adapter.credential_location(&s.group.config_dir);
+
+    s.adapter.fail_identity_writes();
+    assert!(s.engine.activate(&s.b, &s.group, &s.config).is_err());
+
+    assert_eq!(s.store.read(&group_location), Some(cred("cred-a")));
+}
+
+#[test]
+fn reset_profile_never_touches_the_default_profile() {
+    let s = dedicated_setup();
+    let default = ConfigDir::standard(HOME);
+    s.store
+        .write(
+            &cred("viva"),
+            &s.adapter.credential_location(&s.group.config_dir),
+        )
+        .unwrap();
+    s.adapter
+        .write_identity(&s.a.identity, &s.group.config_dir)
+        .unwrap();
+    s.store
+        .write(
+            &cred("do-claude-puro"),
+            &s.adapter.credential_location(&default),
+        )
+        .unwrap();
+    s.adapter.write_identity(&s.a.identity, &default).unwrap();
+
+    s.engine.reset_profile(&s.group.config_dir, s.a.provider);
+    s.engine.reset_profile(&default, s.a.provider);
+
+    assert!(!s
+        .store
+        .exists(&s.adapter.credential_location(&s.group.config_dir)));
+    assert!(s.adapter.identity(&s.group.config_dir).is_none());
+    assert_eq!(
+        s.store.read(&s.adapter.credential_location(&default)),
+        Some(cred("do-claude-puro"))
+    );
+    assert!(s.adapter.identity(&default).is_some());
 }
 
 // --- Ponta a ponta com arquivos reais do Windows ---

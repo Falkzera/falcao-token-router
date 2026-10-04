@@ -261,6 +261,23 @@ fn a_path_with_spaces_and_no_short_name_is_quoted_for_the_shell() {
     assert_eq!(ps, "& 'C:/Program Files/Falcao/router.exe' statusline");
 }
 
+/// Só o espaço era olhado: um apóstrofo ou um `&` no caminho iam crus para o
+/// shell e partiam o comando — o sensor não rodava.
+#[test]
+fn a_path_with_shell_characters_is_quoted() {
+    let bash = command(
+        r"C:\Users\D'Angelo\AppData\Local\FalcaoTokenRouter\router.exe",
+        None,
+        StatusShell::Bash,
+    );
+    assert_eq!(
+        bash,
+        r"'C:/Users/D'\''Angelo/AppData/Local/FalcaoTokenRouter/router.exe' statusline"
+    );
+    let ps = command(r"C:\Users\P&D\router.exe", None, StatusShell::PowerShell);
+    assert_eq!(ps, "& 'C:/Users/P&D/router.exe' statusline");
+}
+
 /// Defeito do macOS que o porte não copia: `settings.json` ilegível virava `{}`
 /// e perdia as chaves do usuário. Aqui é recusado e fica intacto.
 #[test]

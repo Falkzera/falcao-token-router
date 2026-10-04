@@ -157,6 +157,11 @@ impl ProviderAdapter for FakeAdapter {
         Ok(())
     }
 
+    fn clear_identity(&self, dir: &ConfigDir) -> Result<(), IdentityError> {
+        self.identities.lock().unwrap().remove(&dir.raw);
+        Ok(())
+    }
+
     fn launch_command(&self) -> (String, Vec<String>) {
         ("claude".to_string(), Vec::new())
     }

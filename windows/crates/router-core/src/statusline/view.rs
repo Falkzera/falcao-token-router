@@ -273,12 +273,13 @@ fn mix(a: [u8; 3], b: [u8; 3], k: f64) -> [u8; 3] {
     std::array::from_fn(|i| (a[i] as f64 + (b[i] as f64 - a[i] as f64) * k).round() as u8)
 }
 
-/// Cor por severidade, a mesma regra de antes da status line do router (e do
-/// macOS): ≥0,90 vermelho, ≥0,70 amarelo, senão verde.
+/// Cor por severidade, a régua do painel e da bandeja (`gauge-mark`): ≥0,90
+/// vermelho, ≥0,66 amarelo, senão verde. Até 10/2026 aqui era 0,70 (nas duas
+/// plataformas), e uma conta a 68% saía amarela na bandeja e verde no terminal.
 fn tone(fraction: f64) -> &'static str {
     if fraction >= 0.90 {
         RED
-    } else if fraction >= 0.70 {
+    } else if fraction >= 0.66 {
         YELLOW
     } else {
         GREEN
@@ -678,6 +679,8 @@ mod tests {
         };
         assert!(colored(0.95).contains("\x1b[31m█████ 95%"));
         assert!(colored(0.80).contains("\x1b[33m████░ 80%"));
+        // A régua da bandeja: 68% já é aviso.
+        assert!(colored(0.68).contains("\x1b[33m"));
         assert!(colored(0.10).contains("\x1b[32m█░░░░ 10%"));
     }
 

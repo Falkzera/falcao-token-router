@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 use super::account_model::Account;
 use super::anthropic_adapter::AnthropicAdapter;
+use super::config_dir::ConfigDir;
 use super::credential_store::CredentialStore;
 use super::group_model::{AccountGroup, RouterConfig};
 use super::provider::ProviderAdapter;
@@ -61,6 +62,15 @@ impl SessionLauncher {
         &self.engine
     }
 
+    /// O perfil padrão (`~\.claude`) desta máquina — ver
+    /// `RotationEngine::where_else_live`.
+    pub fn with_default_profile(self, dir: ConfigDir) -> Self {
+        SessionLauncher {
+            engine: self.engine.with_default_profile(dir),
+            adapter: self.adapter,
+        }
+    }
+
     /// Acha um grupo pelo nome, sem diferenciar maiúsculas nem espaços nas pontas.
     pub fn group_named<'c>(name: &str, config: &'c RouterConfig) -> Option<&'c AccountGroup> {
         let wanted = name.trim().to_lowercase();
@@ -89,11 +99,21 @@ impl SessionLauncher {
         let active = self.engine.active_account(group, config);
         let threshold = group.threshold_percent / 100.0;
 
+        // Sem ativa e ninguém com folga: a primeira que PODE servir, não a
+        // primeira da lista às cegas — sem credencial na casa, ou viva noutro
+        // perfil, ela fazia o lançamento recusar com outra conta disponível.
         let chosen = match active {
             Some(a) if usage.get(&a.id).is_some_and(|u| *u < threshold) => a,
             _ => match self.engine.next_account(group, config, usage) {
                 Some(next) => next,
-                None => active.unwrap_or(first),
+                None => match active {
+                    Some(a) => a,
+                    None => accounts
+                        .iter()
+                        .copied()
+                        .find(|a| self.engine.can_serve(a, group, config))
+                        .unwrap_or(first),
+                },
             },
         };
 

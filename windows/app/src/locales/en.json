@@ -29,6 +29,7 @@
   "groups.empty.detail": "Create a group — say work and personal — and add the Claude accounts that should take turns inside it.",
   "groups.empty.title": "No groups yet",
   "groups.error.activate.busyElsewhere.format": "This account is already active in group %@ — one account serves one group at a time.",
+  "groups.error.activate.liveInDefaultProfile": "This account is the one plain claude uses in ~\\.claude, and no group uses that profile — activating it here would put its login in two places.",
   "groups.error.activate.noCredential": "This account has no login on this computer — use Log in again.",
   "groups.error.activate.writeFailed.format": "Couldn't switch accounts: %@",
   "groups.error.dismiss": "Dismiss",

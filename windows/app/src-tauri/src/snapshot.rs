@@ -165,6 +165,7 @@ pub enum ErrorView {
     SaveFailed { detail: String },
     ActivateNoCredential,
     ActivateBusyElsewhere { group: String },
+    ActivateLiveInDefaultProfile,
     ActivateWriteFailed { detail: String },
     RouterPathUnknown,
     IntegrationFailed { detail: String },
@@ -240,6 +241,9 @@ fn error_view(error: &StoreError, store: &RouterConfigStore) -> ErrorView {
                     .map(|g| g.name.clone())
                     .unwrap_or_default(),
             }
+        }
+        StoreError::ActivateFailed(RotationError::AccountLiveInDefaultProfile { .. }) => {
+            ErrorView::ActivateLiveInDefaultProfile
         }
         StoreError::ActivateFailed(RotationError::WriteFailed(detail)) => {
             ErrorView::ActivateWriteFailed {
