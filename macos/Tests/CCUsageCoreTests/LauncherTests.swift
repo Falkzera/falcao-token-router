@@ -53,6 +53,31 @@ struct SessionLauncherTests {
         #expect(plan.executable == "claude")
     }
 
+    /// Sem ativa e sem ninguém abaixo do limiar, o lançamento pegava a primeira
+    /// da lista às cegas — e, se ela não tinha credencial, recusava subir mesmo
+    /// com outra conta capaz de servir.
+    @Test("sem ativa e todas cheias, sobe na primeira que pode servir")
+    func coldStartSkipsAnAccountThatCannotServe() throws {
+        let kc = FakeKeychain()
+        let adapter = FakeAdapter()
+        func conta(_ email: String) -> Account {
+            Account(provider: .anthropic,
+                    identity: AccountIdentity(email: email, organizationName: "Acme",
+                                              rateLimitTier: nil, raw: ["emailAddress": .string(email)]),
+                    home: .dedicated("/tmp/casas/\(email)"))
+        }
+        let a = conta("conta1@exemplo.com"), b = conta("conta2@exemplo.com")
+        try kc.write("cb", service: adapter.keychainService(forConfigDir: b.home))  // só b tem login
+        let group = AccountGroup(name: "Trabalho", accountIDs: [a.id, b.id],
+                                 configDir: .dedicated("/tmp/grupos/t"), thresholdPercent: 90)
+        let config = RouterConfig(accounts: [a, b], groups: [group])
+        let launcher = SessionLauncher(keychain: kc, adapters: [adapter])
+
+        let plan = try launcher.prepare(group: group, config: config,
+                                        usage: [a.id: 0.95, b.id: 0.95], arguments: [])
+        #expect(plan.account.id == b.id)
+    }
+
     @Test("mantém a conta ativa enquanto ela tem folga")
     func keepsActiveWithHeadroom() throws {
         let (launcher, config, group, a, _) = fixture()
