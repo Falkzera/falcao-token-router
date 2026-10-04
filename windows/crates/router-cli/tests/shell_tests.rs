@@ -131,6 +131,46 @@ fn the_bash_function_routes_groups_and_chains_the_previous_claude() {
     );
 }
 
+/// Um `alias claude` no `.bashrc` (o instalador antigo do Claude Code deixava
+/// um) era expandido até na definição `claude() {` — erro de sintaxe, função
+/// inexistente —, e `claude <grupo>` abria o `claude` puro, na conta errada. O
+/// script guarda e desfaz o alias, e o `claude` sem grupo passa por ele.
+#[test]
+fn a_bash_alias_named_claude_is_chained_not_fatal() {
+    let Some(bash) = find_git_bash(&GitBashEnv::from_process()) else {
+        eprintln!("sem Git Bash nesta máquina: teste pulado");
+        return;
+    };
+    let w = world(1);
+    let (_, sh) = write_scripts(&w);
+    let sh = sh.to_string_lossy().replace('\\', "/");
+    let test = w.sandbox.cwd.join("teste.sh");
+    // Script não interativo: o alias só é expandido com `expand_aliases`, como
+    // num `.bashrc` lido pelo Git Bash interativo.
+    fs::write(
+        &test,
+        format!(
+            "shopt -s expand_aliases\n\
+             alias claude='claude --extra'\n\
+             . '{sh}'\n\
+             claude oi\n"
+        ),
+    )
+    .unwrap();
+
+    let out = w
+        .sandbox
+        .command(&bash)
+        .arg(test.to_string_lossy().replace('\\', "/"))
+        .output()
+        .unwrap();
+
+    let text = stderr(&out);
+    assert!(out.status.success(), "{}\n{text}", stdout(&out));
+    assert!(!text.contains("syntax error"), "{text}");
+    assert_eq!(args_of_single_run(&w), serde_json::json!(["--extra", "oi"]));
+}
+
 /// O `router.exe` sumiu (app desinstalado ou movido): a função avisa ALTO e o
 /// `claude` segue para a função anterior — em vez de cair em silêncio no
 /// `claude` puro, na conta errada, como no macOS.
