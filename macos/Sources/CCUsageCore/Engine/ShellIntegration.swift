@@ -43,7 +43,10 @@ public enum ShellIntegration {
                                          writeFile: (Data, URL) throws -> Void = {
                                              try $0.write(to: $1, options: .atomic)
                                          }) throws {
-        let url = settingsURL(in: configDir)
+        // Resolve o link antes: quem versiona o `~/.claude/settings.json` em
+        // dotfiles o tem como symlink, e a escrita atômica trocaria o link por
+        // um arquivo comum — o repositório de dotfiles deixava de receber.
+        let url = settingsURL(in: configDir).resolvingSymlinksInPath()
         var root = (readFile(url).flatMap {
             try? JSONSerialization.jsonObject(with: $0) as? [String: Any]
         }) ?? [:]

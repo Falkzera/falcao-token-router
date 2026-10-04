@@ -14,13 +14,17 @@ private func gauge(_ percent: Double,
 }
 
 private func snapshot(_ session: UsageSnapshot.Gauge,
-                      weekly: UsageSnapshot.Gauge? = nil) -> UsageSnapshot {
+                      weekly: UsageSnapshot.Gauge? = nil,
+                      at now: Date = noon) -> UsageSnapshot {
     UsageSnapshot(session: session, weekly: weekly, scopedWeekly: [],
                   weeklyPace: Pace(tokens: 0, typical: 0),
                   today: .zero, week: .zero, month: .zero,
-                  burnRatePerMinute: nil, unknownModels: [], generatedAt: noon,
+                  burnRatePerMinute: nil, unknownModels: [], generatedAt: now,
                   calibratedBlockCeiling: 1, sourceStatus: .live(at: noon))
 }
+
+/// Um instante depois do reset da janela A: é quando a B de fato começa.
+private let afterResetA = resetA.addingTimeInterval(60)
 
 /// Atalho: tudo ligado, ao vivo ligado — o cenário em que a política de fato
 /// trabalha. Os casos de desligado são explícitos nos testes que os exercitam.
@@ -100,7 +104,7 @@ private func evaluate(_ policy: inout AlertPolicy, _ s: UsageSnapshot,
     var policy = AlertPolicy()
     _ = evaluate(&policy, snapshot(gauge(70, resetsAt: resetA)))
     _ = evaluate(&policy, snapshot(gauge(81, resetsAt: resetA)))
-    let alerts = evaluate(&policy, snapshot(gauge(1, resetsAt: resetB)))
+    let alerts = evaluate(&policy, snapshot(gauge(1, resetsAt: resetB), at: afterResetA))
     #expect(alerts == [.windowReset(window: .session)])
 }
 
@@ -110,8 +114,18 @@ private func evaluate(_ policy: inout AlertPolicy, _ s: UsageSnapshot,
 @Test func resetAlertsEvenWhenNoThresholdEverFired() {
     var policy = AlertPolicy()
     _ = evaluate(&policy, snapshot(gauge(10, resetsAt: resetA)))
-    #expect(evaluate(&policy, snapshot(gauge(1, resetsAt: resetB)))
+    #expect(evaluate(&policy, snapshot(gauge(1, resetsAt: resetB), at: afterResetA))
             == [.windowReset(window: .session)])
+}
+
+/// O grupo padrão rodou de conta: o `resetsAt` muda, mas a janela anterior não
+/// terminou. Era lido como reset, e o aviso "capacidade cheia de novo" saía com
+/// a conta nova a 60%.
+@Test("troca de conta antes do reset não é reset")
+func anAccountSwitchIsNotAReset() {
+    var policy = AlertPolicy()
+    _ = evaluate(&policy, snapshot(gauge(85, resetsAt: resetA)))
+    #expect(evaluate(&policy, snapshot(gauge(60, resetsAt: resetB))).isEmpty)
 }
 
 @Test func resetIsSilentWhenResetAlertsAreOff() {
@@ -119,7 +133,7 @@ private func evaluate(_ policy: inout AlertPolicy, _ s: UsageSnapshot,
     preferences.resetEnabled = false
     var policy = AlertPolicy()
     _ = evaluate(&policy, snapshot(gauge(10, resetsAt: resetA)), preferences)
-    #expect(evaluate(&policy, snapshot(gauge(1, resetsAt: resetB)), preferences).isEmpty)
+    #expect(evaluate(&policy, snapshot(gauge(1, resetsAt: resetB), at: afterResetA), preferences).isEmpty)
 }
 
 @Test func resetsStillAlertWhileThresholdAlertsAreOff() {
@@ -127,7 +141,7 @@ private func evaluate(_ policy: inout AlertPolicy, _ s: UsageSnapshot,
     preferences.thresholdsEnabled = false
     var policy = AlertPolicy()
     _ = evaluate(&policy, snapshot(gauge(90, resetsAt: resetA)), preferences)
-    #expect(evaluate(&policy, snapshot(gauge(1, resetsAt: resetB)), preferences)
+    #expect(evaluate(&policy, snapshot(gauge(1, resetsAt: resetB), at: afterResetA), preferences)
             == [.windowReset(window: .session)])
 }
 

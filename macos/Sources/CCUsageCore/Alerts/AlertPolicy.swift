@@ -45,7 +45,8 @@ public struct AlertPolicy {
             .flatMap { window in
                 evaluate(window: window,
                          gauge: gauge(for: window, in: snapshot),
-                         preferences: preferences)
+                         preferences: preferences,
+                         now: snapshot.generatedAt)
             }
     }
 
@@ -59,7 +60,8 @@ public struct AlertPolicy {
 
     private mutating func evaluate(window: Alert.Window,
                                    gauge: UsageSnapshot.Gauge?,
-                                   preferences: AlertPreferences) -> [Alert] {
+                                   preferences: AlertPreferences,
+                                   now: Date) -> [Alert] {
         // A procedência é verificada **no medidor**, não no status do snapshot:
         // um snapshot `.live` pode conter medidor derivado, quando o payload
         // veio sem a janela de 5h. Checar o status deixaria passar alerta sobre
@@ -71,7 +73,7 @@ public struct AlertPolicy {
         let percent = gauge.fraction * 100
         guard var state = states[window], state.resetsAt == resetsAt else {
             return openWindow(window, resetsAt: resetsAt, at: percent,
-                              preferences: preferences)
+                              preferences: preferences, now: now)
         }
 
         // Cruzou agora é passar de baixo para cima entre duas avaliações. Estar
@@ -103,8 +105,13 @@ public struct AlertPolicy {
     private mutating func openWindow(_ window: Alert.Window,
                                      resetsAt: Date,
                                      at percent: Double,
-                                     preferences: AlertPreferences) -> [Alert] {
-        let hadPreviousWindow = states[window] != nil
+                                     preferences: AlertPreferences,
+                                     now: Date) -> [Alert] {
+        // Só é reset se o reset da janela anterior já passou. O `resetsAt` muda
+        // também quando a conta muda — o grupo padrão rodou de A para B — e aí
+        // o aviso "capacidade cheia de novo" saía com B a 60%. Mudou antes da
+        // hora: é outra conta, refaz a linha de base calado.
+        let previousWindowEnded = states[window].map { $0.resetsAt <= now } ?? false
         states[window] = WindowState(
             resetsAt: resetsAt,
             firedThresholds: Set(preferences.thresholds.filter { percent >= Double($0) }),
@@ -114,7 +121,7 @@ public struct AlertPolicy {
         // trabalho pesado. Naturalmente contido: parando de usar o Claude Code,
         // o medidor cai para derivado e a checagem de procedência acima já
         // barra, então o aviso acontece em dia de trabalho.
-        guard preferences.resetEnabled, hadPreviousWindow else { return [] }
+        guard preferences.resetEnabled, previousWindowEnded else { return [] }
         return [.windowReset(window: window)]
     }
 }

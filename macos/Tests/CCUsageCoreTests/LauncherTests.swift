@@ -138,6 +138,30 @@ struct ShellIntegrationTests {
             in: .dedicated("/tmp/g"), readFile: { _ in novo }))
     }
 
+    /// Quem versiona o `~/.claude/settings.json` em dotfiles o tem como link; a
+    /// escrita atômica trocava o link por um arquivo comum.
+    @Test("instalar a status line num settings.json que é link escreve no destino")
+    func statusLineFollowsASymlinkedSettings() throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appending(path: "dot-\(UUID().uuidString)")
+        defer { try? fm.removeItem(at: root) }
+        let profile = root.appending(path: "perfil")
+        let dotfiles = root.appending(path: "dotfiles")
+        try fm.createDirectory(at: profile, withIntermediateDirectories: true)
+        try fm.createDirectory(at: dotfiles, withIntermediateDirectories: true)
+        let target = dotfiles.appending(path: "settings.json")
+        try Data(#"{"model":"opus"}"#.utf8).write(to: target)
+        let link = ShellIntegration.settingsURL(in: .dedicated(profile.path))
+        try fm.createSymbolicLink(at: link, withDestinationURL: target)
+
+        try ShellIntegration.installStatusLine(routerPath: "/x/router", into: .dedicated(profile.path))
+
+        #expect(try fm.destinationOfSymbolicLink(atPath: link.path) == target.path)
+        let written = try String(contentsOf: target, encoding: .utf8)
+        #expect(written.contains("statusline"))
+        #expect(written.contains("opus"))
+    }
+
     /// Perfil sem `settings.json` nenhum conta como obsoleto: o sensor não está
     /// plantado ali, que é o mesmo resultado prático de apontar para o lugar
     /// errado — a conta fica sem medição e o rodízio decide às cegas.

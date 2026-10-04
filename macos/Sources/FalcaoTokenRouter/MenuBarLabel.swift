@@ -28,17 +28,22 @@ struct MenuBarLabel: View {
         return nil
     }
 
+    /// O número da barra. Com grupos, é o da conta que a barra nomeia — e
+    /// conta sem amostra ainda não tem número: "—", anel vazio. Até 10/2026 o
+    /// vazio caía no medidor do `~/.claude` (o JSONL de outro perfil), e a barra
+    /// colava esse % ao lado do nome da conta ativa.
     private var fraction: Double? {
-        headline?.fraction ?? snapshot.session.fraction
+        if let headline { return headline.fraction }
+        return snapshot.session.fraction
     }
 
     private var tint: Color { UsageColor.menuBar(fraction) }
 
     var body: some View {
         HStack(spacing: 4) {
-            Image(nsImage: GaugeMark.menuBarImage(fraction: fraction ?? snapshot.session.fraction))
+            Image(nsImage: GaugeMark.menuBarImage(fraction: fraction ?? 0))
                 .renderingMode(.template)
-            Text(Format.percent(fraction ?? snapshot.session.fraction))
+            Text(verbatim: fraction.map(Format.percent) ?? "—")
                 .monospacedDigit()
             if let name = headline?.name {
                 Text(verbatim: name)

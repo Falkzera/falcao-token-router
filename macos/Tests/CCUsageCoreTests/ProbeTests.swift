@@ -308,3 +308,40 @@ struct UsageOriginTests {
         #expect(uso.origin == .probe)
     }
 }
+
+
+/// Até 10/2026 qualquer código de saída diferente de zero virava "sem login", e
+/// o `router measure` mandava relogar uma conta sã que só estava sem rede.
+@Suite("Sonda — o desfecho do processo")
+struct ProbeOutcomeTests {
+    @Test("código zero devolve a saída")
+    func zeroIsSuccess() throws {
+        #expect(try ClaudeUsageProbe.outcome(status: 0, signaled: false, output: "ok") == "ok")
+    }
+
+    @Test("código diferente de zero que fala de login é \"sem login\"")
+    func loginTextIsNotSignedIn() {
+        #expect(throws: ClaudeUsageProbe.ProbeError.notSignedIn) {
+            _ = try ClaudeUsageProbe.outcome(status: 1, signaled: false,
+                                             output: "Invalid API key · Please run /login")
+        }
+    }
+
+    @Test("código diferente de zero sem falar de login é falha, não \"sem login\"")
+    func otherFailuresAreNotLogin() {
+        #expect(throws: ClaudeUsageProbe.ProbeError.failed(status: 1)) {
+            _ = try ClaudeUsageProbe.outcome(status: 1, signaled: false,
+                                             output: "API Error: Connection error.")
+        }
+    }
+
+    @Test("TERM é o prazo; outro sinal é crash")
+    func signals() {
+        #expect(throws: ClaudeUsageProbe.ProbeError.timedOut) {
+            _ = try ClaudeUsageProbe.outcome(status: SIGTERM, signaled: true, output: "")
+        }
+        #expect(throws: ClaudeUsageProbe.ProbeError.failed(status: SIGSEGV)) {
+            _ = try ClaudeUsageProbe.outcome(status: SIGSEGV, signaled: true, output: "")
+        }
+    }
+}
