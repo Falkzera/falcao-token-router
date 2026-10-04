@@ -46,6 +46,19 @@ struct LoginSheet: View {
         .onChange(of: session?.phase) { _, phase in
             if phase == .success { Task { await finish() } }
         }
+        // Fechar a folha por qualquer caminho (Esc, o X) também descarta.
+        .onDisappear { discardUnfinishedHome() }
+    }
+
+    /// A casa que este login reservou e que não virou conta: o `claude auth
+    /// login` já gravou uma credencial ali, e sem isto ela ficava viva no
+    /// chaveiro para sempre. Relogin reusa a casa de uma conta que existe —
+    /// essa nunca é descartada.
+    private func discardUnfinishedHome() {
+        guard !pending.isRelogin, let session else { return }
+        if case .added = result { return }
+        session.cancel()
+        store.discardPendingHome(session.home, accountID: session.accountID)
     }
 
     private var waitingView: some View {
@@ -97,7 +110,7 @@ struct LoginSheet: View {
                     .multilineTextAlignment(.center)
             }
 
-            Button("groups.cancel") { session?.cancel(); dismiss() }
+            Button("groups.cancel") { discardUnfinishedHome(); dismiss() }
         }
     }
 
@@ -156,9 +169,12 @@ struct LoginSheet: View {
             }
             .controlSize(.small)
             HStack {
-                Button("groups.login.close") { dismiss() }
+                Button("groups.login.close") { discardUnfinishedHome(); dismiss() }
                 Button("groups.login.duplicate.retry") {
-                    // Recomeça o login numa casa nova, mantendo o mesmo grupo.
+                    // Recomeça o login numa casa nova, mantendo o mesmo grupo —
+                    // e a casa da duplicada, com a credencial que o login gravou,
+                    // sai antes.
+                    discardUnfinishedHome()
                     let fresh = store.newAccountHome()
                     let s = LoginSession(home: fresh.home, accountID: fresh.accountID,
                                          groupID: pending.groupID)
@@ -176,7 +192,7 @@ struct LoginSheet: View {
             Text("groups.login.failed").font(.headline)
             Text(verbatim: message).font(.caption).foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-            Button("groups.login.close") { dismiss() }
+            Button("groups.login.close") { discardUnfinishedHome(); dismiss() }
         }
     }
 

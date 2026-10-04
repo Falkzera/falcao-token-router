@@ -135,7 +135,9 @@ final class LoginSession {
     func cancel() {
         process?.terminationHandler = nil
         master?.readabilityHandler = nil
-        process?.terminate()
+        // `terminate()` num Process que nunca rodou levanta exceção — e o
+        // cancelamento agora também roda ao fechar a folha, em qualquer fase.
+        if process?.isRunning == true { process?.terminate() }
         cleanup()
     }
 
