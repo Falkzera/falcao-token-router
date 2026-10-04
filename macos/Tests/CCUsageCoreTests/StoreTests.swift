@@ -90,6 +90,109 @@ struct RouterConfigStoreTests {
                 == "cred-\(c.identity.email)")
     }
 
+    /// O `claude auth login` grava a credencial na casa antes de alguém saber de
+    /// quem ela é. Um login cancelado, falho ou duplicado deixava esse refresh
+    /// token vivo no chaveiro para sempre.
+    @Test("descartar a casa de um login que não virou conta apaga a credencial e a pasta")
+    func discardingAPendingHomeRemovesItsCredential() throws {
+        let (store, kc, adapter, _) = makeStore()
+        _ = store.addGroup(name: "trabalho")
+        let begun = store.newAccountHome()
+        seedLogin("conta1@exemplo.com", home: begun.home, kc: kc, adapter: adapter)
+        let service = adapter.keychainService(forConfigDir: begun.home)
+        #expect(kc.exists(service: service))
+
+        store.discardPendingHome(begun.home, accountID: begun.accountID)
+
+        #expect(!kc.exists(service: service))
+        #expect(!FileManager.default.fileExists(atPath: begun.home.url.path))
+    }
+
+    @Test("a casa de uma conta do registro nunca é descartada como pendente")
+    func aRegisteredHomeIsNeverDiscarded() throws {
+        let (store, kc, adapter, _) = makeStore()
+        let group = store.addGroup(name: "trabalho")
+        let account = try addAccount("conta1@exemplo.com", to: group, store: store, kc: kc, adapter: adapter)
+
+        store.discardPendingHome(account.home, accountID: account.id)
+
+        #expect(kc.exists(service: adapter.keychainService(forConfigDir: account.home)))
+    }
+
+    /// O app fechado no meio de um login deixava a casa — com a credencial — para
+    /// trás. A varredura da subida as acha pelo registro.
+    @Test("a varredura da subida apaga as casas que nenhuma conta cita")
+    func orphanHomesAreSweptAtLaunch() throws {
+        let (store, kc, adapter, paths) = makeStore()
+        let group = store.addGroup(name: "trabalho")  // grava o config.json
+        let kept = try addAccount("conta1@exemplo.com", to: group, store: store, kc: kc, adapter: adapter)
+        let orphan = store.newAccountHome()
+        seedLogin("conta2@exemplo.com", home: orphan.home, kc: kc, adapter: adapter)
+
+        // A subida seguinte, com o mesmo disco.
+        let restarted = RouterConfigStore(paths: paths, keychain: kc, adapters: [adapter])
+        restarted.discardOrphanHomes()
+
+        #expect(!kc.exists(service: adapter.keychainService(forConfigDir: orphan.home)))
+        #expect(kc.exists(service: adapter.keychainService(forConfigDir: kept.home)))
+    }
+
+    /// Com o registro vazio por falha de leitura, TODA casa pareceria órfã. A
+    /// varredura não roda sem um `config.json` lido inteiro.
+    @Test("sem config.json lido, a varredura não apaga nada")
+    func noSweepWithoutAReadableConfig() throws {
+        let (store, kc, adapter, paths) = makeStore()
+        let group = store.addGroup(name: "trabalho")
+        let account = try addAccount("conta1@exemplo.com", to: group, store: store, kc: kc, adapter: adapter)
+        try Data("{ isto não é json".utf8).write(to: paths.configFile)
+
+        let restarted = RouterConfigStore(paths: paths, keychain: kc, adapters: [adapter])
+        restarted.discardOrphanHomes()
+
+        #expect(kc.exists(service: adapter.keychainService(forConfigDir: account.home)))
+    }
+
+    /// Um `config.json` ilegível virava registro vazio, sem aviso, e o primeiro
+    /// `save` gravava por cima: grupos e contas sumiam, com casas e itens de
+    /// chaveiro órfãos.
+    @Test("config.json ilegível vai para o lado, com aviso, e não é sobrescrito")
+    func anUnreadableConfigIsSetAsideNotOverwritten() throws {
+        let (_, kc, adapter, paths) = makeStore()
+        try FileManager.default.createDirectory(at: paths.base, withIntermediateDirectories: true)
+        let garbage = Data("{ \"groups\": [ isto não é json".utf8)
+        try garbage.write(to: paths.configFile)
+
+        let store = RouterConfigStore(paths: paths, keychain: kc, adapters: [adapter])
+        #expect(store.config.groups.isEmpty)
+        #expect(store.lastError != nil)
+        _ = store.addGroup(name: "novo")  // grava um config.json novo
+
+        let aside = try FileManager.default.contentsOfDirectory(atPath: paths.base.path)
+            .filter { $0.hasPrefix("config.unreadable-") }
+        #expect(aside.count == 1)
+        #expect(try Data(contentsOf: paths.base.appending(path: aside[0])) == garbage)
+    }
+
+    /// Sem o grupo, ninguém mais sobrescreve o item dele — e o item guardava o
+    /// refresh token vivo da última conta ativa, para sempre.
+    @Test("apagar um grupo dedicado leva o item de chaveiro e a pasta dele")
+    func removingADedicatedGroupTakesItsCredentialAlong() throws {
+        let (store, kc, adapter, _) = makeStore()
+        _ = store.addGroup(name: "pessoal")            // padrão
+        let work = store.addGroup(name: "trabalho")    // dedicado
+        let a = try addAccount("conta1@exemplo.com", to: work, store: store, kc: kc, adapter: adapter)
+        store.activate(a, in: store.config.groups[1])
+        let groupService = adapter.keychainService(forConfigDir: work.configDir)
+        #expect(kc.exists(service: groupService))
+        try FileManager.default.createDirectory(at: work.configDir.url,
+                                                withIntermediateDirectories: true)
+
+        store.removeGroup(work.id)
+
+        #expect(!kc.exists(service: groupService))
+        #expect(!FileManager.default.fileExists(atPath: work.configDir.url.path))
+    }
+
     @Test("o primeiro grupo é o padrão; o segundo é dedicado")
     func firstGroupIsDefault() {
         let (store, _, _, _) = makeStore()
