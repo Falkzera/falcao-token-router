@@ -259,6 +259,15 @@ function global:claude {{
 # Gerado pelo app; não edite à mão (ele regrava este arquivo quando muda de lugar).
 # Sem `exec`: a sessão roda como filha do shell, que continua aberto quando ela acaba.
 
+# Um alias `claude` venceria a função: o bash expande alias antes de procurar
+# função — e até na definição `claude() {{`, que vira erro de sintaxe e deixa a
+# função sem existir (o instalador antigo do Claude Code deixava um). Guarda e
+# desfaz; o `claude` sem grupo continua passando por ele.
+if [ -n "${{BASH_ALIASES[claude]+x}}" ]; then
+  __falcao_claude_alias="${{BASH_ALIASES[claude]}}"
+  unalias claude
+fi
+
 # Uma função `claude` que já existia continua valendo para o `claude` sem grupo.
 # Só com o próprio bash (sem grep/sed, que podem faltar no PATH).
 __falcao_def="$(declare -f claude 2>/dev/null)"
@@ -279,6 +288,11 @@ claude() {{
   fi
   if declare -F falcao_claude_anterior >/dev/null 2>&1; then
     falcao_claude_anterior "$@"
+  elif [ -n "${{__falcao_claude_alias-}}" ]; then
+    case "$__falcao_claude_alias" in
+      claude|claude[[:space:]]*) eval "command $__falcao_claude_alias \"\$@\"" ;;
+      *) eval "$__falcao_claude_alias \"\$@\"" ;;
+    esac
   else
     command claude "$@"
   fi
