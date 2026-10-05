@@ -14,26 +14,26 @@ reason worth arguing with. Arguing is welcome; that's what issues are for.
 Two platforms, two toolchains, no shared build. Pick the one you are changing —
 you do not need the other installed.
 
-**macOS** needs **macOS 26+** and **Swift 6.4+**. Command Line Tools is enough;
+**macOS** needs **macOS 26+** and **Swift 6.3+**. Command Line Tools is enough;
 Xcode is not required, and the project is deliberately built so it never becomes
 required.
 
 ```bash
 git clone https://github.com/Falkzera/falcao-token-router.git
 cd falcao-token-router/macos
-./Scripts/test.sh                       # should end with "262 tests ... passed"
+./Scripts/test.sh                       # should end with "Test run with … tests … passed"
 ./Scripts/bundle.sh --native --install  # builds and copies to /Applications
 ```
 
 An app you built yourself never carries the quarantine flag, so Gatekeeper stays
 out of your way while developing.
 
-**Windows** needs the Rust toolchain pinned in `windows/rust-toolchain.toml` and
-Node 24.
+**Windows** needs the stable Rust toolchain named in `windows/rust-toolchain.toml`
+(rustup installs it, with the MSVC target) and Node 22.12+ — CI uses 24.
 
 ```powershell
 cd falcao-token-router\windows
-.\scripts\test.ps1    # fmt, clippy -D warnings, 392 tests, svelte-check, strings
+.\scripts\test.ps1    # fmt, clippy -D warnings, the tests, svelte-check, strings
 .\scripts\build.ps1   # the NSIS installer, then checks what came out
 ```
 
@@ -109,14 +109,15 @@ except through a pull request with green CI.
 
    | Prefix | For |
    |---|---|
-   | `feature/` | something the app doesn't do yet |
+   | `feat/` | something the app doesn't do yet |
    | `fix/` | something it does wrong |
    | `docs/` | documentation only |
    | `refactor/` | no behaviour change |
-   | `chore/` | build, CI, dependencies |
+   | `ci/` | workflows and release automation |
+   | `chore/` | build, dependencies |
    | `port/` | a new platform (see [Porting](#porting-to-other-platforms)) |
 
-   `feature/dock-icon`, `fix/zshrc-append`, `port/linux-tray`.
+   `feat/dock-icon`, `fix/zshrc-append`, `port/linux-tray`.
 
 3. **Commit with [Conventional Commits](https://www.conventionalcommits.org/):**
    `feat:`, `fix:`, `docs:`, `refactor:`, `chore:`, `test:`, `ci:`. A scope in
@@ -133,9 +134,10 @@ except through a pull request with green CI.
 5. **CI has to be green.** The `test` check (string catalogs, the Swift suite, a
    release build on `macos-26`) is required on every PR, whichever platform you
    touched — a path filter there would leave a Windows-only PR pending forever.
-   The Windows workflow runs on changes under `windows/`. Locally that is
-   `cd macos && ./Scripts/test.sh && swift build -c release`, or
-   `cd windows && .\scripts\test.ps1`.
+   The Windows workflow runs on changes under `windows/`; it isn't a required
+   check yet, so a red Windows run won't grey out the merge button — treat it as
+   if it did. Locally that is `cd macos && ./Scripts/test.sh && swift build -c
+   release`, or `cd windows && .\scripts\test.ps1`.
 
 6. **Squash merge.** Your commits become one on `main`, with the PR title as the
    subject — so make the title a good Conventional Commit line.
@@ -160,10 +162,15 @@ translated (an account name, a number). Keys are namespaced: `panel.`, `settings
 to the script. **English is the base**: it's what most people can read, so it's
 the fallback.
 
+On Windows the same job is `windows/app/scripts/check-strings.mjs`, run by
+`test.ps1` against `windows/app/src/locales/{en,pt-BR}.json` — missing keys,
+orphans, placeholders that differ between the two, and loose text in the markup.
+`cargo fmt --check` and `clippy -D warnings` run in the same script.
+
 ### Missing tests
 
-Logic changes in `CCUsageCore` come with tests. Most of this codebase was written
-test-first and that's the expectation for the core — not ceremony, just that
+Logic changes in the engine (`CCUsageCore`, `router-core`) come with tests. Most
+of this codebase was written test-first and that's the expectation for the core — not ceremony, just that
 behaviour worth having is behaviour worth pinning down. Every real bug caught in
 use became a regression test that names the episode; that's a good habit to
 continue.
@@ -191,8 +198,9 @@ the login flow is long because it is four things, and there the split is the who
 point. Look at which one you have before you reach for a knife.
 
 The rest of SOLID is not enforced here. Dependency inversion already holds where
-it matters — the engine talks to `CredentialStore` and `ProviderAdapter`, never to
-the disk, which is what lets the suite run without a keychain. Open/closed,
+it matters — the engine talks to `KeychainStore` (macOS) or `CredentialStore`
+(Windows) and to `ProviderAdapter`, never to the credential directly, which is what
+lets the suite run without a keychain. Open/closed,
 substitution and interface segregation are not chased: on a codebase this size,
 chasing them produces the speculative abstraction that costs more than it saves.
 An interface with one implementation is worth having when the second
@@ -245,8 +253,8 @@ design:
   source (sensor or probe), how old. A proposal that simplifies the display by
   dropping provenance is the wrong trade for this app.
 
-If a change touches any of these, say so in the PR and add the `privacy` label.
-That's not a hurdle — it's the part a reviewer most wants to read.
+If a change touches any of these, say so in the PR — a maintainer adds the
+`privacy` label. That's not a hurdle — it's the part a reviewer most wants to read.
 
 ## Issues
 
@@ -257,11 +265,15 @@ Labels `good first issue` and `help wanted` mark things a newcomer can pick up;
 For bugs, the single most useful thing you can paste is the output of:
 
 ```bash
-'/Applications/FalcaoTokenRouter.app/Contents/MacOS/router' doctor
+'/Applications/FalcaoTokenRouter.app/Contents/MacOS/router' doctor   # macOS
 ```
 
-It names the problem in most of the failure modes this app has, and it prints no
-secrets — but **do redact account e-mails** before pasting; they're yours, and
+```powershell
+& "$env:LOCALAPPDATA\FalcaoTokenRouter\router.exe" doctor            # Windows
+```
+
+It names the problem in most of the failure modes this app has (in Portuguese),
+and it prints no secrets — but **do redact account e-mails** before pasting; they're yours, and
 they don't need to be public. Also say which group you were in, whether the
 number came from the sensor or a probe (the panel says), and how you installed.
 
@@ -271,25 +283,29 @@ moment where the app left them guessing.
 
 ## Porting to other platforms
 
-This is a macOS app today, and the maintainer works on macOS. **Ports are
-welcome**, and the codebase was split so that one is feasible: everything
-platform-specific sits behind a small number of seams, and the file formats the
-app reads and writes are the same everywhere Claude Code runs.
+Two platforms ship today, macOS and Windows, and **a third is welcome**.
+Everything system-specific sits behind a small number of seams, and the file
+formats the app reads and writes are the same everywhere Claude Code runs.
 
-`docs/PORTING.md` maps each macOS-specific piece to what a Linux or Windows port
-needs to replace, and what it can keep. Open a **port** issue first so the work
-is visible and nobody duplicates it; use a `port/` branch; and expect the review
-to be about the invariants above, not about the platform — they hold everywhere.
+`docs/PORTING.md` maps each system-specific piece to what a new port needs to
+replace, and what it can keep. The Windows port is the worked example:
+`windows/docs/PLATFORM.md` records every Windows fact it relies on and how each
+was verified. Open a **port** issue first so the work is visible and nobody
+duplicates it; use a `port/` branch; and expect the review to be about the
+invariants above, not about the platform — they hold everywhere.
 
-Two honest caveats. The maintainer can't test on your platform, so a port lives
+Two honest caveats. The maintainers can't test on your platform, so a port lives
 or dies on its own tests. And the credential mechanism was discovered by
-observing Claude Code on macOS; on another platform, verify every assumption in
-`docs/ARCHITECTURE.md` against your own install before building on it.
+observing Claude Code on macOS and Windows; on another platform, verify every
+assumption in `docs/ARCHITECTURE.md` against your own install before building on
+it — the Windows port found that a credential swap only lands when the file's
+modification time changes.
 
 ## Language
 
-Code comments in this repo are in **Portuguese**, by choice — it's the
-maintainer's language, and `CCUsageCore` is mostly comments explaining decisions.
+Code comments and `agent.md` files in this repo are in **Portuguese**, by choice —
+it's the maintainers' language, and both engines are mostly comments explaining
+decisions.
 Everything facing the outside world — README, `docs/`, UI strings, release notes,
 this file — is in **English**, because it's what the most people can read.
 
@@ -301,11 +317,11 @@ contribution.
 ## Security
 
 If you find something with security or privacy impact, please don't open a public
-issue. Use GitHub's **Report a vulnerability** button under the Security tab.
+issue. Use GitHub's **Report a vulnerability** button under the Security tab —
+[`SECURITY.md`](SECURITY.md) says what counts and what to include.
 
 ## License
 
 By contributing, you agree your contributions are licensed under the
-[MIT License](LICENSE) that covers the project. The project is a fork of
-[ClaudeTokenCounter](https://github.com/Ulpio/ClaudeTokenCounter) (MIT), whose
+[MIT License](LICENSE) that covers the project. The project is a fork of ClaudeTokenCounter by Ulpio Netto (MIT), whose
 attribution is preserved in `LICENSE`.

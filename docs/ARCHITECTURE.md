@@ -6,8 +6,10 @@ then the `agent.md` of wherever you're about to touch.
 Almost everything below was discovered by observing Claude Code, not by reading
 documentation — none of it is documented by Anthropic. Where a fact was verified
 against a real install, the code comment says when. Treat every one of them as
-"true on macOS, as of the version noted", and verify before building on it
-elsewhere.
+"true on the system and Claude Code version noted", and verify before building on
+it elsewhere. This map describes the macOS app; the Windows app follows the same
+design, and every Windows fact it relies on is in
+[`windows/docs/PLATFORM.md`](../windows/docs/PLATFORM.md).
 
 ## The constraint
 
@@ -27,15 +29,16 @@ paths below.
 
 ## The three targets
 
-| Target | Role |
-|---|---|
-| `CCUsageCore` | The engine. No SwiftUI. Everything testable without a window. |
-| `FalcaoTokenRouter` | The SwiftUI app. Menu bar, panel, groups window, settings. Every user-facing string. |
-| `router` | The CLI the app bundles at `Contents/MacOS/router`. The shell and the status line call it. |
+| Target (macOS) | Windows | Role |
+|---|---|---|
+| `CCUsageCore` | `router-core` | The engine. No UI. Everything testable without a window. |
+| `FalcaoTokenRouter` | `windows/app` (Tauri + Svelte) | The app. Menu bar or tray, panel, groups window, settings. Every user-facing string. |
+| `router` | `router.exe` | The CLI the app ships (`Contents/MacOS/router`, or beside the Windows app's exe). The shell and the status line call it. |
 
-`CCUsageCore/Engine` is the router product. The rest of `CCUsageCore` — `Aggregation`,
+`CCUsageCore/Engine` is the router product, with `StatusLine` (the line the sensor
+prints) and `Usage` (the probe). The rest of `CCUsageCore` — `Aggregation`,
 `Models`, `Parsing`, `Pricing` — is the token *meter* this project grew out of,
-which still powers the "Meter" tab.
+which still powers the macOS "Meter" tab; the Windows app doesn't carry it.
 
 ## Profiles, homes and groups
 
@@ -57,6 +60,10 @@ The credential for a profile is a keychain item named
 a `~` or a trailing slash changes the hash and points at an item that doesn't
 exist. The blob has no identity in it; who the credential belongs to is written
 in the `.claude.json` next to it (`oauthAccount.emailAddress`).
+
+On Windows the credential is a file inside the profile,
+`<profile>\.credentials.json`, with no hash in its name — and a live session
+re-reads it only when the file's modification time changes.
 
 On top of that, the product defines:
 
@@ -84,7 +91,9 @@ Activating an account in a group (`RotationEngine.activate`):
 
 That's it. A live session re-reads its keychain item on the next request and is
 served by the new account — no restart, no `--resume`, no lost context. This was
-proved on a real session before anything else was built.
+proved on a real session before anything else was built. (On Windows the copy is
+a freshly written file — temp + rename — so its modification time changes; a
+copy that keeps the old timestamp swaps nothing.)
 
 Two rules make it safe, and both exist because their absence killed accounts:
 
@@ -198,17 +207,21 @@ path; the app heals both at launch if the `.app` has moved.
 
 `router doctor` checks all of this and names what's wrong.
 
-## What's macOS-specific
+## What's system-specific
 
-| Piece | macOS | Where |
-|---|---|---|
-| Credential store | Keychain, via `/usr/bin/security` (same binary Claude Code uses — avoids the authorization prompt) | `SecurityCLIKeychain` |
-| Process liveness | `sysctl(KERN_PROC_PID)` start time | `ProcessLiveness` |
-| Sign-in terminal | `openpty` | `LoginSession` |
-| UI | SwiftUI `MenuBarExtra`, `Window`, `LSUIElement`, `SMAppService` | `FalcaoTokenRouter` |
-| Shell | zsh function in `~/.zshrc` | `ShellIntegration` |
-| Data directory | `~/Library/Application Support/<bundle-id>/` | `RouterPaths` |
+| Piece | macOS | Windows | Where (macOS) |
+|---|---|---|---|
+| Credential store | Keychain, via `/usr/bin/security` (same binary Claude Code uses — avoids the authorization prompt) | `<profile>\.credentials.json`, opaque blob, temp + rename | `SecurityCLIKeychain` |
+| Process liveness | `sysctl(KERN_PROC_PID)` start time | `OpenProcess` + `GetProcessTimes` | `ProcessLiveness` |
+| Sign-in terminal | `openpty` | ConPTY | `LoginSession` |
+| UI | SwiftUI `MenuBarExtra`, `Window`, `LSUIElement`, `SMAppService` | Tauri tray, flyout and window | `FalcaoTokenRouter` |
+| Shell | zsh function in `~/.zshrc` | PowerShell `$PROFILE`s and Git Bash `~/.bashrc` | `ShellIntegration` |
+| Data directory | `~/Library/Application Support/com.synqo.falcao-router/` | `%LOCALAPPDATA%\com.synqo.falcao-router` | `RouterPaths` |
+
+The data directory keeps that name on purpose, apart from the app's bundle id: on
+macOS the keychain item is a hash of each profile's path, so renaming the
+directory would put every credential out of reach.
 
 Everything else — the config model, the sample format, the rotation rules, the
-`/usage` parser, the sessions registry reader — is plain Foundation and reads
+`/usage` parser, the sessions registry reader — is platform-neutral logic over
 files Claude Code writes the same way everywhere. See `PORTING.md`.
