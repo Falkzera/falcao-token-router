@@ -1,4 +1,4 @@
-# gauge-mark — a marca: o anel-medidor (≙ GaugeGeometry + macos/Scripts/icon.swift)
+# gauge-mark — o anel-medidor (≙ GaugeGeometry)
 
 Um desenho só para a bandeja (fração ao vivo) e para o ícone do app (congelado em 62%). Sem
 Tauri e sem sistema: devolve pixels RGBA (sem pré-multiplicação) e PNG — testável por pixel.
