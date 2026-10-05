@@ -25,7 +25,10 @@ passa no clippy e roda os testes dele junto com o resto.
 - `binaries/` — gerado pelo build (fora do git): `router-<alvo>.exe`, o nome que o Tauri pede.
 - `capabilities/default.json` — as janelas `home` e `flyout` com `core:default` (eventos e o
   básico da janela).
-- `icons/` — GERADOS pelo `icongen` do `gauge-mark` (não editar à mão).
+- `icons/` — a marca Falcão: o ícone arredondado da ferramenta da marca (símbolo branco sobre
+  marinho `#0B2D4C`, a 66%), rasterizado do SVG em cada tamanho; o `icon.ico` leva 16 a 256 px,
+  cada um desenhado no próprio tamanho. Não editar à mão nem redesenhar o símbolo: a fonte é o
+  repositório da marca (`falcao-identidade-visual`, `aplicar-marca.py`).
 - `src/` — o código (ver o `agent.md` de lá).
 
 ## Decisões

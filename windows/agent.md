@@ -15,7 +15,7 @@ um `.github/workflows/windows.yml` filtrado por caminho).
 - `crates/router-cli/` — a CLI `router` (`statusline`, `launch`, `is-group`, `rotate`, `measure`,
   `doctor`).
 - `crates/fake-claude/` — `claude` de mentira para os testes de integração (nunca empacotado).
-- `crates/gauge-mark/` — a marca (o anel): bandeja e ícone do app do mesmo desenho, por pixel.
+- `crates/gauge-mark/` — o anel-medidor da bandeja, por pixel. O ícone do app é da marca Falcão.
 - `docs/PLATFORM.md` — os fatos do Windows verificados (inglês), o mapa macOS → Windows e as
   diferenças deliberadas.
 - `scripts/test.ps1` — a verificação (fmt + clippy + testes + checagens do front), igual na CI.

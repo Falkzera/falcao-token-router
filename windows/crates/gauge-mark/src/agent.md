@@ -1,16 +1,17 @@
-# gauge-mark — a marca: o anel-medidor (≙ GaugeGeometry + Scripts/icon.swift)
+# gauge-mark — o anel-medidor (≙ GaugeGeometry)
 
-Um desenho só para a bandeja (fração ao vivo) e para o ícone do app (congelado em 62%). Sem
-Tauri e sem sistema: devolve pixels RGBA (sem pré-multiplicação) e PNG — testável por pixel.
+O desenho da bandeja: a fração ao vivo da conta que o grupo usa. Sem Tauri e sem sistema:
+devolve pixels RGBA (sem pré-multiplicação) e PNG — testável por pixel.
+
+O ícone do app não sai mais daqui: desde 05/10/2026 é da marca Falcão (o símbolo branco sobre
+marinho), em `app/src-tauri/icons/`. O anel mede, o falcão assina.
 
 ## Arquivos
 - `lib.rs` — `quantize` (20 passos; pontas protegidas: cheio só em 100%, vazio só em 0),
   `severity` (limiares do painel: 0,66 aviso, 0,90 crítico), `TrayKey`/`render_tray`/`tray_icon`
-  (a chave do cache da bandeja: passo, cor, tema, tamanho), `tray_png` (prévia), `app_icon`/
-  `app_icon_png`/`app_icon_ico` (superelipse verde + anel branco; abaixo de 64 px o traço
-  engrossa e brilho/fio de luz saem).
-- `bin/icongen.rs` — gera os ícones que o `tauri.conf.json` lista (`icon.ico` com cada tamanho
-  desenhado no próprio tamanho, os PNGs) e, com `--tray`, a prévia da bandeja nos estados e temas.
+  (a chave do cache da bandeja: passo, cor, tema, tamanho), `tray_png` (prévia).
+- `bin/icongen.rs` — a prévia da bandeja nos estados e temas (`--tray`, o modo antigo, segue
+  aceito).
 
 ## Decisões
 - 22/09/2026: no estado calmo o anel da bandeja tem a cor do TEMA DA BARRA (branco na escura,
@@ -19,10 +20,10 @@ Tauri e sem sistema: devolve pixels RGBA (sem pré-multiplicação) e PNG — te
   a mesma cor a 30%. Sem amostra ("pronta") = só a trilha.
 - 22/09/2026: a cor vem da fração REAL e o desenho da QUANTIZADA (66% já é aviso, como no
   painel, mesmo caindo no passo de 65%).
-- 22/09/2026: o `.ico` é montado aqui (entradas PNG, que o Windows lê desde o Vista) em vez de
-  pelo `tauri icon`, que redimensiona o de 1024 px — a 16 px daria o anel borrado que o modo
-  compacto existe para evitar.
 - Arco das 12 horas no sentido HORÁRIO, em cúbicas de até 90° (o tiny-skia não tem arco).
+- 05/10/2026: saíram `app_icon`, `app_icon_png`, `app_icon_ico` e `ICON_FRACTION`. O ícone do
+  app passou a ser a marca Falcão, e um `icongen` que ainda o gerasse devolveria o anel por cima
+  dos ícones da marca.
 
-## Regerar os ícones
-`cargo run -p gauge-mark --bin icongen -- app\src-tauri\icons` (a partir de `windows\`).
+## Prévia da bandeja
+`cargo run -p gauge-mark --bin icongen -- <pasta>` (a partir de `windows\`).

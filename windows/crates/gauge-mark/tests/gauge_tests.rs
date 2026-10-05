@@ -3,7 +3,7 @@
 //! macOS), e o que o anel afirma tem de estar nos pixels.
 
 use gauge_mark::{
-    app_icon, quantize, severity, tray_icon, Severity, TaskbarTheme, CRITICAL, TRAY_STEPS, WARNING,
+    quantize, severity, tray_icon, Severity, TaskbarTheme, CRITICAL, TRAY_STEPS, WARNING,
 };
 
 /// O pixel (x, y) de uma imagem RGBA sem pré-multiplicação.
@@ -172,28 +172,4 @@ fn the_ring_survives_at_16_px() {
     // de pelo menos metade.
     let covered = icon.rgba.chunks(4).filter(|p| p[3] >= 128).count();
     assert!(covered >= 40, "só {covered} pixels cobertos");
-}
-
-// MARK: - Ícone do app
-
-/// A placa (superelipse verde) com o anel branco a 62% — o arco mais cheio que
-/// ainda cabe no verde; um ícone permanentemente âmbar seria alarme falso.
-#[test]
-fn the_app_icon_is_a_green_plate_with_a_white_ring() {
-    let side = 256;
-    let icon = app_icon(side);
-    assert_eq!(icon.len(), (side * side * 4) as usize);
-
-    // Canto: fora da placa, transparente.
-    assert_eq!(px(&icon, side, 1, 1)[3], 0);
-    // Centro: dentro da placa, no furo do anel — verde, opaco.
-    let center = px(&icon, side, side / 2, side / 2);
-    assert_eq!(center[3], 255);
-    assert!(center[1] > center[0] && center[1] > center[2], "{center:?}");
-    // Arco a 3 horas (dentro dos 62%), na linha de centro do traço: branco.
-    let ring_right = px(&icon, side, side / 2 + side * 20 / 100, side / 2);
-    assert!(
-        ring_right[0] > 225 && ring_right[1] > 225 && ring_right[2] > 225,
-        "{ring_right:?}"
-    );
 }

@@ -10,7 +10,7 @@ A geometria que a UI desenha, **sem SwiftUI**. Mora no core pela mesma razão qu
 - Nada aqui importa SwiftUI. Se precisar, é sinal de que pertence ao alvo do app.
 
 ## Decisões recentes
-- A marca existe UMA vez: a barra de menus desenha com a fração ao vivo, e `Scripts/icon.swift` — compilado contra este mesmo arquivo — congela em 62% para o ícone do app.
+- 2026-10-05: o anel é o medidor, não a marca. A barra de menus o desenha com a fração ao vivo; o ícone do app, o banner e o card social são da marca Falcão (`Scripts/icon.swift`), que não compila mais contra este arquivo.
 
 ## Pendências conhecidas
 - Nenhuma.

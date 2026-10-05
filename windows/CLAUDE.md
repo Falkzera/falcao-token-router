@@ -22,7 +22,8 @@ do WebView2 para `%LOCALAPPDATA%\tauri`. `README.md` (inglês) é o guia de quem
 - `crates/router-core` = ≙ `macos/Sources/CCUsageCore` (parte do router). Sem UI, sem rede.
 - `crates/router-cli`  = ≙ `macos/Sources/router` → `router.exe`.
 - `crates/fake-claude` = `claude` de mentira dos testes de integração.
-- `crates/gauge-mark`  = o anel (bandeja + ícone do app), testado por pixel.
+- `crates/gauge-mark`  = o anel-medidor da bandeja, testado por pixel. O ícone do app é da marca
+  Falcão (`app/src-tauri/icons/`), não do anel.
 - `app/`               = ≙ `macos/Sources/FalcaoTokenRouter`: Tauri v2 (`src-tauri/`) + Svelte 5 (`src/`).
 - Fonte macOS portada: `macos/Sources/CCUsageCore/{Engine,Usage}`, `macos/Sources/router/main.swift`,
   `macos/Tests/CCUsageCoreTests/*`. Fatos do Windows: `docs/PLATFORM.md`.

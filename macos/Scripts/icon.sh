@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #
-# Gera dist/AppIcon.icns e a arte do instalador.
+# Gera dist/AppIcon.icns, a arte do instalador, o banner e o card social.
 #
-# O gerador é compilado junto com GaugeGeometry.swift, o mesmo arquivo que o app
-# usa para desenhar o anel na barra de menu — é isso que mantém o ícone e a
-# barra sendo o mesmo desenho, e não dois parecidos.
+# A arte é da marca Falcão: o símbolo e o nome saem dos SVGs oficiais, copiados
+# no icon.swift, e as fontes da marca ficam em Scripts/fonts/. O anel é o
+# medidor, e quem o desenha é a barra de menus — não este script.
 #
 # Uso: ./Scripts/icon.sh [captura-crua-do-painel.png]
 #
@@ -23,10 +23,7 @@ trap 'rm -rf "$BUILD"' EXIT
 mkdir -p "$OUT"
 
 echo "==> Compilando o gerador"
-swiftc -O \
-    "$ROOT/Scripts/icon.swift" \
-    "$ROOT/Sources/CCUsageCore/Presentation/GaugeGeometry.swift" \
-    -o "$BUILD/icongen"
+swiftc -O -parse-as-library "$ROOT/Scripts/icon.swift" -o "$BUILD/icongen"
 
 echo "==> Desenhando"
 "$BUILD/icongen" "$OUT" ${1:+"$1"}
