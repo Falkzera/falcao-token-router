@@ -3,7 +3,9 @@
 //!
 //! O sensor passivo só enxerga quem está servindo, e só as janelas de 5h e 7
 //! dias. A sonda mede conta OCIOSA e traz o limite POR MODELO. Custa um processo
-//! e uma requisição por conta, então é comando, não laço.
+//! e uma requisição por conta, então aqui é comando; a medição de 5 em 5 horas
+//! é do app (21/10/2026). Toda medição deixa um ponto no histórico
+//! (`router_core::engine::usage_history`), a desta CLI também.
 
 use chrono::Utc;
 
