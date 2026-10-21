@@ -219,3 +219,37 @@ fn a_failed_measurement_leaves_no_point() {
     assert!(result.is_err());
     assert!(UsageHistory::read(EMAIL, &UsageHistory::directory(base)).is_empty());
 }
+
+// --- apagar o histórico (Ajustes, 21/10/2026) ---
+
+/// "Apagar o histórico" leva os pontos de todas as contas — os `.jsonl`, e só
+/// eles: outro arquivo que alguém deixou na pasta fica.
+#[test]
+fn clearing_removes_every_account_history_and_nothing_else() {
+    let tmp = tempfile::tempdir().unwrap();
+    UsageHistory::append(&point(T0, Some(0.1)), EMAIL, tmp.path(), ts(T0)).unwrap();
+    UsageHistory::append(
+        &point(T0, Some(0.2)),
+        "conta2@exemplo.com",
+        tmp.path(),
+        ts(T0),
+    )
+    .unwrap();
+    std::fs::write(tmp.path().join("leia-me.txt"), b"nao e historico").unwrap();
+
+    assert_eq!(UsageHistory::clear(tmp.path()).unwrap(), 2);
+
+    assert!(UsageHistory::read(EMAIL, tmp.path()).is_empty());
+    assert!(UsageHistory::read("conta2@exemplo.com", tmp.path()).is_empty());
+    assert!(tmp.path().join("leia-me.txt").exists());
+}
+
+/// Sem pasta (nada foi medido ainda), não há o que apagar — e não é erro.
+#[test]
+fn clearing_a_history_that_never_existed_is_nothing_to_do() {
+    let tmp = tempfile::tempdir().unwrap();
+    assert_eq!(
+        UsageHistory::clear(&UsageHistory::directory(tmp.path())).unwrap(),
+        0
+    );
+}

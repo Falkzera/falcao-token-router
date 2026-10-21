@@ -5,7 +5,7 @@
   `quit_app`, as ações de grupos e contas, a integração de terminal — `terminal_report`,
   `install_integration`, `allow_profiles_for` — e os ajustes — `get_settings`, `set_autostart`,
   `set_show_in_taskbar`, `set_hidden_summary`, `open_url` —, o histórico — `get_history`,
-  `set_scheduled_measure` —, a status line — `get_status_line`, `set_status_line`,
+  `set_scheduled_measure`, `clear_history` —, a status line — `get_status_line`, `set_status_line`,
   `test_status_line` —, o login — `start_login`, `start_relogin`,
   `current_login`, `login_submit_code`, `login_retry`, `login_recheck`, `login_close`) e os
   eventos (`navigate` — `{tab, account}`: a conta é a do atalho do Histórico —,
@@ -25,7 +25,8 @@
   (`&login=ok|codigo|duplicada|errada|recusado|encerrado|timeout|semclaude`, com as fases no
   tempo e a revisão crescente). Dados só de exemplo (`@exemplo.com`, Acme, `C:\Users\exemplo`).
   A aba pela URL inclui `&tab=history`, e `&conta=<id>` abre o Histórico já nessa conta (como o
-  atalho do painel); o histórico vem do `mock-history.ts`.
+  atalho do painel); o histórico vem do `mock-history.ts`. "Apagar o histórico…" deixa o
+  histórico simulado vazio daí em diante (`&apagar=falha` faz a gravação falhar).
 - `mock-history.ts` — o `get_history` do backend simulado (21/10/2026): 4 semanas de pontos de 5
   em 5 horas para cada conta do quadro, estáveis por conta e por bloco de 5 h (nada sorteado:
   a releitura não muda o gráfico); a 5h alta no horário de trabalho e sem janela de madrugada,

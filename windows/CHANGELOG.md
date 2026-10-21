@@ -22,6 +22,9 @@ a fix on one platform never waits for the other's calendar.
 - **A shortcut to each account's history**: the chart button next to every account
   on the Groups tab, and **View history** on an account's card in the tray panel,
   open the History tab right on that account.
+- **Delete history…** in **Settings → History** empties the history of every
+  account, after a confirmation. Measuring goes on, and the history starts over
+  with the next measurement.
 
 ## [1.0.0] — 2026-09-24
 

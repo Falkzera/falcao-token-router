@@ -18,7 +18,9 @@ Modelos, formato da amostra, leitor de uso, credencial, rotação e o store. Sem
 - `usage_history.rs` — `UsageHistoryPoint`/`UsageHistory` (21/10/2026, só do Windows): um ponto
   por medição da SONDA em `<base>\history\<email>.jsonl` — o vocabulário da amostra, janela
   ausente fica ausente (nunca zero), as por modelo vão junto. `append` relê (linha ilegível é
-  pulada), poda o que passou de 90 dias, ordena e regrava atômico; `read`/`last_sampled_at`.
+  pulada), poda o que passou de 90 dias, ordena e regrava atômico; `read`/`last_sampled_at`;
+  `clear` — o "Apagar o histórico…" dos Ajustes — apaga os `.jsonl` da pasta, e só eles (pasta
+  ausente = nada a fazer).
 - `measure_schedule.rs` — `MeasureSchedule` (21/10/2026): a regra PURA da medição de 5 em 5
   horas — vence quando a mais nova entre a última medição gravada e a última tentativa da
   agenda tem 5 h ou mais (ou nunca houve nenhuma).
@@ -43,7 +45,8 @@ Modelos, formato da amostra, leitor de uso, credencial, rotação e o store. Sem
   chama, dividido por motivo de mudança: `mod.rs` (tipos, construção, leitura do estado,
   persistência), `groups.rs`, `accounts.rs` (login/relogin), `rotation.rs` (o que toca
   credencial e a medição — inclusive `scheduled_measure_plans`, o plano da agenda de 5 em 5
-  horas) e `terminal.rs` (integração de shell). Era um arquivo de 869 linhas — quebrado
+  horas, e `clear_history`, que apaga o histórico sob a trava do motor) e `terminal.rs`
+  (integração de shell). Era um arquivo de 869 linhas — quebrado
   em 24/09/2026 pela régua de 600 linhas de produção (ver `CONTRIBUTING.md`).
 - `engine_lock.rs` — trava entre processos (mutex nomeado `Local\com.synqo.falcao-router.engine.<fnv>`,
   nome derivado da base) em volta de toda escrita de credencial do store e da CLI.

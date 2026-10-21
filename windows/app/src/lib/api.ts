@@ -127,6 +127,8 @@ export const openUrl = (url: string) => call<void>("open_url", { url });
 export const getHistory = () => call<HistoryView>("get_history");
 /** "Medir as contas a cada 5 horas". */
 export const setScheduledMeasure = (on: boolean) => call<SettingsView>("set_scheduled_measure", { on });
+/** "Apagar o histórico…": os pontos de todas as contas (devolve quantos arquivos saíram). */
+export const clearHistory = () => call<number>("clear_history");
 
 // MARK: - Status line (a escolha mora na base do router; a CLI a lê a cada render)
 

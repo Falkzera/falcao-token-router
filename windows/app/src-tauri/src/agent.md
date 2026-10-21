@@ -24,7 +24,9 @@
   fuso e relógio por parâmetro, testado): por grupo e conta, a janela de 5h dos últimos 7 dias
   e a semanal das últimas 4 semanas, recortadas, quebradas em buracos de mais de 7h30, com o %
   do núcleo e as horas pelo `reset_when` (ponto, reset, "próxima às"); marcas do eixo na
-  meia-noite local (dia da semana / data a cada 7 dias); o limiar do grupo.
+  meia-noite local (dia da semana / data a cada 7 dias); o limiar do grupo. `clear_history` — o
+  "Apagar o histórico…" dos Ajustes — apaga pelo store (sob a trava do motor), avisa as janelas
+  e devolve quantos arquivos saíram (a falha volta com o motivo).
 - `measure_schedule.rs` — a medição de 5 em 5 horas (21/10/2026): `check` olha a agenda (chave
   ligada, nada medindo, sem login em andamento, `claude` achado), anota as tentativas e mede
   numa thread os planos do store grupo a grupo, com o spinner do grupo; falha não abre o aviso.

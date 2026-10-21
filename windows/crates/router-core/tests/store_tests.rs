@@ -1059,3 +1059,28 @@ fn the_schedule_probes_the_active_account_through_its_group() {
         env.group(group.id).config_dir.raw
     );
 }
+
+/// "Apagar o histórico" pelo store: os pontos de todas as contas saem, e a
+/// próxima medição recomeça o histórico.
+#[test]
+fn clearing_the_history_empties_it_for_every_account() {
+    use router_core::engine::usage_history::UsageHistory;
+
+    let mut env = make_store();
+    let group = env.store.add_group_with("trabalho", false);
+    env.add_account("conta1@exemplo.com", group.id);
+    env.add_account("conta2@exemplo.com", group.id);
+    measured(&env, "conta1@exemplo.com", 1);
+    measured(&env, "conta2@exemplo.com", 7);
+
+    assert_eq!(env.store.clear_history().unwrap(), 2);
+
+    let dir = env.paths.history_dir();
+    assert!(UsageHistory::read("conta1@exemplo.com", &dir).is_empty());
+    assert!(UsageHistory::read("conta2@exemplo.com", &dir).is_empty());
+    // Sem ponto nenhum, as duas voltam a vencer na agenda.
+    let plans = env
+        .store
+        .scheduled_measure_plans(Utc::now(), &std::collections::HashMap::new());
+    assert_eq!(plans[0].1.targets.len(), 2);
+}

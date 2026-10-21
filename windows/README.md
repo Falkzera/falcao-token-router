@@ -168,7 +168,8 @@ that didn't, and the last line is `tudo certo.` (all good) or `há problemas aci
 - **Settings**: the **Status line** (below), the **Groups summary** (what each
   account row shows: the 5-hour and 7-day usage, the model limit, and when each
   one resets — everything by default), **Measure accounts every 5 hours** (on by
-  default), **Open at login** and **Show in taskbar**.
+  default) and **Delete history…** (asks first; measuring goes on, and the history
+  starts over with the next measurement), **Open at login** and **Show in taskbar**.
 
 Resize or maximize the window as you like; it reopens at its last size. Closing it
 leaves the app running in the notification area; **Quit** ends it. The app follows your Windows language — English or Portuguese.
@@ -240,7 +241,7 @@ threshold.
 | The app and `router.exe` | `%LOCALAPPDATA%\FalcaoTokenRouter` |
 | Groups, accounts, their profiles, the samples | `%LOCALAPPDATA%\com.synqo.falcao-router` — the same layout as the macOS app's `Application Support` folder |
 | The status line choice | `statusline.json` in that same folder (Windows only) |
-| The measurement history | `history\` in that same folder: one `<e-mail>.jsonl` per account, kept 90 days (Windows only) |
+| The measurement history | `history\` in that same folder: one `<e-mail>.jsonl` per account, kept 90 days (Windows only); **Settings → History → Delete history…** empties it |
 | The app's own settings, and its window's cache | `%APPDATA%\com.synqo.falcao-token-router`, and the same name under `%LOCALAPPDATA%` |
 | The terminal integration | one line in each `$PROFILE` and in `~/.bashrc`, pointing at `shell.ps1` / `shell.sh` in the router's folder |
 

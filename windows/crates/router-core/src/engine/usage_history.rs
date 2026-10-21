@@ -10,6 +10,7 @@
 //! Só a sonda grava (a medição de 5 em 5 horas, o "Medir contas" e o `router
 //! measure`) — decidido com o usuário: o sensor não entra.
 
+use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -17,7 +18,7 @@ use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 
 use super::group_usage::GroupUsageStore;
-use crate::platform::atomic_write::{read_retrying, write_atomic};
+use crate::platform::atomic_write::{read_retrying, remove_retrying, write_atomic};
 use crate::usage::claude_usage_probe::{ModelWindow, Reading};
 
 /// Uma medição da sonda, como fica no histórico. O vocabulário é o da amostra
@@ -127,5 +128,26 @@ impl UsageHistory {
             text.push('\n');
         }
         write_atomic(&dir.join(Self::file_name(email)), text.as_bytes())
+    }
+
+    /// Apaga o histórico de todas as contas — o "Apagar o histórico…" dos
+    /// Ajustes (21/10/2026, pedido do usuário): os `.jsonl` da pasta, e só
+    /// eles. Pasta ausente = nada a apagar. Devolve quantos arquivos saíram.
+    /// Quem chama segura a trava do motor: uma medição pode estar gravando.
+    pub fn clear(dir: &Path) -> io::Result<usize> {
+        let entries = match fs::read_dir(dir) {
+            Ok(entries) => entries,
+            Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(0),
+            Err(e) => return Err(e),
+        };
+        let mut removed = 0;
+        for entry in entries {
+            let path = entry?.path();
+            if path.is_file() && path.extension().is_some_and(|ext| ext == "jsonl") {
+                remove_retrying(&path)?;
+                removed += 1;
+            }
+        }
+        Ok(removed)
     }
 }

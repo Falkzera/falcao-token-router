@@ -23,12 +23,15 @@
       ? t("history.account.measured.format", duration(ageSeconds(account.lastMeasuredAt, clock.now)))
       : t("history.account.never"),
   );
-  // A hora da próxima vem escrita do Rust; vencida (a agenda ainda não chegou
-  // nela), "em instantes".
+  // A hora da próxima vem escrita do Rust. Vencida, ou a menos de uma volta da
+  // agenda (ela olha a cada 3 min — e o relógio da tela anda de 30 em 30 s,
+  // atrás da hora do quadro), "em instantes": senão uma conta recém-zerada
+  // diria "próxima às" a hora de agora.
+  const SOON_MS = 3 * 60_000;
   const next = $derived(
     !scheduleOn
       ? t("history.account.scheduleOff")
-      : account.nextMeasureAt && account.nextMeasureLabel && Date.parse(account.nextMeasureAt) > clock.now
+      : account.nextMeasureAt && account.nextMeasureLabel && Date.parse(account.nextMeasureAt) > clock.now + SOON_MS
         ? t("history.account.next.format", account.nextMeasureLabel)
         : t("history.account.nextSoon"),
   );

@@ -6,6 +6,7 @@
 //   &tab=groups|history|settings  &select=<conta>  &foreign=<e-mail>  &scripts=current|missing|stale
 // O histórico (aba Histórico, `mock-history.ts`):
 //   &historico=cheio|vazio|lacuna|desligado  &conta=<id> (abre já nela, como o atalho do painel)
+//   &apagar=falha (o "Apagar o histórico…" dos Ajustes falha)
 // A integração de terminal e os ajustes:
 //   &terminal=ausente|ok|bloqueado|parcial|velha|semrouter  &devmode=1
 //   &install=falha (Ativar grava só parte)  &diretiva=1 (Permitir não vence a política)
@@ -295,6 +296,9 @@ const settings: SettingsView = {
   scheduledMeasure: param("historico") !== "desligado",
   version: "0.1.0-mock",
 };
+
+/** "Apagar o histórico…" já foi usado: o histórico simulado fica vazio. */
+let historyCleared = false;
 
 // MARK: - Status line
 
@@ -717,11 +721,21 @@ const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
     settings.hiddenSummary = order.filter((item) => hidden.includes(item));
     return { ...settings };
   },
-  get_history: () => mockHistory(state.groups, mockLocale(), param("historico"), settings.scheduledMeasure),
+  get_history: () =>
+    mockHistory(state.groups, mockLocale(), historyCleared ? "vazio" : param("historico"), settings.scheduledMeasure),
   set_scheduled_measure: (args) => {
     settings.scheduledMeasure = Boolean(args.on);
     changed();
     return { ...settings };
+  },
+  // Como o Rust: devolve quantos arquivos saíram (um por conta com histórico).
+  clear_history: () => {
+    if (param("apagar") === "falha") throw new Error("Acesso negado. (os error 5)");
+    const accounts = new Set(state.groups.flatMap((g) => g.accounts.map((a) => a.id)));
+    const removed = historyCleared || param("historico") === "vazio" ? 0 : accounts.size;
+    historyCleared = true;
+    changed();
+    return removed;
   },
   open_url: (args) => {
     const url = String(args.url);

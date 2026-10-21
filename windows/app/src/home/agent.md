@@ -37,14 +37,17 @@
   até o cartão da conta — no grupo do clique; senão, o primeiro — e o destaca por 1,8 s; depois
   avisa (`onFocused`) e o pedido some, para a releitura de 30 s não rolar a página de novo.
 - `HistoryCard.svelte` — uma conta no Histórico: rótulo, e-mail, a linha de estado ("medida há
-  2h · próxima às 19:05", "próxima em instantes" quando vencida, "medição automática desligada",
-  "sem medições ainda") e os dois `LineChart` (5h em 7 dias, semanal em 4 semanas) com o limiar
-  do grupo. `data-account`/`data-group` são o endereço do atalho; `highlight`, o contorno que
-  some sozinho (fixo com movimento reduzido).
-- `SettingsView.svelte` — a aba Ajustes: a status line (em cima), o resumo dos grupos, "Medir as
-  contas a cada 5 horas" (21/10/2026; controlado, mostra o que o backend gravou), "Abrir no
-  login" (do sistema, com o motivo da recusa), "Mostrar na barra de tarefas" com a explicação, a
-  dica do ícone escondido no `^` (→ `ms-settings:taskbar`) e a versão.
+  2h · próxima às 19:05", "próxima em instantes" quando vencida ou a menos de 3 min — uma volta
+  da agenda; o relógio da tela anda de 30 em 30 s e uma conta recém-zerada dizia "próxima às" a
+  hora de agora —, "medição automática desligada", "sem medições ainda") e os dois `LineChart`
+  (5h em 7 dias, semanal em 4 semanas) com o limiar do grupo. `data-account`/`data-group` são o
+  endereço do atalho; `highlight`, o contorno que some sozinho (fixo com movimento reduzido).
+- `SettingsView.svelte` — a aba Ajustes: a status line (em cima), o resumo dos grupos, o
+  Histórico (21/10/2026) — "Medir as contas a cada 5 horas" (controlado, mostra o que o backend
+  gravou) e "Apagar o histórico…" (pedido do usuário: confirmação destrutiva, "Histórico apagado
+  ✓" por 2 s só com o backend confirmando, a falha com o motivo) —, "Abrir no login" (do
+  sistema, com o motivo da recusa), "Mostrar na barra de tarefas" com a explicação, a dica do
+  ícone escondido no `^` (→ `ms-settings:taskbar`) e a versão.
 - `SummarySection.svelte` — "Resumo dos grupos" (pedido de 23/09/2026): o que cada conta mostra
   na aba Grupos, em pares por janela (uso | reset: 5 h, 7 dias, limite do modelo); de fábrica,
   tudo. O reset fica desligado sem a janela dele (o estado é guardado e volta com ela); "Mostrar

@@ -17,9 +17,10 @@ use router_core::engine::usage_history::{UsageHistory, UsageHistoryPoint};
 use router_core::statusline::view::{reset_when, weekday_abbrev};
 use router_core::{Account, Id, UsagePercent};
 use serde::Serialize;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 
 use crate::locale::Locale;
+use crate::rotation_loop::SNAPSHOT_CHANGED;
 use crate::settings::SettingsStore;
 use crate::state::AppState;
 
@@ -318,6 +319,20 @@ pub fn get_history(app: AppHandle) -> HistoryView {
         &chrono::Local,
         state.locale == Locale::PtBr,
     )
+}
+
+/// "Apagar o histórico…" (Ajustes): apaga os pontos de todas as contas e avisa
+/// as janelas — a aba Histórico relê e fica vazia até a próxima medição.
+/// Devolve quantos arquivos saíram; a falha volta com o motivo.
+#[tauri::command]
+pub fn clear_history(app: AppHandle) -> Result<usize, String> {
+    let removed = app
+        .state::<AppState>()
+        .store()
+        .clear_history()
+        .map_err(|e| e.to_string())?;
+    let _ = app.emit(SNAPSHOT_CHANGED, ());
+    Ok(removed)
 }
 
 #[cfg(test)]

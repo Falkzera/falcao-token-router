@@ -123,6 +123,15 @@ impl RouterConfigStore {
         plans
     }
 
+    /// "Apagar o histórico…" (Ajustes, 21/10/2026): os pontos de todas as
+    /// contas saem do disco, sob a trava do motor (a sonda grava o ponto sob
+    /// ela). As medições continuam: cada conta ganha um novo primeiro ponto na
+    /// próxima. Devolve quantos arquivos saíram.
+    pub fn clear_history(&self) -> io::Result<usize> {
+        let _lock = EngineLock::acquire(&self.paths.base, EngineLock::WAIT);
+        UsageHistory::clear(&self.paths.history_dir())
+    }
+
     /// Publica o saldo de uma medição: o erro (contas que não responderam) e o
     /// quadro relido com as amostras novas.
     pub fn finish_measure(&mut self, summary: MeasureSummary) {

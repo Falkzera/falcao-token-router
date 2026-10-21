@@ -154,6 +154,10 @@ Windows only (2026-10-21). Every probe measurement — **Measure accounts**,
   half a line, and a line that doesn't parse is skipped without the others.
 - A failure writing the history doesn't fail the measurement: the sample in
   `usage\`, which drives the rotation, is already on disk.
+- **Settings → History → Delete history…** removes every `.jsonl` in the folder —
+  and nothing else — under the engine lock, after a confirmation. With no point
+  left, every account is due again (unless the schedule tried it in the last 5
+  hours), so the history starts over with the next measurement.
 - The sensor writes nothing here, and the macOS app neither reads nor writes the
   folder: `usage\<e-mail>.json` and `config.json` stay the shared contract.
 - **The schedule** lives in the app: Settings → History → "Measure accounts every 5

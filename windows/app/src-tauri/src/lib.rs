@@ -236,6 +236,7 @@ pub fn run() {
             commands::foreign_default_login,
             commands::measure_group,
             history::get_history,
+            history::clear_history,
             terminal::terminal_report,
             terminal::install_integration,
             terminal::allow_profiles_for,
