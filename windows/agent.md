@@ -39,6 +39,12 @@ um `.github/workflows/windows.yml` filtrado por caminho).
   confere o que saiu, a CI publicando o instalador como artefato, e o `README.md` em inglês
   para quem nunca viu o app (instalar → grupo → duas contas → integração → `claude <grupo>`
   → ver a troca → `router doctor`, problemas conhecidos, desinstalar).
+- **Histórico de uso** (21/10/2026, pedido do usuário; desenho em
+  `docs/specs/2026-10-21-usage-history-design.md`): toda medição da sonda vira um ponto em
+  `<base>\history\<email>.jsonl` (só do Windows, fora do contrato com o macOS); o app mede cada
+  conta de 5 em 5 horas enquanto está aberto (chave nos Ajustes, ligada de fábrica) e a aba
+  Histórico desenha a janela de 5h (7 dias) e a semanal (4 semanas). A sonda deixou de ser
+  "nunca laço" — decisão do usuário.
 - Próxima: fase 7 (ponta a ponta com contas reais, grupo dedicado, seguindo o README).
 
 ## Regras (herdadas do repo + combinadas)

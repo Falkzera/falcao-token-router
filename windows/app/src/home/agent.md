@@ -1,7 +1,8 @@
-# app/src/home — a janela Grupos / Ajustes (≙ Settings/HomeWindow.swift + GroupsView.swift)
+# app/src/home — a janela Grupos / Histórico / Ajustes (≙ Settings/HomeWindow.swift + GroupsView.swift)
 
 ## Arquivos
-- `Home.svelte` — as duas abas, **Grupos** (o produto) e **Ajustes** (sem medidor nesta entrega).
+- `Home.svelte` — as três abas, **Grupos** (o produto), **Histórico** (21/10/2026, só do Windows)
+  e **Ajustes** (sem medidor nesta entrega).
   O tamanho é da janela (abre no último, 520×620 na 1ª vez; redimensiona e maximiza — o Rust
   cuida, `home_window.rs`), nunca do conteúdo: as abas têm alturas naturais diferentes e a
   janela pularia a cada troca. Numa janela larga, abas, páginas e o aviso de erro seguem a mesma
@@ -26,7 +27,16 @@
   diretiva de grupo vencer), a linha do `.bashrc` com copiar para o `.bash_profile` que o ignora,
   a função `claude` do usuário encadeada (info), o app movido (scripts velhos) e a dica do Modo
   de Desenvolvedor (→ `ms-settings:developers`). "Instalada ✓" por 2 s só com `ok`.
-- `SettingsView.svelte` — a aba Ajustes: a status line (em cima), o resumo dos grupos, "Abrir no
+- `HistoryView.svelte` — a aba Histórico (21/10/2026): o aviso de que cada ponto é uma medição
+  da sonda, os grupos na ordem da lista com as contas na ordem de rotação (a conta em dois
+  grupos aparece nos dois), vazio com convite. Relê o quadro (`get_history`) ao abrir e a cada
+  `snapshot-changed` — o laço avisa depois de cada grupo medido.
+- `HistoryCard.svelte` — uma conta no Histórico: rótulo, e-mail, a linha de estado ("medida há
+  2h · próxima às 19:05", "próxima em instantes" quando vencida, "medição automática desligada",
+  "sem medições ainda") e os dois `LineChart` (5h em 7 dias, semanal em 4 semanas) com o limiar
+  do grupo.
+- `SettingsView.svelte` — a aba Ajustes: a status line (em cima), o resumo dos grupos, "Medir as
+  contas a cada 5 horas" (21/10/2026; controlado, mostra o que o backend gravou), "Abrir no
   login" (do sistema, com o motivo da recusa), "Mostrar na barra de tarefas" com a explicação, a
   dica do ícone escondido no `^` (→ `ms-settings:taskbar`) e a versão.
 - `SummarySection.svelte` — "Resumo dos grupos" (pedido de 23/09/2026): o que cada conta mostra
@@ -90,6 +100,11 @@
   são os reais mesmo no sandbox.
 - Login (23/09): todos os estados no navegador (`&login=…`), nos dois idiomas e temas; e o
   caminho real no app do sandbox com o `fake-claude` (ver `src-tauri/src/agent.md`).
+- Histórico (21/10/2026): Chrome headless pelo DevTools Protocol (script no scratchpad da
+  sessão) — `?tab=history` nos dois idiomas e temas, `&historico=cheio|lacuna|vazio|desligado`,
+  `&state=vazio` (sem grupos), 520 px e janela larga (a coluna de 880 px); a dica pelo ponteiro
+  dos dois lados e pelo teclado (foco + ←); a chave nos Ajustes (uma gravação, e o Histórico
+  passa a dizer "medição automática desligada").
 
 ## Pendências
 - O login com o `claude` e o navegador de verdade: teste ponta a ponta (fase 7).

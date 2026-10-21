@@ -157,9 +157,15 @@ that didn't, and the last line is `tudo certo.` (all good) or `há problemas aci
 - **Groups** has what the walkthrough used and, per group, the rotation order (drag,
   or ↑/↓), **Log in again…** for an account whose login expired, **Remove account**,
   **Measure accounts**, rename, default and delete.
+- **History** draws two lines per account: the 5-hour window over the last 7 days
+  and the weekly window over the last 4 weeks, with the group's threshold dashed.
+  Each point is one measurement (see [What the numbers mean](#what-the-numbers-mean));
+  more than 7½ hours without one — the app closed, the PC asleep — breaks the line
+  instead of guessing. Hover a chart, or focus it and use ← →, to read a point.
 - **Settings**: the **Status line** (below), the **Groups summary** (what each
   account row shows: the 5-hour and 7-day usage, the model limit, and when each
-  one resets — everything by default), **Open at login** and **Show in taskbar**.
+  one resets — everything by default), **Measure accounts every 5 hours** (on by
+  default), **Open at login** and **Show in taskbar**.
 
 Resize or maximize the window as you like; it reopens at its last size. Closing it
 leaves the app running in the notification area; **Quit** ends it. The app follows your Windows language — English or Portuguese.
@@ -195,8 +201,10 @@ Every number carries its window, its source and its age: the tooltip reads
   served. An account that hasn't served a message yet shows **ready**, not a number.
 - **Measure accounts** (or `router measure work`) asks the official `claude` for
   `/usage`, account by account. It sees idle accounts and the per-model limit, which
-  never reaches the status line. It takes a few seconds per account, so it's a
-  button, never a loop.
+  never reaches the status line. It takes a few seconds per account. While the app
+  is open it also runs on its own — each account 5 hours after its last
+  measurement — and every measurement, whoever asked for it, becomes a point on the
+  **History** tab. **Settings → History** turns the schedule off.
 
 The switch compares the **larger** of the 5-hour and 7-day windows with the
 threshold.
@@ -229,6 +237,7 @@ threshold.
 | The app and `router.exe` | `%LOCALAPPDATA%\FalcaoTokenRouter` |
 | Groups, accounts, their profiles, the samples | `%LOCALAPPDATA%\com.synqo.falcao-router` — the same layout as the macOS app's `Application Support` folder |
 | The status line choice | `statusline.json` in that same folder (Windows only) |
+| The measurement history | `history\` in that same folder: one `<e-mail>.jsonl` per account, kept 90 days (Windows only) |
 | The app's own settings, and its window's cache | `%APPDATA%\com.synqo.falcao-token-router`, and the same name under `%LOCALAPPDATA%` |
 | The terminal integration | one line in each `$PROFILE` and in `~/.bashrc`, pointing at `shell.ps1` / `shell.sh` in the router's folder |
 

@@ -11,9 +11,17 @@ Modelos, formato da amostra, leitor de uso, credencial, rotação e o store. Sem
 - `group_model.rs` — `AccountGroup` e `RouterConfig` (o `config.json`). serde camelCase,
   `accountIDs` renomeado à mão, ids MAIÚSCULOS.
 - `group_usage.rs` — `UsageOrigin`, `GroupUsageSample`, `ModelUsage`, `GroupUsageStore`.
-  A escrita preserva o bloco por modelo quando a amostra nova não o traz.
+  A escrita preserva o bloco por modelo quando a amostra nova não o traz. `safe_stem` é a
+  limpeza do e-mail no nome do arquivo (o histórico usa a mesma).
 - `group_usage_reader.rs` — `GroupUsageReader`/`AccountUsage`: maior janela válida, empate
   vai para a de horizonte mais longo (`max_by` = último dos empatados, igual `max(by:<=)`).
+- `usage_history.rs` — `UsageHistoryPoint`/`UsageHistory` (21/10/2026, só do Windows): um ponto
+  por medição da SONDA em `<base>\history\<email>.jsonl` — o vocabulário da amostra, janela
+  ausente fica ausente (nunca zero), as por modelo vão junto. `append` relê (linha ilegível é
+  pulada), poda o que passou de 90 dias, ordena e regrava atômico; `read`/`last_sampled_at`.
+- `measure_schedule.rs` — `MeasureSchedule` (21/10/2026): a regra PURA da medição de 5 em 5
+  horas — vence quando a mais nova entre a última medição gravada e a última tentativa da
+  agenda tem 5 h ou mais (ou nunca houve nenhuma).
 - `anthropic_adapter.rs` — `AnthropicAdapter`: lê o `.claude.json` (`identity`), grava a
   identidade de forma **cirúrgica** (`write_identity` + `splice_identity`) e diz onde mora a
   credencial (`<perfil>\.credentials.json`).
@@ -34,7 +42,8 @@ Modelos, formato da amostra, leitor de uso, credencial, rotação e o store. Sem
 - `router_config_store/` — ≙ `RouterConfigStore` (sem UI). Um tipo só, a fachada que a UI
   chama, dividido por motivo de mudança: `mod.rs` (tipos, construção, leitura do estado,
   persistência), `groups.rs`, `accounts.rs` (login/relogin), `rotation.rs` (o que toca
-  credencial) e `terminal.rs` (integração de shell). Era um arquivo de 869 linhas — quebrado
+  credencial e a medição — inclusive `scheduled_measure_plans`, o plano da agenda de 5 em 5
+  horas) e `terminal.rs` (integração de shell). Era um arquivo de 869 linhas — quebrado
   em 24/09/2026 pela régua de 600 linhas de produção (ver `CONTRIBUTING.md`).
 - `engine_lock.rs` — trava entre processos (mutex nomeado `Local\com.synqo.falcao-router.engine.<fnv>`,
   nome derivado da base) em volta de toda escrita de credencial do store e da CLI.
@@ -50,7 +59,8 @@ Modelos, formato da amostra, leitor de uso, credencial, rotação e o store. Sem
   de outra máquina, confere o processo (tolerância 300 s; sem prova confia no pid), mais nova
   primeiro.
 - `router_paths.rs` — base `%LOCALAPPDATA%\com.synqo.falcao-router` (override `ROUTER_APP_SUPPORT`),
-  com `config.json`, `usage\` e o `statusline.json` (a escolha da status line, só do Windows).
+  com `config.json`, `usage\`, o `statusline.json` (a escolha da status line) e o `history\`
+  (o histórico das medições) — os dois últimos só do Windows.
 
 - `shell_integration.rs` — ≙ `ShellIntegration`: a `statusLine` (`/` e sem aspas; com espaço, 8.3;
   sem 8.3, aspas do shell detectado — `&` no PowerShell; `--profile` nos grupos dedicados),
@@ -111,3 +121,15 @@ Modelos, formato da amostra, leitor de uso, credencial, rotação e o store. Sem
   na casa desta, e "Usar" serviria a outra conta com o nome desta (o macOS deixava). A credencial
   estranha sai (a conta fica sem login, o estado honesto); só age quando a casa tem mesmo outra
   identidade.
+- 21/10/2026 (histórico de uso, decidido com o usuário):
+  - Só a SONDA entra no histórico (a agenda de 5 em 5 horas, o "Medir contas" e o `router
+    measure`); o sensor não. Quem grava é o `measure_into`, depois da amostra e sob a mesma
+    trava — falha no histórico não desfaz a medição.
+  - Pasta própria (`history\`), não o `usage\`: aquele é a última amostra, regravada pelo
+    sensor a cada render, e o contrato com o macOS.
+  - Regravar o arquivo inteiro (temp + rename) em vez de acrescentar: queda nunca deixa linha
+    pela metade, e a poda de 90 dias vai junto. ~5 pontos por dia, arquivo pequeno.
+  - A agenda conta a TENTATIVA (sucesso ou falha) além do último ponto: sem ela, uma conta
+    deslogada seria sondada a cada volta do laço. As tentativas moram no app (memória).
+  - `scheduled_measure_plans`: um plano por grupo, só as contas vencidas, cada conta uma vez (a
+    que está em dois grupos vai no primeiro), a ativa pelo perfil do grupo (`probe_targets`).

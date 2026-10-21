@@ -7,6 +7,19 @@ a fix on one platform never waits for the other's calendar.
 > ⚠️ `releases/latest` is **ambiguous** in this repository — it resolves to
 > whichever platform released last. Link to a tag, never to `/latest`.
 
+## [Unreleased]
+
+### Added
+
+- **Usage history.** A **History** tab draws two lines per account — the 5-hour
+  window over the last 7 days and the weekly window over the last 4 weeks — from
+  the probe's measurements, with the group's threshold dashed on both. While the
+  app is open it measures each account every 5 hours (**Settings → History**, on
+  by default); **Measure accounts** and `router measure` add their points too.
+  More than 7½ hours without a point breaks the line instead of guessing. Hover a
+  chart, or focus it and use ← →, to read a point. The points are kept for 90 days
+  in `%LOCALAPPDATA%\com.synqo.falcao-router\history`.
+
 ## [1.0.0] — 2026-09-24
 
 First Windows release. The port reads and writes the same files as the macOS
@@ -54,4 +67,5 @@ instead, so an update over a live session works.
 The inherited token meter (JSONL cost, pricing, alerts), code signing and arm64
 are out of scope for this first release.
 
+[Unreleased]: https://github.com/Falkzera/falcao-token-router/compare/windows-v1.0.0...HEAD
 [1.0.0]: https://github.com/Falkzera/falcao-token-router/releases/tag/windows-v1.0.0

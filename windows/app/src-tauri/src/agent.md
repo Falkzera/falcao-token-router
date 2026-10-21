@@ -13,8 +13,18 @@
   quis o X que tira o app da barra. A janela destruída encerra o login que estivesse nela
   (ninguém veria o desfecho).
 - `state.rs` — `AppState`: o `RouterConfigStore` (montado como na CLI: credencial em arquivo com a
-  guarda do perfil padrão) atrás de um `Mutex` que sobrevive a envenenamento, o idioma, a home e
-  a aba pedida para a próxima abertura da janela.
+  guarda do perfil padrão) atrás de um `Mutex` que sobrevive a envenenamento, o idioma, a home,
+  a aba pedida para a próxima abertura da janela (Grupos, Histórico, Ajustes), o grupo sendo
+  medido (`try_start_measuring`: atômico, o botão e a agenda nunca medem juntos) e as tentativas
+  da agenda por conta (memória: o que segura uma conta deslogada).
+- `history.rs` — a aba Histórico (21/10/2026): `get_history` e o quadro dela (`build`, puro com
+  fuso e relógio por parâmetro, testado): por grupo e conta, a janela de 5h dos últimos 7 dias
+  e a semanal das últimas 4 semanas, recortadas, quebradas em buracos de mais de 7h30, com o %
+  do núcleo e as horas pelo `reset_when` (ponto, reset, "próxima às"); marcas do eixo na
+  meia-noite local (dia da semana / data a cada 7 dias); o limiar do grupo.
+- `measure_schedule.rs` — a medição de 5 em 5 horas (21/10/2026): `check` olha a agenda (chave
+  ligada, nada medindo, sem login em andamento, `claude` achado), anota as tentativas e mede
+  numa thread os planos do store grupo a grupo, com o spinner do grupo; falha não abre o aviso.
 - `tray.rs` — a bandeja: anel do `gauge-mark` no tamanho exato do ícone pequeno (cache por
   `TrayKey`), tooltip, menu do botão direito (Grupos, Ajustes, Sair — as portas do rodapé do
   painel do macOS); clique esquerdo (na soltura) abre o flyout junto do ícone.
@@ -36,7 +46,8 @@
   `CloseRequested` e no `RunEvent::Exit` (o "Sair" com a janela aberta).
 - `commands.rs` — os comandos da janela de Grupos: cada ação muda o store (sob a trava), redesenha
   a bandeja, emite `snapshot-changed` e devolve o quadro novo. "Medir contas" roda a sonda numa
-  thread FORA da trava (planeja → roda → publica), uma medição por vez, com o spinner no quadro.
+  thread FORA da trava (planeja → roda → publica), uma medição por vez (a mesma marca da agenda
+  de 5 em 5 horas), com o spinner no quadro.
   Grupo novo com a escolha de padrão (`add_group_with`); login estranho no `~\.claude`
   (`foreign_default_login`); dispensar o erro. `copy_text` (plugin clipboard) mora no `lib.rs`.
 - `terminal.rs` — a integração de terminal na tela: o quadro POR SHELL (`terminal_report`, fora
@@ -47,9 +58,11 @@
   ou shell sem a linha — a política e o `.bash_profile` que ignora o `.bashrc` têm correção
   própria); `bash_login_file` nomeia o perfil de login do Git Bash. Testado (`view`).
 - `settings.rs` — ajustes do app em `<Roaming>\com.synqo.falcao-token-router\settings.json`
-  (`show_in_taskbar`, o último tamanho da janela e o resumo das contas — `hidden_summary`, os
+  (`show_in_taskbar`, o último tamanho da janela, o resumo das contas — `hidden_summary`, os
   `SummaryItem` TIRADOS: de fábrica nada, item desconhecido ignorado sem derrubar o resto,
-  gravado sem repetidos na ordem da tela, comando `set_hidden_summary`; ilegível = padrão;
+  gravado sem repetidos na ordem da tela, comando `set_hidden_summary` — e a medição de 5 em 5
+  horas — `scheduled_measure`, ligada de fábrica e quando o campo falta, comando
+  `set_scheduled_measure`, que avisa as janelas; `Default` à mão por isso); ilegível = padrão;
   `remember` muda só a memória e `flush` grava se algo mudou — `update` grava tudo na hora); "abrir no login" pelo plugin de autostart, SEMPRE relido
   do sistema, com o motivo da recusa; `open_url` só para a lista (ms-settings:developers/taskbar,
   logout do claude.ai, hosts do login oficial — testado). `SettingsStore::at` para os testes.
@@ -68,6 +81,8 @@
   também rotaciona, como o macOS (a 1ª volta, com rotação, é na subida). Emite
   `snapshot-changed` para as janelas. Com um login em andamento a rotação fica para a próxima
   volta: ela espelha grupo → casa da conta ativa e pisaria na credencial nova de um relogin.
+  A partir da 2ª volta de rotação (3 min depois da subida) olha também a agenda da medição de 5
+  em 5 horas (`measure_schedule::check`) — na abertura do Windows não disputa a máquina.
 - `login_output.rs` — o que a saída do `claude auth login` diz, lida através do ConPTY (puro,
   testado, com o fluxo REAL gravado): limpa VT/ANSI em fluxo (sequência cortada entre pedaços
   não vaza), pega o link pelo texto visível (só completo, só nos dois hosts oficiais, nunca

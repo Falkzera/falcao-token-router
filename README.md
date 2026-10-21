@@ -102,9 +102,10 @@ $ router measure trabalho
 
 It asks the official binary (`claude --print /usage`) — the same thing that
 happens when you type `/usage` yourself. Still no network call of our own, still
-no token read. It costs a Node cold start per account, so it is a button and a
-command, never a loop; the passive sensor remains the thing that runs every
-minute.
+no token read. It costs a Node cold start per account, so on macOS it is a button
+and a command, never a loop. The Windows app also runs it every 5 hours while it's
+open (a setting, on by default) and keeps each reading for its History tab. The
+passive sensor remains the thing that runs every minute.
 
 Per-model numbers carry their own timestamp, separate from the sensor's, because
 the two age at different rates. An account active in a group is always probed

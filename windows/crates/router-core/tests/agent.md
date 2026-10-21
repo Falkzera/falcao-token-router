@@ -20,7 +20,15 @@ Credencial/adapter falsos em memória ou pastas temporárias — nada toca o sis
   a ponta com arquivos reais).
 - `store_tests.rs` — os 16 do `StoreTests.swift` + regressões (config ilegível, reordenar, remoção
   fora da base, sessões, integração, sonda) + o que o app usa (grupo criado dedicado, login
-  estranho no `~\.claude`, contas exclusivas, medição em três passos, casa pendente descartada).
+  estranho no `~\.claude`, contas exclusivas, medição em três passos, casa pendente descartada)
+  + o plano da medição de 5 em 5 horas (só as vencidas, grupo a grupo, conta em dois grupos uma
+  vez, tentativa recente segura a conta, ativa pelo grupo).
+- `history_tests.rs` — o histórico de uso (21/10/2026): ordem, poda de 90 dias, linha estragada
+  pulada, nome do `usage\` com `.jsonl`, data sem fração, janela ausente fora da linha; e a
+  sonda gravando o ponto (falha no histórico não derruba a medição; medição falha não deixa
+  ponto; leitura sem a sessão não vira 5h zero).
+- `schedule_tests.rs` — a regra pura da agenda (`MeasureSchedule`): nunca medida vence, menos
+  de 5 h não, 5 h exatas sim, a tentativa que falhou segura por 5 h.
 - `terminal_report_tests.rs` — o quadro da integração por shell (edições, política sem o escopo
   Process, `function claude` em UTF-8/UTF-16, `.bash_profile`, scripts atuais/obsoletos), numa
   máquina de mentira: nenhum PowerShell de verdade é consultado.

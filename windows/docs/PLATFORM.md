@@ -137,6 +137,39 @@ after recording the sample — the sensor is the same in every mode:
   checks the sensor runs, and an empty line passes), reports the choice, and in
   command mode runs the user's command against a sample session.
 
+## The measurement history
+
+Windows only (2026-10-21). Every probe measurement — **Measure accounts**,
+`router measure`, and the app's own every-5-hours schedule — leaves a point in
+`<data dir>\history\<e-mail>.jsonl`. The engine writes it inside the probe
+(`measure_into`), after the sample and under the same engine lock:
+
+```json
+{"sampledAt":"2026-10-21T12:00:00Z","fiveHourPercent":0.29,"fiveHourResetsAt":"2026-10-21T14:05:00Z","sevenDayPercent":0.33,"sevenDayResetsAt":"2026-10-27T09:00:00Z","models":[{"name":"Fable","percent":0.12}]}
+```
+
+- The file name is the `usage\` one with `.jsonl`. A window the reading didn't
+  have is absent, never zero. Points older than 90 days go when the next one is
+  written; the file is rewritten whole (temp + rename), so a crash never leaves
+  half a line, and a line that doesn't parse is skipped without the others.
+- A failure writing the history doesn't fail the measurement: the sample in
+  `usage\`, which drives the rotation, is already on disk.
+- The sensor writes nothing here, and the macOS app neither reads nor writes the
+  folder: `usage\<e-mail>.json` and `config.json` stay the shared contract.
+- **The schedule** lives in the app: Settings → History → "Measure accounts every 5
+  hours", on by default, kept as `scheduledMeasure` in the app's `settings.json`.
+  An account is due when the newest of its last point and the app's last scheduled
+  attempt on it is 5 hours old or more — the attempt is what keeps a signed-out
+  account from being probed on every pass. The check runs with the rotation, every
+  180 s, from the second pass on (3 minutes after the app starts). It waits while a
+  sign-in is in progress or another measurement runs, measures group by group (an
+  account in two groups once, the active one through its group's profile), and
+  stays quiet: no error banner, since nobody asked.
+- **The History tab** draws the 5-hour window over the last 7 days and the weekly
+  window over the last 4 weeks. The series come from the backend already cut,
+  split where two points are more than 7 h 30 min apart, with the percentages from
+  `UsagePercent` and the times written by the status line's `reset_when`.
+
 ## PowerShell and Git Bash
 
 - A literal `--` reaches a native executable, but a PowerShell **function** drops it
@@ -281,6 +314,7 @@ folder. A real profile always has the folder, and the sandbox now creates it.
 | Data directory | `~/Library/Application Support/com.synqo.falcao-router` | `%LOCALAPPDATA%\com.synqo.falcao-router` (Local, not Roaming) |
 | Finding `claude` | three separate searches | one resolver: `ROUTER_CLAUDE_BIN`, `~\.local\bin\claude.exe`, `PATH`, `%APPDATA%\npm` (an npm `claude.cmd` shim is read and run as `node cli.js`, never through `cmd.exe`); Claude Desktop's copy and WindowsApps aliases are skipped |
 | Group status line | always the router's line | the router's line with the items the user keeps, or the user's own command after the sensor (`statusline.json`) |
+| The probe | a button and `router measure` | the same, plus every 5 hours while the app runs; each reading kept in `history\<e-mail>.jsonl` for the History tab |
 
 ## Deliberate differences
 
