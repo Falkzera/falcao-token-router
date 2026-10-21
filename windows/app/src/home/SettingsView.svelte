@@ -7,11 +7,13 @@
   // - "Mostrar na barra de tarefas" (≙ "Mostrar no Dock", pela mesma razão).
   // - a dica do ícone escondido no `^` do Windows 11, com o atalho para as
   //   Configurações onde se escolhe o que fica à vista.
-  // Antes delas, a status line das sessões dos grupos (`StatusLineSection`) e o
-  // que o resumo de cada conta mostra na aba Grupos (`SummarySection`).
+  // Antes delas, a status line das sessões dos grupos (`StatusLineSection`), o
+  // que o resumo de cada conta mostra na aba Grupos (`SummarySection`) e a
+  // medição de 5 em 5 horas que alimenta a aba Histórico (21/10/2026).
   import { onMount } from "svelte";
   import * as api from "../lib/api";
   import { t } from "../lib/i18n";
+  import Rich from "../lib/Rich.svelte";
   import Switch from "../lib/Switch.svelte";
   import type { SettingsView } from "../lib/types";
   import StatusLineSection from "./StatusLineSection.svelte";
@@ -28,6 +30,20 @@
   <div class="settings">
     <StatusLineSection />
     <SummarySection initial={settings.hiddenSummary} />
+
+    <section>
+      <h3>{t("settings.section.history")}</h3>
+      <div class="group">
+        <div class="row">
+          <Switch
+            checked={settings.scheduledMeasure}
+            label={t("settings.history.measure")}
+            onChange={async (on) => (settings = await api.setScheduledMeasure(on))}
+          />
+          <p class="detail"><Rich text={t("settings.history.measure.detail")} /></p>
+        </div>
+      </div>
+    </section>
 
     <section>
       <h3>{t("settings.section.system")}</h3>

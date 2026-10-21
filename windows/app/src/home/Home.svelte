@@ -1,5 +1,6 @@
 <script lang="ts">
-  // A janela única (≙ HomeWindow.swift): Grupos (o produto) e Ajustes, em abas.
+  // A janela única (≙ HomeWindow.swift): Grupos (o produto), Histórico e
+  // Ajustes, em abas.
   // O tamanho é da janela (do usuário, lembrado pelo Rust), nunca do conteúdo:
   // as abas têm alturas naturais diferentes e a janela pularia a cada troca.
   // Numa janela larga, abas e páginas seguem a mesma coluna (`--page-inline`).
@@ -8,6 +9,7 @@
   import { t } from "../lib/i18n";
   import type { AccountView, AppInfo, HomeTab, LoginView } from "../lib/types";
   import GroupsView from "./GroupsView.svelte";
+  import HistoryView from "./HistoryView.svelte";
   import LoginDialog from "./LoginDialog.svelte";
   import SettingsView from "./SettingsView.svelte";
 
@@ -55,6 +57,9 @@
     <button role="tab" aria-selected={tab === "groups"} onclick={() => (tab = "groups")}>
       {t("home.tab.groups")}
     </button>
+    <button role="tab" aria-selected={tab === "history"} onclick={() => (tab = "history")}>
+      {t("home.tab.history")}
+    </button>
     <button role="tab" aria-selected={tab === "settings"} onclick={() => (tab = "settings")}>
       {t("home.tab.settings")}
     </button>
@@ -63,6 +68,8 @@
   <section class="page" role="tabpanel">
     {#if tab === "groups"}
       <GroupsView onAddAccount={(groupId) => void addAccount(groupId)} onRelogin={(account, groupId) => void relogin(account, groupId)} />
+    {:else if tab === "history"}
+      <HistoryView />
     {:else}
       <SettingsView />
     {/if}
