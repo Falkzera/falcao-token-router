@@ -22,6 +22,7 @@ use crate::locale::{self, Locale};
 #[serde(rename_all = "lowercase")]
 pub enum HomeTab {
     Groups,
+    History,
     Settings,
 }
 
@@ -80,8 +81,26 @@ impl AppState {
         *lock(&self.measuring) = group;
     }
 
+    /// Marca o grupo como "medindo" se nada está sendo medido. Atômico: o
+    /// botão e a agenda de 5 em 5 horas nunca medem ao mesmo tempo.
+    pub fn try_start_measuring(&self, group: Id) -> bool {
+        let mut measuring = lock(&self.measuring);
+        if measuring.is_some() {
+            return false;
+        }
+        *measuring = Some(group);
+        true
+    }
+
     pub fn measure_attempts(&self) -> HashMap<Id, DateTime<Utc>> {
         lock(&self.measure_attempts).clone()
+    }
+
+    pub fn record_attempts(&self, accounts: impl IntoIterator<Item = Id>, at: DateTime<Utc>) {
+        let mut attempts = lock(&self.measure_attempts);
+        for id in accounts {
+            attempts.insert(id, at);
+        }
     }
 
     pub fn store(&self) -> MutexGuard<'_, RouterConfigStore> {

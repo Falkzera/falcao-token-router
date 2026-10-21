@@ -2,8 +2,9 @@
 //!
 //! Apresentação e orquestração: a regra de negócio mora no `router-core`, a
 //! marca (o anel) no `gauge-mark`. Aqui ficam a bandeja, as duas janelas (o
-//! flyout da bandeja e a janela de Grupos/Ajustes), o laço de rotação, o login
-//! por ConPTY e a ponte de comandos com o front em Svelte.
+//! flyout da bandeja e a janela de Grupos/Histórico/Ajustes), o laço de
+//! rotação com a medição de 5 em 5 horas, o login por ConPTY e a ponte de
+//! comandos com o front em Svelte.
 
 mod commands;
 mod flyout;
@@ -14,6 +15,7 @@ mod locale;
 mod login;
 mod login_output;
 mod login_session;
+mod measure_schedule;
 mod rotation_loop;
 mod settings;
 mod snapshot;
