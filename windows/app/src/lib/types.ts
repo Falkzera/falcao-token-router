@@ -3,7 +3,7 @@
 
 export type Locale = "en" | "pt-BR";
 
-export type HomeTab = "groups" | "settings";
+export type HomeTab = "groups" | "history" | "settings";
 
 /** Qual superfície uma janela mostra. */
 export type View = "home" | "flyout";
@@ -170,6 +170,8 @@ export interface SettingsView {
   showInTaskbar: boolean;
   /** O que o resumo das contas NÃO mostra (de fábrica, nada). */
   hiddenSummary: SummaryItem[];
+  /** "Medir as contas a cada 5 horas" (de fábrica, ligada). */
+  scheduledMeasure: boolean;
   version: string;
 }
 
@@ -225,4 +227,57 @@ export interface Snapshot {
   lastError: ErrorView | null;
   /** O estado barato da integração (o quadro por shell é pedido à parte). */
   scripts: ScriptsState;
+}
+
+/** Um ponto do Histórico: a fração (o desenho), o % pronto (do núcleo) e as
+ *  horas escritas pelo Rust, no fuso do Windows e no idioma do app. */
+export interface HistoryPoint {
+  at: string;
+  fraction: number;
+  text: string;
+  /** Quando foi medido ("qua (21) 10:05"). */
+  label: string;
+  /** Quando aquela janela resetava, se a leitura disse. */
+  resetsLabel: string | null;
+}
+
+/** Uma marca do eixo do tempo (a meia-noite local). */
+export interface HistoryTick {
+  at: string;
+  label: string;
+}
+
+export interface HistorySeries {
+  from: string;
+  to: string;
+  ticks: HistoryTick[];
+  /** Trechos da linha: mais de 7h30 sem ponto quebra a linha. */
+  segments: HistoryPoint[][];
+  latest: HistoryPoint | null;
+}
+
+export interface AccountHistory {
+  id: string;
+  label: string;
+  email: string;
+  lastMeasuredAt: string | null;
+  /** Com a agenda ligada; pode já ter passado ("em instantes"). */
+  nextMeasureAt: string | null;
+  nextMeasureLabel: string | null;
+  /** A janela de 5h nos últimos 7 dias. */
+  fiveHour: HistorySeries;
+  /** A semanal nas últimas 4 semanas. */
+  sevenDay: HistorySeries;
+}
+
+export interface GroupHistory {
+  id: string;
+  name: string;
+  thresholdPercent: number;
+  accounts: AccountHistory[];
+}
+
+export interface HistoryView {
+  scheduleOn: boolean;
+  groups: GroupHistory[];
 }

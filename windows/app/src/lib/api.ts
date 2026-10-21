@@ -9,6 +9,7 @@ import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { mockInvoke, mockListen, mockLoginListen } from "./mock";
 import type {
   AppInfo,
+  HistoryView,
   HomeTab,
   InstallResult,
   LoginView,
@@ -117,6 +118,13 @@ export const setHiddenSummary = (hidden: SummaryItem[]) =>
   call<SettingsView>("set_hidden_summary", { hidden });
 /** Só os endereços da lista do backend (Configurações do Windows, logout, login). */
 export const openUrl = (url: string) => call<void>("open_url", { url });
+
+// MARK: - Histórico (as medições da sonda, de 5 em 5 horas e sob demanda)
+
+/** As duas séries de cada conta (5h em 7 dias, semanal em 4 semanas), prontas. */
+export const getHistory = () => call<HistoryView>("get_history");
+/** "Medir as contas a cada 5 horas". */
+export const setScheduledMeasure = (on: boolean) => call<SettingsView>("set_scheduled_measure", { on });
 
 // MARK: - Status line (a escolha mora na base do router; a CLI a lê a cada render)
 

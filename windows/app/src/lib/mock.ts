@@ -3,7 +3,9 @@
 // quadro e avisam a tela, como o backend de verdade. Cenário, idioma, janela,
 // aba e seleção vêm da URL:
 //   ?view=home|flyout  &state=uso|vazio|pronta|critico|erro  &lang=en|pt-BR
-//   &tab=groups|settings  &select=<conta>  &foreign=<e-mail>  &scripts=current|missing|stale
+//   &tab=groups|history|settings  &select=<conta>  &foreign=<e-mail>  &scripts=current|missing|stale
+// O histórico (aba Histórico, `mock-history.ts`):
+//   &historico=cheio|vazio|lacuna|desligado
 // A integração de terminal e os ajustes:
 //   &terminal=ausente|ok|bloqueado|parcial|velha|semrouter  &devmode=1
 //   &install=falha (Ativar grava só parte)  &diretiva=1 (Permitir não vence a política)
@@ -38,6 +40,7 @@ import type {
   TerminalView,
   UsageView,
 } from "./types";
+import { mockHistory } from "./mock-history";
 
 function param(name: string): string | null {
   return new URLSearchParams(window.location.search).get(name);
@@ -48,7 +51,8 @@ function mockLocale(): Locale {
 }
 
 function mockTab(): HomeTab {
-  return param("tab") === "settings" ? "settings" : "groups";
+  const tab = param("tab");
+  return tab === "settings" || tab === "history" ? tab : "groups";
 }
 
 const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
@@ -288,6 +292,7 @@ const settings: SettingsView = {
   autostartFailure: null,
   showInTaskbar: param("taskbar") === "1",
   hiddenSummary: (param("resumo")?.split(",").filter(Boolean) ?? []) as SummaryItem[],
+  scheduledMeasure: param("historico") !== "desligado",
   version: "0.1.0-mock",
 };
 
@@ -704,6 +709,12 @@ const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
     const order: SummaryItem[] = ["fiveHour", "fiveHourReset", "sevenDay", "sevenDayReset", "model", "modelReset"];
     const hidden = args.hidden as SummaryItem[];
     settings.hiddenSummary = order.filter((item) => hidden.includes(item));
+    return { ...settings };
+  },
+  get_history: () => mockHistory(state.groups, mockLocale(), param("historico"), settings.scheduledMeasure),
+  set_scheduled_measure: (args) => {
+    settings.scheduledMeasure = Boolean(args.on);
+    changed();
     return { ...settings };
   },
   open_url: (args) => {
