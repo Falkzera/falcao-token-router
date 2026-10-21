@@ -7,6 +7,7 @@
 
 mod commands;
 mod flyout;
+mod history;
 mod home_window;
 mod i18n;
 mod locale;
@@ -219,6 +220,7 @@ pub fn run() {
             commands::dismiss_error,
             commands::foreign_default_login,
             commands::measure_group,
+            history::get_history,
             terminal::terminal_report,
             terminal::install_integration,
             terminal::allow_profiles_for,

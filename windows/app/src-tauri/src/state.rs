@@ -1,9 +1,11 @@
 //! O estado do app, um só por processo: o store do motor (a MESMA montagem da
-//! CLI — credencial em arquivo com a guarda do perfil padrão), o idioma e a aba
-//! que a janela deve abrir.
+//! CLI — credencial em arquivo com a guarda do perfil padrão), o idioma, a aba
+//! que a janela deve abrir e o que a medição (botão e agenda) precisa lembrar.
 
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard};
 
+use chrono::{DateTime, Utc};
 use router_core::engine::anthropic_adapter::AnthropicAdapter;
 use router_core::engine::credential_store::FileCredentialStore;
 use router_core::engine::default_profile_guard::DefaultProfileGuard;
@@ -34,6 +36,9 @@ pub struct AppState {
     /// O grupo que a sonda está medindo agora (fora da trava do store: a
     /// sonda leva segundos por conta e a bandeja segue respondendo).
     measuring: Mutex<Option<Id>>,
+    /// A última tentativa da medição automática em cada conta, nesta execução
+    /// do app — o que segura uma conta deslogada (ver `MeasureSchedule`).
+    measure_attempts: Mutex<HashMap<Id, DateTime<Utc>>>,
 }
 
 /// Um `Mutex` envenenado (pânico noutra thread) não pode derrubar a bandeja:
@@ -63,6 +68,7 @@ impl AppState {
             home,
             pending_tab: Mutex::new(None),
             measuring: Mutex::new(None),
+            measure_attempts: Mutex::new(HashMap::new()),
         }
     }
 
@@ -72,6 +78,10 @@ impl AppState {
 
     pub fn set_measuring(&self, group: Option<Id>) {
         *lock(&self.measuring) = group;
+    }
+
+    pub fn measure_attempts(&self) -> HashMap<Id, DateTime<Utc>> {
+        lock(&self.measure_attempts).clone()
     }
 
     pub fn store(&self) -> MutexGuard<'_, RouterConfigStore> {

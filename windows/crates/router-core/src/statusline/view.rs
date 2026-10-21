@@ -16,7 +16,7 @@
 
 use std::path::{Path, PathBuf};
 
-use chrono::{Datelike, NaiveDateTime, Timelike};
+use chrono::{Datelike, NaiveDateTime, Timelike, Weekday};
 
 use crate::usage::usage_percent::UsagePercent;
 
@@ -310,15 +310,21 @@ pub fn reset_when(at: NaiveDateTime, with_day: bool, portuguese: bool) -> String
     }
 }
 
-/// "seg (28) 9:00" / "Mon (28) 9:00": o reset semanal pode cair em qualquer
-/// dia. Hora sem zero à esquerda, de propósito.
-fn day_and_time(at: NaiveDateTime, portuguese: bool) -> String {
+/// O dia da semana abreviado como a linha o escreve ("seg" / "Mon"). Público:
+/// as marcas de dia do gráfico da aba Histórico usam os mesmos nomes.
+pub fn weekday_abbrev(weekday: Weekday, portuguese: bool) -> &'static str {
     const PT: [&str; 7] = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
     const EN: [&str; 7] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     let names = if portuguese { PT } else { EN };
+    names[weekday.num_days_from_sunday() as usize]
+}
+
+/// "seg (28) 9:00" / "Mon (28) 9:00": o reset semanal pode cair em qualquer
+/// dia. Hora sem zero à esquerda, de propósito.
+fn day_and_time(at: NaiveDateTime, portuguese: bool) -> String {
     format!(
         "{} ({}) {}:{:02}",
-        names[at.weekday().num_days_from_sunday() as usize],
+        weekday_abbrev(at.weekday(), portuguese),
         at.day(),
         at.hour(),
         at.minute()
