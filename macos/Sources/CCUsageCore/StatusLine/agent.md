@@ -10,7 +10,7 @@ Par do `windows/crates/router-core/src/statusline/`, portado dele.
 ## Arquivos
 - `StatusLineView.swift` — o modelo (`Label`, `Window`, `Context`, `Style`) e o `render`: a linha inteira, pura.
 - `StatusLinePaint.swift` — ANSI, cor por severidade, a barra, e a animação do `effort` (o brilho do `xhigh`, o arco-íris do `max`), com a fase entrando por parâmetro.
-- `StatusLineFormat.swift` — texto: `resetWhen` (o "quando" de um reset), nome do modelo, tokens, caminho encurtado.
+- `StatusLineFormat.swift` — texto: `resetWhen` (o "quando" de um reset), `weekdayName` (o dia abreviado, "seg"/"Mon"), nome do modelo, tokens, caminho encurtado.
 - `StatusLineSource.swift` — o que vem do ambiente: o branch pelo `.git/HEAD` e se o terminal aceita truecolor.
 - `StatusLineSession.swift` — o JSON do Claude Code → `View`, e a sessão de EXEMPLO (`sample`) para a prévia e o `doctor`.
 - `StatusLineChoice.swift` — a ESCOLHA do usuário, em `<base>/statusline.json`: os itens tirados da linha e (a partir do PR seguinte) o comando próprio. Leitura TOLERANTE, gravação atômica.
@@ -27,6 +27,8 @@ Par do `windows/crates/router-core/src/statusline/`, portado dele.
 
 - **24/09/2026 — a escolha guarda os ESCONDIDOS, não os mostrados.** É de propósito: um item novo numa versão futura aparece para todos, como "a completa menos o que eu tirei". Guardar os mostrados esconderia toda novidade de quem já tem o arquivo.
 - **24/09/2026 — a escolha mora em arquivo, não no `UserDefaults`.** A CLI roda fora do app e não lê o `UserDefaults`; e ela não entra no `config.json`, que é o formato combinado com o Windows.
+
+- **21/10/2026 — `weekdayName` é pública.** As marcas de dia dos gráficos do Histórico usam os mesmos nomes da linha, e a dica de cada ponto escreve as horas com o `resetWhen`. O `resetWhen` passou a lê-los dali; a saída dele não mudou.
 
 ## Pendências
 - O modo "meu comando" (roda o comando do usuário depois do sensor, com botão Testar) — próximo PR, par do `command.rs` do Windows. O `StatusLineChoice` já carrega `mode` e `command` para não precisar migrar arquivo depois.

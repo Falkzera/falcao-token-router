@@ -44,6 +44,24 @@ All notable changes to this project are documented here. The format follows
 
   Encontrado pelo porte Windows no primeiro teste real, e portado dele.
 
+### Added
+
+- **Usage history.** A **History** tab draws two lines per account — the 5-hour
+  window over the last 7 days and the weekly window over the last 4 weeks — from
+  the probe's measurements, with the group's threshold dashed on both. While the
+  app is open it measures each account every 5 hours (**Meter → History**, on by
+  default); **Measure accounts** and `router measure` add their points too. More
+  than 7½ hours without a point breaks the line instead of guessing. The points
+  are kept for 90 days in `history/<email>.jsonl` — the same file, in the same
+  format, that the Windows app writes. Ported from the Windows app
+  ([#35](https://github.com/Falkzera/falcao-token-router/pull/35)).
+- **A shortcut to each account's history**: the chart button next to every
+  account on the Groups tab, and **View history** on an account's card in the
+  menu bar panel, open the History tab right on that account.
+- **Delete history…** in **Meter → History** empties the history of every
+  account, after a confirmation. Measuring goes on, and the history starts over
+  with the next measurement.
+
 ## [1.0.0] — 2026-09-22
 
 First stable release of the router. Version numbers restart at 1.0.0 because

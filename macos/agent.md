@@ -19,16 +19,12 @@ Esta pasta é autocontida: `Package.swift`, `VERSION`, `CHANGELOG.md` e
 - `Tests/CCUsageCoreTests/` — a suíte do motor e do store.
 - `Resources/{en,pt-BR}.lproj/` — os catálogos, conferidos pelo `check-strings.sh`.
 - `Scripts/` — `test.sh`, `check-strings.sh`, `bundle.sh`, `dmg.sh`, `icon.sh`, `release.sh`.
-- `docs/plans/` — planos de implementação ainda por executar. `2026-10-21-usage-history.md`: o histórico de uso do Windows (PR #35) trazido para cá, escrito sem toolchain Swift — os testes do plano são o contrato.
 
 ## O que não é óbvio
 - **`swift test` puro não funciona** sob Command Line Tools. Use `./Scripts/test.sh`, que injeta o plugin de macro e o `Testing.framework`. Está no `CONTRIBUTING.md`.
 - **Nunca escrever `@State`** — do SDK do macOS 26 em diante é macro do SwiftUI e o plugin só vem no Xcode. Use `@ViewState` (`Sources/FalcaoTokenRouter/ViewState.swift`).
 - **O `icon.sh` escreve fora desta pasta.** O banner e o card social são do produto, não da plataforma, e vão para `../docs/art` — ele usa `$REPO`, não `$ROOT`.
-- **O que esta pasta compartilha com `windows/` não é código, é o formato em disco:** `config.json`, as casas por conta e `usage/<email>.json`. Mudar esse formato é mudar as duas plataformas.
-
-## Pendências
-- **Histórico de uso** (21/10/2026): o Windows mede cada conta de 5 em 5 horas e desenha a aba Histórico (PR #35); aqui ainda não. O plano está em `docs/plans/2026-10-21-usage-history.md`. Até ele ser executado, o `history/` da base é só do Windows — este app não lê nem grava a pasta.
+- **O que esta pasta compartilha com `windows/` não é código, é o formato em disco:** `config.json`, as casas por conta, `usage/<email>.json` e — desde 21/10/2026 — `history/<email>.jsonl`. Mudar esse formato é mudar as duas plataformas.
 
 ## Decisões com data
 - **24/09/2026** — a pasta nasce. Antes, este projeto era a raiz do repositório e o `windows/` era hóspede; a estrutura contradizia a documentação, que trata portes como cidadãos de primeira classe. `CHANGELOG.md` e `VERSION` vieram junto, porque o Windows já tinha os dele.

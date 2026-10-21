@@ -94,7 +94,8 @@ every platform. The sessions registry is the detector.
 
 `~/Library/Application Support/<bundle-id>/` becomes `$XDG_DATA_HOME` (or
 `~/.local/share`) on Linux and `%LOCALAPPDATA%` on Windows. Everything under it
-— `config.json`, `accounts/`, `groups/`, `usage/`, `shell.sh` — is relative.
+— `config.json`, `accounts/`, `groups/`, `usage/`, `history/`, `shell.sh` — is
+relative.
 
 **Warning:** on macOS the keychain service name is a hash of the profile path,
 so moving the data directory orphans every credential. If your credential store
@@ -119,14 +120,20 @@ source and its age.** That's an invariant, not a style.
   items don't sync — but the format allows it).
 - `GroupUsageSample`, `GroupUsageStore`, `GroupUsageReader` — the sample
   format and the decision.
+- `UsageHistory`, `MeasureSchedule`, `UsageHistoryChart` — the history file
+  (`history/<email>.jsonl`, one line per probe measurement, kept 90 days), the
+  rule for when the app measures an account again (5 hours after the newest of
+  its last measurement and its last attempt), and what the History charts draw.
+  The macOS and Windows apps write the same file and read each other's.
 - `RotationEngine` — the rules. Every line of it exists because its absence
   killed an account.
 - `ClaudeUsageProbe.parse` and `resetDate` — the `/usage` parser, with its two
   time formats and the nearest-year rule.
 - `SessionRegistry.session(from:)` — the registry record decoder.
 - `ProviderEnv` — the environment scrub.
-- The tests. `EngineTests`, `StoreTests`, `ProbeTests`, `SessionRegistryTests`
-  run against in-memory fakes and don't touch the platform.
+- The tests. `EngineTests`, `StoreTests`, `ProbeTests`, `SessionRegistryTests`,
+  `UsageHistoryTests`, `MeasureScheduleTests` and `UsageHistoryChartTests` run
+  against in-memory fakes and temporary folders and don't touch the platform.
 
 ## What "done" looks like
 

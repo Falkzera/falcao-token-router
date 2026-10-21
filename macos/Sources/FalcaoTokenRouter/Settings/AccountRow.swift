@@ -9,6 +9,8 @@ struct AccountRow: View {
     let usage: AccountUsage?
     let sampledAt: Date?
     let onSwitch: () -> Void
+    /// Abre o Histórico nesta conta (21/10/2026).
+    let onHistory: () -> Void
     let onRelogin: () -> Void
     let onRemove: () -> Void
 
@@ -75,6 +77,11 @@ struct AccountRow: View {
                 Button("groups.account.use", action: onSwitch)
                     .controlSize(.small).buttonStyle(.bordered)
             }
+            // O atalho para o Histórico DESTA conta: sempre visível, ao lado do
+            // menu — é ele que leva da lista ao gráfico sem procurar a conta.
+            Button(action: onHistory) { Image(systemName: "chart.xyaxis.line") }
+                .buttonStyle(.borderless)
+                .help(String(localized: "groups.account.history"))
             // Ações raras ficam atrás do menu; "usar" fica exposto porque é a
             // ação frequente.
             Menu {

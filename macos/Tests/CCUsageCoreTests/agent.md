@@ -10,6 +10,10 @@ Testes do motor e do store — chaveiro/adapter falsos em memória, caminhos tem
 - `ProbeTests.swift` — a sonda: parse da saída REAL do `claude /usage` (fixture capturada em 18/09/2026), virada de ano no reset, `probeConfigDir` (ativa vai pelo grupo), o por modelo entrando na decisão de rotação, e a preservação do bloco por modelo quando o sensor escreve por cima.
 - `ProbeTests.swift` (suite `UsageOriginTests`) — procedência: amostra antiga sem a chave decodifica como sensor, a origem sobrevive ao disco, sensor por cima da sonda troca a origem mas preserva o modelo, e a origem chega ao `AccountUsage` que a UI lê.
 - `SessionRegistryTests.swift` — o registro de sessões: leitura de um registro real, status desconhecido virando `.other` (e não `idle`), processo morto descartado, pid reciclado recusado pelo instante de início, e o `ctime` com dia de um dígito.
+- `UsageHistoryTests.swift` — o histórico (21/10/2026): ordem, poda de 90 dias, linha estragada pulada, formato (sem fração, janela ausente sem chave, `models` omitido), **uma linha gravada pelo Windows lida aqui**, apagar só os `.jsonl`; e o `ProbeRecord` (amostra + ponto, histórico que falha não desfaz a amostra, sessão ausente não vira zero).
+- `MeasureScheduleTests.swift` — a regra da agenda: nunca medida vence, 5 horas exatas vencem, a tentativa que falhou segura a conta.
+- `HistoryStoreTests.swift` — o store com o histórico: o plano só com as vencidas, grupo a grupo; conta em dois grupos medida uma vez; a tentativa recente; a ativa pelo perfil do grupo; login aberto segura a agenda; apagar.
+- `UsageHistoryChartTests.swift` — as séries dos gráficos, num fuso fixo (UTC−3): períodos de 7 e 28 dias, buraco de mais de 7h30, ausência fora do gráfico, marcas e nomes dos dias.
 - Demais suites herdadas do medidor (UsageStore, parsers, pricing).
 - *(`PanoramaTests.swift` saiu em 18/09/2026 junto com o subsistema que testava.)*
 

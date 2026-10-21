@@ -63,6 +63,11 @@ struct SettingsView: View {
     /// para o campo manual não ser preenchido no escuro.
     let calibratedCeiling: UInt64
 
+    @ViewState private var confirmingClear = false
+    /// "Histórico apagado ✓" por 2 s, só depois de o motor confirmar.
+    @ViewState private var cleared = false
+    @ViewState private var clearFailure: String?
+
     var body: some View {
         Form {
             Section("settings.section.plan") {
@@ -195,6 +200,34 @@ struct SettingsView: View {
                 }
             }
 
+            // O histórico de uso (21/10/2026): a medição de 5 em 5 horas que o
+            // alimenta, e o jeito de começá-lo do zero.
+            Section("settings.section.history") {
+                Toggle("settings.history.measure", isOn: $settings.scheduledMeasure)
+                Text("settings.history.measure.detail")
+                    .font(.caption).foregroundStyle(.secondary)
+                HStack {
+                    Button("settings.history.clear") { confirmingClear = true }
+                    if cleared {
+                        Text("settings.history.cleared")
+                            .font(.caption).foregroundStyle(UsageColor.calm)
+                    }
+                }
+                if let clearFailure {
+                    Text(verbatim: String(format: String(localized: "settings.history.clear.failed.format"),
+                                          clearFailure))
+                        .font(.caption).foregroundStyle(UsageColor.critical)
+                }
+                Text("settings.history.clear.detail")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            .confirmationDialog("settings.history.clear.title", isPresented: $confirmingClear) {
+                Button("settings.history.clear.confirm", role: .destructive) { clearHistory() }
+                Button("groups.cancel", role: .cancel) {}
+            } message: {
+                Text("settings.history.clear.message")
+            }
+
             Section("settings.section.system") {
                 Toggle("settings.system.dock", isOn: $settings.showInDock)
                 Text("settings.system.dock.detail")
@@ -216,6 +249,22 @@ struct SettingsView: View {
             Task { await alerts.refreshAuthorization() }
         }
         .onChange(of: form.useManualCeiling) { _, _ in form.commit(to: settings) }
+    }
+
+    /// "Apagar o histórico…" depois do sim: o motor apaga os pontos de todas as
+    /// contas, e só então a tela diz que apagou.
+    private func clearHistory() {
+        clearFailure = nil
+        do {
+            try router.clearHistory()
+            cleared = true
+            Task {
+                try? await Task.sleep(for: .seconds(2))
+                cleared = false
+            }
+        } catch {
+            clearFailure = error.localizedDescription
+        }
     }
 
     private func toggleThreshold(_ value: Int) {

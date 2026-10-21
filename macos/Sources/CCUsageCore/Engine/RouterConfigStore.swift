@@ -37,7 +37,20 @@ public final class RouterConfigStore {
     public private(set) var lastError: String?
     /// O grupo que está sendo sondado agora, ou `nil`. Observável porque a
     /// sondagem leva segundos — sem indicação, o clique parece não fazer nada.
-    public private(set) var measuringGroup: UUID?
+    /// A agenda de 5 em 5 horas (`RouterConfigStore+History.swift`) usa a mesma
+    /// marca, e por isso o `set` é do módulo, não do arquivo.
+    public internal(set) var measuringGroup: UUID?
+    /// O histórico de cada conta (conta → pontos), o que a aba Histórico
+    /// desenha (21/10/2026). Observável e em memória, relido no `refreshUsage`:
+    /// uma computada que lesse o disco não re-renderizaria a tela.
+    public internal(set) var historyByAccount: [UUID: [UsageHistoryPoint]] = [:]
+    /// A última tentativa da medição automática em cada conta, nesta execução
+    /// do app — o que segura uma conta deslogada (ver `MeasureSchedule`).
+    @ObservationIgnored public internal(set) var measureAttempts: [UUID: Date] = [:]
+    /// Um login (ou relogin) está aberto na tela: a agenda espera. A sonda
+    /// poderia mexer na casa que está sendo relogada. Quem liga e desliga é a
+    /// `LoginSheet`, do aparecer ao sumir.
+    @ObservationIgnored public var signingIn = false
     /// Espelho OBSERVÁVEL de `shellIntegrationInstalled`: aquele é computado
     /// lendo o disco, e computado não dispara re-render — o clique em "Ativar"
     /// funcionava e a tela ficava parada, parecendo botão morto.
@@ -51,8 +64,10 @@ public final class RouterConfigStore {
     /// status line apontam. Setado pelo app ao iniciar; `nil` fora do app.
     @ObservationIgnored public var routerPath: String?
 
-    @ObservationIgnored private let paths: RouterPaths
-    @ObservationIgnored private let engine: RotationEngine
+    // Do módulo, e não do arquivo: o histórico e a agenda moram numa extensão
+    // em outro arquivo (`RouterConfigStore+History.swift`, régua das 600 linhas).
+    @ObservationIgnored let paths: RouterPaths
+    @ObservationIgnored let engine: RotationEngine
     @ObservationIgnored private let keychain: any KeychainStore
     @ObservationIgnored private let login: AccountLoginService
     @ObservationIgnored private let usage: GroupUsageReader
@@ -339,20 +354,19 @@ public final class RouterConfigStore {
     /// oficial e traz o quadro inteiro, inclusive o limite POR MODELO, que não
     /// chega no `rate_limits` da status line e é o que estoura primeiro.
     ///
-    /// Sob demanda, e não no laço: cada conta custa um processo Node subindo do
-    /// zero e uma requisição de verdade. Medir cinco contas leva ~15s.
+    /// Sob demanda (este botão) — e, com o app aberto, de 5 em 5 horas pela
+    /// agenda (`runScheduledMeasure`, 21/10/2026). Nunca no laço de 3 minutos:
+    /// cada conta custa um processo Node subindo do zero e uma requisição de
+    /// verdade. Medir cinco contas leva ~15s. Toda medição deixa um ponto no
+    /// histórico (`ProbeRecord`).
     public func measureAccounts(in group: AccountGroup) async {
         guard measuringGroup == nil else { return }
         measuringGroup = group.id
         defer { measuringGroup = nil }
 
-        // O perfil de cada conta é decidido AQUI, com o config na mão: conta
-        // ativa vai pelo perfil do grupo, nunca pela casa (ver `probeConfigDir`
-        // — sondar a casa de uma conta ativa derruba a sessão viva).
-        let alvos = config.accounts(in: group).map {
-            (email: $0.identity.email, dir: engine.probeConfigDir(for: $0, config: config))
-        }
+        let alvos = probeTargets(in: group)
         let usageDir = paths.usageDir
+        let historyDir = paths.historyDir
         let scratchBase = paths.base
 
         let falhas = await Task.detached(priority: .userInitiated) { () -> Int in
@@ -361,17 +375,8 @@ public final class RouterConfigStore {
             for alvo in alvos {
                 do {
                     let leitura = try probe.read(configDir: alvo.dir)
-                    let agora = Date()
-                    let amostra = GroupUsageSample(
-                        configDirRaw: alvo.dir.raw, email: alvo.email,
-                        fiveHourPercent: leitura.session,
-                        fiveHourResetsAt: leitura.sessionResetsAt,
-                        sevenDayPercent: leitura.weeklyAll,
-                        sevenDayResetsAt: leitura.weeklyAllResetsAt,
-                        sampledAt: agora,
-                        models: ModelUsage(windows: leitura.models, sampledAt: agora),
-                        origin: .probe)
-                    try GroupUsageStore.write(amostra, forEmail: alvo.email, in: usageDir)
+                    try ProbeRecord.write(leitura, email: alvo.email, configDir: alvo.dir,
+                                          usageDir: usageDir, historyDir: historyDir)
                 } catch {
                     erros += 1
                 }
@@ -389,8 +394,10 @@ public final class RouterConfigStore {
         refreshUsage()
     }
 
-    /// Relê o uso do sensor e a conta ativa de cada grupo, e publica ambos.
-    /// Chamado pelo laço do app, e ao abrir a lista de grupos.
+    /// Relê o uso do sensor e a conta ativa de cada grupo, e publica ambos —
+    /// e, desde 21/10/2026, o histórico de cada conta, para a aba Histórico
+    /// ganhar o ponto novo sem esperar. Chamado pelo laço do app, e ao abrir a
+    /// lista de grupos.
     public func refreshUsage() {
         let detail = usage.detailByAccount(config)
         usageDetail = detail
@@ -405,6 +412,7 @@ public final class RouterConfigStore {
         }
         activeByGroup = active
         liveSessions = sessions
+        refreshHistory()
     }
 
     /// Quantas sessões vivas um grupo tem agora.

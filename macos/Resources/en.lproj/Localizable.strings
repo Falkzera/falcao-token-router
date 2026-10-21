@@ -205,3 +205,32 @@
 "settings.statusline.item.resets" = "When each window resets";
 "settings.statusline.item.cost" = "Session cost";
 "settings.statusline.item.email" = "Active account";
+
+/* History tab (21/10/2026) */
+"home.tab.history" = "History";
+"home.history.intro" = "Each point is one measurement of Claude Code's `/usage`: every 5 hours while the app is open, plus each “Measure accounts” and `router measure`.";
+"home.history.empty.title" = "No groups yet";
+"home.history.empty.detail" = "Create a group on the Groups tab. Its accounts show up here, with a point for each measurement.";
+"home.history.group.empty" = "No accounts in this group yet.";
+"home.history.account.measured.format" = "measured %@ ago";
+"home.history.account.never" = "no measurements yet";
+"home.history.account.next.format" = "next at %@";
+"home.history.account.nextSoon" = "next in a moment";
+"home.history.account.scheduleOff" = "automatic measuring is off";
+"home.history.chart.fiveHour" = "5 hours · last 7 days";
+"home.history.chart.sevenDay" = "Weekly · last 4 weeks";
+"home.history.chart.threshold.format" = "switch at %@";
+"home.history.chart.empty" = "No points in this period.";
+"home.history.chart.label.format" = "%1$@ — latest %2$@";
+"groups.account.history" = "This account's usage history";
+"panel.account.history" = "View history";
+"settings.section.history" = "History";
+"settings.history.measure" = "Measure accounts every 5 hours";
+"settings.history.measure.detail" = "Runs Claude Code's `/usage` for each account — the same query as “Measure accounts” — while the app is open, and keeps each result for the History tab.";
+"settings.history.clear" = "Delete history…";
+"settings.history.clear.detail" = "Deletes the points of every account on this Mac. Measuring goes on, and the history starts over with the next measurement.";
+"settings.history.clear.title" = "Delete the history?";
+"settings.history.clear.message" = "Every point of every account is deleted from this Mac, and the History tab starts empty. This can't be undone. Groups, accounts and logins stay as they are.";
+"settings.history.clear.confirm" = "Delete";
+"settings.history.cleared" = "History deleted ✓";
+"settings.history.clear.failed.format" = "Couldn't delete the history: %@";

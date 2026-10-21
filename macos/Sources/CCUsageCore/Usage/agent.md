@@ -10,6 +10,7 @@ Nenhuma das duas fala com `api.anthropic.com`. Quem faz requisição é o client
 
 ## Arquivos
 - `ClaudeUsageProbe.swift` — a sonda: acha as janelas em `claude /usage`, inclusive `Current week (Fable)`. Roda o processo (prazo, stdin nulo, stderr descartado, scratch fixo) e faz o parse. `output` é injetável, para o teste exercitar o texto sem login nem rede.
+- `ProbeRecord.swift` — o que uma medição da sonda grava, num lugar só: a amostra (`usage/`, origem `probe`) e o ponto do histórico (`history/`). O botão, a agenda de 5 em 5 horas e o `router measure` passam por aqui; falha no histórico não desfaz a amostra.
 - `ClaudeBinary.swift` — onde o `claude` está instalado. No core porque o app (login em pty) e a CLI (sonda) precisam dele, e `which` não resolve num app lançado pelo Finder.
 - `UsagePercent.swift` — a conversão fração→% **num lugar só** (o sensor arredondava e o painel truncava: 0,666 saía 67% numa tela e 66% na outra).
 - `UsageReport.swift` / `UsageReportDecoder.swift` — o payload de uso da Anthropic, decodificado a partir de `limits[]` (as chaves de topo são codinomes internos que giram a cada ciclo).
@@ -29,6 +30,8 @@ Nenhuma das duas fala com `api.anthropic.com`. Quem faz requisição é o client
 - 2026-09-18: a telemetria fica **ligada de propósito**. `DISABLE_TELEMETRY` e `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` também desligam a consulta de feature flags, e a linha semanal por modelo está atrás de um desses portões — com qualquer um setado, `/usage` para de imprimi-la. Descoberta do `codenotch` (MIT), confirmada aqui.
 - 2026-09-18: a data de reset é parseada com **duas grafias** (`h:mma` e `ha`), porque os minutos somem na hora cheia: `Sep 18 at 7:29pm`, mas `Sep 21 at 9am`. Um padrão só perderia o reset em uma hora de cada sessenta.
 - 2026-09-18: o ano do reset não é impresso e é **escolhido**: o candidato mais próximo de `now` entre ano passado, este e o que vem. Qualquer outra regra erra a virada do ano numa das direções.
+
+- 2026-10-21: a sonda deixou de ser só "botão e comando": com o app aberto ela roda **de 5 em 5 horas por conta** (`Engine/MeasureSchedule.swift`), para a aba Histórico — umas 5 medições por conta por dia, com uma chave nos Ajustes que a desliga. Nunca no laço de 3 minutos. A montagem da amostra, que o store e a CLI faziam cada um à mão, foi para o `ProbeRecord`.
 
 ## Pendências conhecidas
 - A sonda mede uma conta por vez, em série. Cinco contas levam ~15s. Paralelizar é possível, mas cada uma sobe um Node — vale medir a pressão antes.

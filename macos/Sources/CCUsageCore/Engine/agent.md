@@ -5,6 +5,10 @@ O motor do Falcão Router: contas, grupos, troca de credencial, medição passiv
 
 ## Arquivos
 - `RouterConfigStore.swift` — o store observável que a UI chama: CRUD de grupos/contas, login/relogin pendente, rotação, integração de shell. `config` persiste em `config.json`.
+- `RouterConfigStore+History.swift` — a extensão do histórico (fora do arquivo principal pela régua das 600 linhas): `probeTargets` (por qual perfil medir cada conta de um grupo — o botão e a agenda passam por aqui), `scheduledMeasurePlans` (o plano da agenda: por grupo, só as contas vencidas, cada conta uma vez), `runScheduledMeasure` (a medição de 5 em 5 horas, silenciosa), `clearHistory` e `refreshHistory`. Define `ProbeTarget` e `MeasurePlan`.
+- `UsageHistory.swift` — `UsageHistoryPoint` + o histórico por conta: `<base>/history/<email>.jsonl`, uma linha por medição da SONDA, 90 dias, regravado de forma atômica. Mesmo formato do porte Windows.
+- `MeasureSchedule.swift` — a regra pura de QUANDO medir uma conta de novo: 5 horas depois da mais nova entre a última medição e a última tentativa da agenda.
+- `UsageHistoryChart.swift` — as séries dos gráficos do Histórico, puras: recorte (7 e 28 dias), quebra em buraco de mais de 7h30, marcas do eixo à meia-noite local.
 - `RotationEngine.swift` — a troca em si: ativar conta (casa→grupo), espelhar vivo→casa, relogin (casa→grupo via `pushHomeToGroup`), decidir rotação, e `probeConfigDir` (por qual perfil sondar cada conta). As regras anti-morte-de-conta moram aqui.
 - `GroupUsageReader.swift` — amostras → uso por conta. Considera TRÊS janelas: 5h, 7d e a mais apertada POR MODELO (esta vem da sonda, `Usage/ClaudeUsageProbe.swift`). Janela com reset vencido decai; conta sem amostra fica FORA do mapa (presumida fresca pelo motor). `detailByAccount` devolve `AccountUsage` (fração + de QUAL janela veio + as duas medidas); `usageByAccount` é a mesma coisa só com a fração, para a rotação.
 - `GroupUsage.swift` — `GroupUsageSample` + store de amostras por e-mail, e `UsageOrigin` (sensor × sonda). A origem é serializada como opcional: amostra gravada antes de a sonda existir só podia vir do sensor.
@@ -15,7 +19,7 @@ O motor do Falcão Router: contas, grupos, troca de credencial, medição passiv
 - `ShellIntegration.swift` — a função `claude()` de shell, a status line nos settings.json (`installStatusLine` / `statusLineIsStale`) e o append idempotente no `~/.zshrc`.
 - `SessionRegistry.swift` — quais sessões do Claude Code estão vivas **em cada perfil** (`<perfil>/sessions/<pid>.json`, escrito por ele). Traz `ProcessLiveness`, que confere pid + instante de início para não ressuscitar sessão morta com pid reciclado.
 - `KeychainStore.swift` — protocolo (`read`/`write`/`exists`/`delete`) + `SecurityCLIKeychain` (via `security`).
-- `RouterPaths.swift` — onde tudo mora em Application Support.
+- `RouterPaths.swift` — onde tudo mora em Application Support (`historyDir` é `<base>/history`).
 - `ConfigDir.swift` / `AccountModel.swift` / `GroupModel.swift` / `Provider.swift` / `ProviderEnv.swift` — tipos do domínio.
 
 ## Padrões
@@ -46,6 +50,11 @@ O motor do Falcão Router: contas, grupos, troca de credencial, medição passiv
 - 2026-09-19: a medida da conta passou a carregar **procedência** (`UsageOrigin`). O medidor já fazia isso (`UsageSnapshot.Provenance`: live/cached/derived); o roteador não, e depois da sonda a tela atribuía ao sensor um número que a sonda tinha buscado — com a frase "medido pela sessão da própria conta", falsa justamente nas contas ociosas, que sessão nenhuma serviu. Uma amostra pode carregar as DUAS procedências: 5h/7d do sensor e as por modelo da sonda, cada uma com seu carimbo.
 
 - 2026-09-23: `ProviderEnv.credentialKeys` ganhou oito nomes que o porte Windows (issue #5, @viniventur) achou no JavaScript do Claude Code e que eu confirmei com `strings` no binário do macOS. O grave é `CLAUDE_CODE_OAUTH_TOKEN`: exportada, a sessão é servida por esse token e não pela conta do grupo — o `router launch` deixava passar. `CLAUDE_SECURESTORAGE_CONFIG_DIR` tem precedência sobre `CLAUDE_CONFIG_DIR` para achar a credencial: setada, o app escreveria o item do grupo enquanto o Claude Code lê outro.
+
+- 2026-10-21: **histórico de uso**, porta do porte Windows (PR #35). Só a SONDA grava (agenda de 5 em 5 horas, "Medir contas", `router measure`) — o sensor não entra: ele roda a cada mensagem e encheria o arquivo de pontos de uma conta só. O arquivo é o MESMO do Windows (`history/<email>.jsonl`, mesma limpeza do e-mail via `GroupUsageStore.safeStem`, mesmas chaves, janela ausente = chave ausente), e um app lê o do outro.
+- 2026-10-21: a agenda vive no store e é **silenciosa**: falha não vira `lastError` (é da última ação do usuário, e uma conta deslogada repetiria o aviso a cada 5 horas). A tentativa (`measureAttempts`, só em memória) conta como medição para a regra: sem ela, a conta deslogada seria sondada a cada volta do laço. Espera o botão (`measuringGroup`) e o login aberto (`signingIn`, ligado pela `LoginSheet`).
+- 2026-10-21: `paths` e `engine` deixaram de ser `private` (e `measuringGroup` ganhou `internal(set)`): a extensão do histórico mora em outro arquivo. Seguem fora da API pública.
+- 2026-10-21: sem trava entre processos no histórico (o Windows tem a do motor; aqui não há uma): app e `router measure` medindo a mesma conta no mesmo instante podem perder um ponto. A gravação é atômica — o arquivo nunca quebra.
 
 ## Pendências conhecidas
 - `removeAccount`/`removeGroup` não apagam o item de chaveiro nem a pasta `accounts/<uuid>`: a credencial da conta removida continua viva no chaveiro do usuário. Deliberado por ora (ver comentário em `removeGroup`), mas num produto pago "remover a conta" que deixa o refresh token para trás é promessa quebrada.

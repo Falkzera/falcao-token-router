@@ -146,12 +146,18 @@ public enum GroupUsageStore {
         base.appending(path: bundleID).appending(path: "usage")
     }
 
-    /// Nome de arquivo estável e seguro para um e-mail (sem `/` nem `:`).
-    public static func fileName(forEmail email: String) -> String {
-        let safe = email.map { c -> Character in
+    /// O e-mail como pedaço de nome de arquivo, estável e seguro (sem `/` nem
+    /// `:`). O histórico (`UsageHistory`) usa a mesma limpeza — e o porte
+    /// Windows também, que é o que deixa um app ler o arquivo do outro.
+    public static func safeStem(forEmail email: String) -> String {
+        String(email.map { c -> Character in
             c.isLetter || c.isNumber || c == "." || c == "@" || c == "-" ? c : "_"
-        }
-        return String(safe) + ".json"
+        })
+    }
+
+    /// Nome de arquivo estável e seguro para um e-mail.
+    public static func fileName(forEmail email: String) -> String {
+        safeStem(forEmail: email) + ".json"
     }
 
     /// Grava a amostra da conta, de forma atômica. Chamado pelo sensor.

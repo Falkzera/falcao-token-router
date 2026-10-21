@@ -76,11 +76,21 @@ struct FalcaoTokenRouterApp: App {
     /// limiar. Três minutos porque o `rate_limits` só muda quando há atividade, e
     /// o endpoint de uso tem orçamento próprio — reconsultar mais rápido não traz
     /// número novo, só trabalho.
+    ///
+    /// A partir da 2ª volta (3 min depois da subida), olha também a agenda da
+    /// medição de 5 em 5 horas (21/10/2026) — na abertura do Mac ela não disputa
+    /// a máquina com tudo o mais que sobe junto. Numa `Task` à parte: medir leva
+    /// segundos por conta, e a rotação não espera por ela.
     @MainActor private static func startRotation() {
         Task {
+            var volta = 0
             while !Task.isCancelled {
                 router.refreshUsage()
                 router.rotateAll()
+                if volta > 0 && settings.scheduledMeasure {
+                    Task { await router.runScheduledMeasure() }
+                }
+                volta += 1
                 try? await Task.sleep(for: .seconds(180))
             }
         }

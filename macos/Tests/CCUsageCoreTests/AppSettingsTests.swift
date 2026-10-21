@@ -95,6 +95,22 @@ private func freshDefaults() -> UserDefaults {
     #expect(settings.liveUsageEnabled == true)
 }
 
+/// A medição de 5 em 5 horas (21/10/2026) vem ligada de fábrica — e um payload
+/// de antes dela (sem o campo) também a liga. Desligada, fica desligada.
+@MainActor
+@Test func scheduledMeasureIsOnUnlessTurnedOff() {
+    let defaults = freshDefaults()
+    #expect(AppSettings(defaults: defaults, detectPlan: { nil }).scheduledMeasure)
+
+    let old = freshDefaults()
+    old.set(Data(#"{"plan":"max5"}"#.utf8), forKey: AppSettings.storageKey)
+    #expect(AppSettings(defaults: old, detectPlan: { nil }).scheduledMeasure)
+
+    let settings = AppSettings(defaults: defaults, detectPlan: { nil })
+    settings.scheduledMeasure = false
+    #expect(!AppSettings(defaults: defaults, detectPlan: { nil }).scheduledMeasure)
+}
+
 @MainActor
 @Suite("Migração do domínio antigo")
 struct LegacyDefaultsMigrationTests {

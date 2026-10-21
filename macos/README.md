@@ -52,13 +52,32 @@ cd falcao-token-router/macos
 
 An app you assembled yourself never carries the quarantine flag.
 
+## Usage history
+
+The **History** tab draws two lines per account: the 5-hour window over the
+last 7 days and the weekly window over the last 4 weeks, with the group's
+threshold dashed on both. Each point is one measurement by the probe
+(`claude /usage`): while the app is open it measures each account every 5 hours
+(**Meter → History → Measure accounts every 5 hours**, on by default), and
+**Measure accounts** and `router measure` add their points too. More than 7½
+hours without a point breaks the line instead of guessing — the app was closed,
+or the Mac was asleep. Select a point on a chart to read its value, when it was
+measured and when that window reset.
+
+The chart button next to each account on the Groups tab, and **View history**
+on an account's card in the menu bar panel, open the tab right on that account.
+**Delete history…**, in the same section of the Meter tab, empties it for every
+account; measuring goes on.
+
 ## Where things live
 
 Everything the app writes is under
 `~/Library/Application Support/com.synqo.falcao-router/`: `config.json` (groups
 and accounts), `accounts/<uuid>/` (each account's home profile),
 `groups/<uuid>/` (the profile a group's sessions run in), `usage/<email>.json`
-(the sensor's samples) and `shell.sh` (the terminal function).
+(the sensor's samples), `history/<email>.jsonl` (one line per probe
+measurement, kept for 90 days — the same file the Windows app writes) and
+`shell.sh` (the terminal function).
 
 The credential itself is **not** there — it is a keychain item,
 `Claude Code-credentials` for the default profile and
