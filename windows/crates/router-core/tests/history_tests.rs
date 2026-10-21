@@ -79,13 +79,7 @@ fn a_broken_line_is_skipped_and_the_others_stay() {
 
     assert_eq!(UsageHistory::read(EMAIL, tmp.path()).len(), 2);
 
-    UsageHistory::append(
-        &point(T0 + 120, Some(0.3)),
-        EMAIL,
-        tmp.path(),
-        ts(T0 + 120),
-    )
-    .unwrap();
+    UsageHistory::append(&point(T0 + 120, Some(0.3)), EMAIL, tmp.path(), ts(T0 + 120)).unwrap();
     let text = std::fs::read_to_string(tmp.path().join(UsageHistory::file_name(EMAIL))).unwrap();
     assert_eq!(text.lines().count(), 3);
     assert!(!text.contains("meio escrito"));
@@ -132,7 +126,10 @@ fn a_line_has_dates_without_fraction_and_no_absent_window() {
     );
     assert!(!text.contains("fiveHourPercent"), "{text}");
     assert!(text.contains("\"sevenDayPercent\":0.5"), "{text}");
-    assert!(!text.contains("models"), "sem janela por modelo, nem a chave");
+    assert!(
+        !text.contains("models"),
+        "sem janela por modelo, nem a chave"
+    );
 }
 
 // --- a sonda grava o ponto ---

@@ -3,6 +3,8 @@
 //! Parte do `impl RouterConfigStore` — ver o `mod.rs` ao lado.
 
 use super::*;
+use crate::engine::measure_schedule::MeasureSchedule;
+use crate::engine::usage_history::UsageHistory;
 
 impl RouterConfigStore {
     // MARK: - Rotação (ações que tocam credencial)
@@ -48,7 +50,9 @@ impl RouterConfigStore {
     ///
     /// É o que o sensor passivo não consegue: conta ociosa nunca serviu mensagem
     /// (sem amostra, "pronta") e o limite POR MODELO não chega no `rate_limits`.
-    /// Sob demanda, não no laço: cada conta custa um processo e uma requisição.
+    /// Sob demanda (este botão) — e, com o app aberto, de 5 em 5 horas pela
+    /// agenda (`scheduled_measure_plans`, 21/10/2026). Nunca no laço de 3
+    /// minutos: cada conta custa um processo e uma requisição.
     /// Síncrona: o app a chama fora da thread da interface.
     pub fn measure_accounts(
         &mut self,
@@ -74,6 +78,49 @@ impl RouterConfigStore {
             usage_dir: self.paths.usage_dir(),
             base: self.paths.base.clone(),
         }
+    }
+
+    /// A medição automática (de 5 em 5 horas, 21/10/2026): por grupo, na ordem
+    /// da lista, um plano só com as contas VENCIDAS (`MeasureSchedule`). Cada
+    /// conta vai uma vez — a que está em dois grupos, no primeiro —, e grupo
+    /// sem conta vencida fica de fora. `attempts` é a última tentativa da
+    /// agenda em cada conta nesta execução do app (quem guarda é o app). A
+    /// conta ativa vai pelo perfil do grupo, como no "Medir contas".
+    pub fn scheduled_measure_plans(
+        &self,
+        now: DateTime<Utc>,
+        attempts: &HashMap<Id, DateTime<Utc>>,
+    ) -> Vec<(Id, MeasurePlan)> {
+        let history = self.paths.history_dir();
+        let mut planned: HashSet<Id> = HashSet::new();
+        let mut plans = Vec::new();
+        for group in &self.config.groups {
+            let targets: Vec<ProbeTarget> = self
+                .probe_targets(group)
+                .into_iter()
+                .filter(|target| {
+                    !planned.contains(&target.account_id)
+                        && MeasureSchedule::is_due(
+                            UsageHistory::last_sampled_at(&target.email, &history),
+                            attempts.get(&target.account_id).copied(),
+                            now,
+                        )
+                })
+                .collect();
+            if targets.is_empty() {
+                continue;
+            }
+            planned.extend(targets.iter().map(|t| t.account_id));
+            plans.push((
+                group.id,
+                MeasurePlan {
+                    targets,
+                    usage_dir: self.paths.usage_dir(),
+                    base: self.paths.base.clone(),
+                },
+            ));
+        }
+        plans
     }
 
     /// Publica o saldo de uma medição: o erro (contas que não responderam) e o

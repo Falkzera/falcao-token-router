@@ -11,6 +11,7 @@ pub mod engine_lock;
 pub mod group_model;
 pub mod group_usage;
 pub mod group_usage_reader;
+pub mod measure_schedule;
 pub mod profile_sharing;
 pub mod provider;
 pub mod provider_env;

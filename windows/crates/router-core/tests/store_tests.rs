@@ -939,3 +939,123 @@ fn the_last_error_can_be_dismissed() {
     env.store.clear_last_error();
     assert_eq!(env.store.last_error(), None);
 }
+
+// --- medição automática (de 5 em 5 horas, 21/10/2026) ---
+
+/// Um ponto no histórico de uma conta, `hours` horas atrás.
+fn measured(env: &Env, email: &str, hours: i64) {
+    use router_core::engine::usage_history::{UsageHistory, UsageHistoryPoint};
+    let point = UsageHistoryPoint {
+        sampled_at: Utc::now() - chrono::Duration::hours(hours),
+        five_hour_percent: Some(0.1),
+        five_hour_resets_at: None,
+        seven_day_percent: Some(0.2),
+        seven_day_resets_at: None,
+        models: Vec::new(),
+    };
+    UsageHistory::append(&point, email, &env.paths.history_dir(), Utc::now()).unwrap();
+}
+
+/// A agenda mede, grupo a grupo e na ordem da lista, só as contas VENCIDAS.
+#[test]
+fn the_schedule_plans_only_due_accounts_group_by_group() {
+    use std::collections::HashMap;
+
+    let mut env = make_store();
+    let work = env.store.add_group_with("trabalho", false);
+    let personal = env.store.add_group_with("pessoal", false);
+    let a = env.add_account("conta1@exemplo.com", work.id);
+    let b = env.add_account("conta2@exemplo.com", work.id);
+    let c = env.add_account("conta3@exemplo.com", personal.id);
+    // A conta1 foi medida há 1 h (não vence); a conta3, há 6 h (vence); a
+    // conta2 nunca foi medida (vence).
+    measured(&env, "conta1@exemplo.com", 1);
+    measured(&env, "conta3@exemplo.com", 6);
+
+    let plans = env
+        .store
+        .scheduled_measure_plans(Utc::now(), &HashMap::new());
+
+    let shape: Vec<(Id, Vec<Id>)> = plans
+        .iter()
+        .map(|(g, p)| (*g, p.targets.iter().map(|t| t.account_id).collect()))
+        .collect();
+    assert_eq!(shape, [(work.id, vec![b.id]), (personal.id, vec![c.id])]);
+    assert!(!shape.iter().any(|(_, ids)| ids.contains(&a.id)));
+}
+
+/// A conta que está em dois grupos é medida uma vez só — no primeiro.
+#[test]
+fn an_account_in_two_groups_is_measured_once() {
+    use std::collections::HashMap;
+
+    let mut env = make_store();
+    let work = env.store.add_group_with("trabalho", false);
+    let personal = env.store.add_group_with("pessoal", false);
+    let shared = env.add_account("conta1@exemplo.com", work.id);
+    env.add_account("conta2@exemplo.com", personal.id);
+    // A compartilhada entra também no 2º grupo, pelo `config.json`.
+    let mut config = env.store.config().clone();
+    config.groups[1].account_ids.insert(0, shared.id);
+    std::fs::write(
+        env.paths.config_file(),
+        serde_json::to_vec(&config).unwrap(),
+    )
+    .unwrap();
+    let store = open(env.tmp.path(), &env.creds, &env.adapter);
+
+    let plans = store.scheduled_measure_plans(Utc::now(), &HashMap::new());
+
+    let all: Vec<Id> = plans
+        .iter()
+        .flat_map(|(_, p)| p.targets.iter().map(|t| t.account_id))
+        .collect();
+    assert_eq!(all.iter().filter(|id| **id == shared.id).count(), 1);
+    assert_eq!(plans[0].0, work.id);
+    assert_eq!(plans[0].1.targets[0].account_id, shared.id);
+    assert_eq!(plans[1].0, personal.id);
+}
+
+/// A tentativa da agenda segura a conta que falhou (deslogada) por 5 horas.
+#[test]
+fn a_recent_attempt_keeps_an_account_out_of_the_plan() {
+    use std::collections::HashMap;
+
+    let mut env = make_store();
+    let group = env.store.add_group_with("trabalho", false);
+    let a = env.add_account("conta1@exemplo.com", group.id);
+
+    let tried = HashMap::from([(a.id, Utc::now() - chrono::Duration::hours(1))]);
+    assert!(env
+        .store
+        .scheduled_measure_plans(Utc::now(), &tried)
+        .is_empty());
+
+    let long_ago = HashMap::from([(a.id, Utc::now() - chrono::Duration::hours(5))]);
+    assert_eq!(
+        env.store
+            .scheduled_measure_plans(Utc::now(), &long_ago)
+            .len(),
+        1
+    );
+}
+
+/// Na agenda também, a conta ATIVA é sondada pelo perfil do grupo — nunca
+/// pela casa (a regra do `probe_targets`).
+#[test]
+fn the_schedule_probes_the_active_account_through_its_group() {
+    use std::collections::HashMap;
+
+    let mut env = make_store();
+    let group = env.store.add_group_with("trabalho", false);
+    let a = env.add_account("conta1@exemplo.com", group.id);
+    env.store.activate(&a, &env.group(group.id));
+
+    let plans = env
+        .store
+        .scheduled_measure_plans(Utc::now(), &HashMap::new());
+    assert_eq!(
+        plans[0].1.targets[0].dir.raw,
+        env.group(group.id).config_dir.raw
+    );
+}
