@@ -8,7 +8,8 @@
   `set_scheduled_measure` —, a status line — `get_status_line`, `set_status_line`,
   `test_status_line` —, o login — `start_login`, `start_relogin`,
   `current_login`, `login_submit_code`, `login_retry`, `login_recheck`, `login_close`) e os
-  eventos (`navigate`, `snapshot-changed`, `login-changed`). Dentro do
+  eventos (`navigate` — `{tab, account}`: a conta é a do atalho do Histórico —,
+  `snapshot-changed`, `login-changed`). `openHome(aba, conta?)`. Dentro do
   Tauri, `invoke`/`listen`; no navegador, o backend simulado. `currentView()` pelo rótulo da
   janela (ou `?view=`); `initialSelection()` abre o cartão de uma conta só no navegador
   (`?select=`).
@@ -23,7 +24,8 @@
   navegador, e a escolha gravada volta normalizada como no Rust) e o login
   (`&login=ok|codigo|duplicada|errada|recusado|encerrado|timeout|semclaude`, com as fases no
   tempo e a revisão crescente). Dados só de exemplo (`@exemplo.com`, Acme, `C:\Users\exemplo`).
-  A aba pela URL inclui `&tab=history`; o histórico vem do `mock-history.ts`.
+  A aba pela URL inclui `&tab=history`, e `&conta=<id>` abre o Histórico já nessa conta (como o
+  atalho do painel); o histórico vem do `mock-history.ts`.
 - `mock-history.ts` — o `get_history` do backend simulado (21/10/2026): 4 semanas de pontos de 5
   em 5 horas para cada conta do quadro, estáveis por conta e por bloco de 5 h (nada sorteado:
   a releitura não muda o gráfico); a 5h alta no horário de trabalho e sem janela de madrugada,
@@ -48,7 +50,7 @@
   relógio).
 - `clock.svelte.ts` — o relógio da tela, andando a cada 30 s (idades não congelam na tela aberta).
 - `Icon.svelte` — os ícones do app em SVG (grupos, ajustes, fechar, relógio, sensor, sonda,
-  terminal, copiar, ✓, lápis, +, aviso, informação).
+  terminal, copiar, ✓, lápis, +, aviso, informação, gráfico — o atalho do Histórico).
 - `Modal.svelte` — o `<dialog>` nativo (`showModal`): foco preso, Esc fecha, clicar fora NÃO fecha
   (confirmação destrutiva não pode sumir por clique errado).
 - `Menu.svelte` — o menu ⋯ (fecha ao escolher, ao clicar fora e no Esc; itens destrutivos em

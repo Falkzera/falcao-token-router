@@ -13,6 +13,7 @@ import type {
   HomeTab,
   InstallResult,
   LoginView,
+  Navigation,
   SettingsView,
   ShellName,
   Snapshot,
@@ -65,9 +66,10 @@ export function fitFlyout(height: number): Promise<void> {
   return call<void>("fit_flyout", { height });
 }
 
-/** Uma porta do rodapé do flyout: abre a janela na aba. */
-export function openHome(tab: HomeTab): Promise<void> {
-  return call<void>("open_home", { tab });
+/** Uma porta do flyout: abre a janela na aba — e, com uma conta, o Histórico
+ *  já nela (o atalho do cartão da conta). */
+export function openHome(tab: HomeTab, account: string | null = null): Promise<void> {
+  return call<void>("open_home", { tab, account });
 }
 
 export function quitApp(): Promise<void> {
@@ -156,9 +158,9 @@ export async function onLoginChanged(handler: (view: LoginView | null) => void):
   return on<LoginView | null>("login-changed", handler);
 }
 
-/** A bandeja pediu outra aba com a janela já aberta. */
-export function onNavigate(handler: (tab: HomeTab) => void): Promise<UnlistenFn> {
-  return on<HomeTab>("navigate", handler);
+/** A bandeja pediu outra aba (ou o Histórico de uma conta) com a janela já aberta. */
+export function onNavigate(handler: (navigation: Navigation) => void): Promise<UnlistenFn> {
+  return on<Navigation>("navigate", handler);
 }
 
 /** O backend releu o quadro (laço de 30 s, ou uma ação mudou algo). No

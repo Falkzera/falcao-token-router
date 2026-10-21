@@ -35,13 +35,15 @@ use tauri::{
 };
 
 use settings::SettingsStore;
-use state::{AppState, HomeTab};
+use state::{AppState, HomeTab, Navigation};
 
-/// O rótulo da janela única (Grupos / Ajustes), num lugar só: é escrito aqui e
-/// lido por quem a abre — rótulo repetido em vários arquivos falha em silêncio.
+/// O rótulo da janela única (Grupos / Histórico / Ajustes), num lugar só: é
+/// escrito aqui e lido por quem a abre — rótulo repetido em vários arquivos
+/// falha em silêncio.
 pub const HOME_WINDOW: &str = "home";
 
-/// O evento que pede à janela aberta para trocar de aba.
+/// O evento que pede à janela aberta para trocar de aba (e, no atalho do
+/// Histórico, mostrar uma conta).
 const NAVIGATE: &str = "navigate";
 
 /// O que o front precisa saber antes de qualquer outra coisa.
@@ -52,14 +54,18 @@ struct AppInfo {
     locale: locale::Locale,
     /// A aba com que a janela abre (a bandeja pode ter pedido Ajustes).
     initial_tab: HomeTab,
+    /// A conta que o Histórico mostra ao abrir (o atalho do painel da bandeja).
+    initial_account: Option<String>,
 }
 
 #[tauri::command]
 fn app_info(app: AppHandle, state: State<'_, AppState>) -> AppInfo {
+    let navigation = state.take_request();
     AppInfo {
         version: app.package_info().version.to_string(),
         locale: state.locale,
-        initial_tab: state.take_tab(),
+        initial_tab: navigation.tab,
+        initial_account: navigation.account,
     }
 }
 
@@ -75,11 +81,12 @@ fn fit_flyout(app: AppHandle, height: f64) {
     flyout::fit_height(&app, height);
 }
 
-/// Uma porta do rodapé do flyout: fecha o flyout e abre a janela na aba.
+/// Uma porta do flyout: fecha o flyout e abre a janela na aba — e, no atalho
+/// do cartão de uma conta, o Histórico já nela.
 #[tauri::command]
-fn open_home(app: AppHandle, tab: HomeTab) {
+fn open_home(app: AppHandle, tab: HomeTab, account: Option<String>) {
     flyout::hide(&app);
-    show_home(&app, tab);
+    show_home_to(&app, Navigation { tab, account });
 }
 
 #[tauri::command]
@@ -95,18 +102,24 @@ fn copy_text(app: AppHandle, text: String) -> Result<(), String> {
     app.clipboard().write_text(text).map_err(|e| e.to_string())
 }
 
-/// Mostra a janela de Grupos/Ajustes na aba pedida, criando-a se preciso, e a
-/// traz para a frente — o app vive na bandeja e não se ativa sozinho.
+/// Mostra a janela de Grupos/Histórico/Ajustes na aba pedida, criando-a se
+/// preciso, e a traz para a frente — o app vive na bandeja e não se ativa
+/// sozinho.
 pub fn show_home(app: &AppHandle, tab: HomeTab) {
+    show_home_to(app, Navigation::to(tab));
+}
+
+/// O mesmo, com o destino inteiro (a aba e a conta do atalho do Histórico).
+fn show_home_to(app: &AppHandle, navigation: Navigation) {
     if let Some(window) = app.get_webview_window(HOME_WINDOW) {
-        let _ = window.emit(NAVIGATE, tab);
+        let _ = window.emit(NAVIGATE, navigation);
         let _ = window.unminimize();
         let _ = window.show();
         let _ = window.set_focus();
         return;
     }
     let state = app.state::<AppState>();
-    state.request_tab(tab);
+    state.request(navigation);
     let settings = app.state::<SettingsStore>();
     let size = home_window::WindowSize::opening(settings.get().home_window);
     // O acompanhamento parte do tamanho de abertura: aberta maximizada, é para

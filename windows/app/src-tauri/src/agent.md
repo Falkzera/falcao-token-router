@@ -11,10 +11,13 @@
   a DESTRÓI nos dois modos (o botão sai da barra de tarefas, o app fica na bandeja; minimizar é
   o do Windows). Até 23/09/2026, com "Mostrar na barra de tarefas", o X só minimizava — o usuário
   quis o X que tira o app da barra. A janela destruída encerra o login que estivesse nela
-  (ninguém veria o desfecho).
+  (ninguém veria o desfecho). `open_home(aba, conta?)` — a conta é o atalho do Histórico do
+  cartão de uma conta no flyout (21/10/2026): vai no evento `navigate` (`Navigation {tab,
+  account}`) com a janela aberta, ou no `app_info` (`initialAccount`) da janela que vai abrir.
 - `state.rs` — `AppState`: o `RouterConfigStore` (montado como na CLI: credencial em arquivo com a
   guarda do perfil padrão) atrás de um `Mutex` que sobrevive a envenenamento, o idioma, a home,
-  a aba pedida para a próxima abertura da janela (Grupos, Histórico, Ajustes), o grupo sendo
+  o destino pedido para a próxima abertura da janela (`Navigation`: a aba — Grupos, Histórico,
+  Ajustes — e a conta do atalho do Histórico; serialização testada), o grupo sendo
   medido (`try_start_measuring`: atômico, o botão e a agenda nunca medem juntos) e as tentativas
   da agenda por conta (memória: o que segura uma conta deslogada).
 - `history.rs` — a aba Histórico (21/10/2026): `get_history` e o quadro dela (`build`, puro com

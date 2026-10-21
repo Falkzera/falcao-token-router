@@ -5,6 +5,12 @@ export type Locale = "en" | "pt-BR";
 
 export type HomeTab = "groups" | "history" | "settings";
 
+/** Para onde a janela vai: a aba e, no atalho do Histórico, a conta. */
+export interface Navigation {
+  tab: HomeTab;
+  account: string | null;
+}
+
 /** Qual superfície uma janela mostra. */
 export type View = "home" | "flyout";
 
@@ -13,6 +19,8 @@ export interface AppInfo {
   locale: Locale;
   /** A aba com que a janela abre (a bandeja pode ter pedido Ajustes). */
   initialTab: HomeTab;
+  /** A conta que o Histórico mostra ao abrir (o atalho do painel da bandeja). */
+  initialAccount: string | null;
 }
 
 /** Uma janela do `rate_limits`: fração 0–1, o % pronto (do núcleo) e o reset. */

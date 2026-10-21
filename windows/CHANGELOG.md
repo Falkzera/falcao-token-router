@@ -19,6 +19,9 @@ a fix on one platform never waits for the other's calendar.
   More than 7½ hours without a point breaks the line instead of guessing. Hover a
   chart, or focus it and use ← →, to read a point. The points are kept for 90 days
   in `%LOCALAPPDATA%\com.synqo.falcao-router\history`.
+- **A shortcut to each account's history**: the chart button next to every account
+  on the Groups tab, and **View history** on an account's card in the tray panel,
+  open the History tab right on that account.
 
 ## [1.0.0] — 2026-09-24
 

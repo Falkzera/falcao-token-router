@@ -153,7 +153,8 @@ that didn't, and the last line is `tudo certo.` (all good) or `há problemas aci
   yellow from 66%, red from 90%. Its tooltip has one line per group: account,
   window, percentage, where the number came from and how old it is.
 - **Left click** opens the accounts table next to the icon; click an account for
-  its details. **Right click** has Groups, Settings and Quit.
+  its details, and **View history** there for its charts. **Right click** has
+  Groups, Settings and Quit.
 - **Groups** has what the walkthrough used and, per group, the rotation order (drag,
   or ↑/↓), **Log in again…** for an account whose login expired, **Remove account**,
   **Measure accounts**, rename, default and delete.
@@ -161,7 +162,9 @@ that didn't, and the last line is `tudo certo.` (all good) or `há problemas aci
   and the weekly window over the last 4 weeks, with the group's threshold dashed.
   Each point is one measurement (see [What the numbers mean](#what-the-numbers-mean));
   more than 7½ hours without one — the app closed, the PC asleep — breaks the line
-  instead of guessing. Hover a chart, or focus it and use ← →, to read a point.
+  instead of guessing. Hover a chart, or focus it and use ← →, to read a point. The
+  chart button next to each account on the Groups tab opens History right on that
+  account.
 - **Settings**: the **Status line** (below), the **Groups summary** (what each
   account row shows: the 5-hour and 7-day usage, the model limit, and when each
   one resets — everything by default), **Measure accounts every 5 hours** (on by

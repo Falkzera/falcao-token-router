@@ -5,7 +5,7 @@
 //   ?view=home|flyout  &state=uso|vazio|pronta|critico|erro  &lang=en|pt-BR
 //   &tab=groups|history|settings  &select=<conta>  &foreign=<e-mail>  &scripts=current|missing|stale
 // O histórico (aba Histórico, `mock-history.ts`):
-//   &historico=cheio|vazio|lacuna|desligado
+//   &historico=cheio|vazio|lacuna|desligado  &conta=<id> (abre já nela, como o atalho do painel)
 // A integração de terminal e os ajustes:
 //   &terminal=ausente|ok|bloqueado|parcial|velha|semrouter  &devmode=1
 //   &install=falha (Ativar grava só parte)  &diretiva=1 (Permitir não vence a política)
@@ -585,10 +585,16 @@ const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
     publishLogin();
     return changed();
   },
-  app_info: (): AppInfo => ({ version: "0.1.0-mock", locale: mockLocale(), initialTab: mockTab() }),
+  // `&conta=<id>`: a janela abre no Histórico já nessa conta (o atalho do painel).
+  app_info: (): AppInfo => ({
+    version: "0.1.0-mock",
+    locale: mockLocale(),
+    initialTab: param("conta") ? "history" : mockTab(),
+    initialAccount: param("conta"),
+  }),
   get_snapshot: () => structuredClone(state),
   fit_flyout: () => undefined,
-  open_home: (args) => console.info("mock: abrir a janela na aba", args.tab),
+  open_home: (args) => console.info("mock: abrir a janela na aba", args.tab, "na conta", args.account),
   quit_app: () => console.info("mock: sair"),
   copy_text: async (args) => {
     await navigator.clipboard?.writeText(String(args.text)).catch(() => undefined);

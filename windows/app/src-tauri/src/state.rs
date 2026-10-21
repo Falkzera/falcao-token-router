@@ -26,14 +26,31 @@ pub enum HomeTab {
     Settings,
 }
 
+/// Para onde a janela vai: a aba e, no Histórico, a conta a mostrar — o atalho
+/// de cada conta (21/10/2026), que pode vir do painel da bandeja, outra janela.
+/// É o que o evento `navigate` leva e o que a janela que ainda vai abrir lê.
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Navigation {
+    pub tab: HomeTab,
+    #[serde(default)]
+    pub account: Option<String>,
+}
+
+impl Navigation {
+    pub fn to(tab: HomeTab) -> Self {
+        Navigation { tab, account: None }
+    }
+}
+
 pub struct AppState {
     store: Mutex<RouterConfigStore>,
     pub locale: Locale,
     /// A home do usuário (`%USERPROFILE%`), de onde sai o perfil padrão.
     pub home: String,
-    /// A aba pedida para a PRÓXIMA abertura da janela (quem pede é a bandeja,
-    /// antes de a janela existir).
-    pending_tab: Mutex<Option<HomeTab>>,
+    /// O destino pedido para a PRÓXIMA abertura da janela (quem pede é a
+    /// bandeja, antes de a janela existir).
+    pending: Mutex<Option<Navigation>>,
     /// O grupo que a sonda está medindo agora (fora da trava do store: a
     /// sonda leva segundos por conta e a bandeja segue respondendo).
     measuring: Mutex<Option<Id>>,
@@ -67,7 +84,7 @@ impl AppState {
             store: Mutex::new(store),
             locale: locale::system(),
             home,
-            pending_tab: Mutex::new(None),
+            pending: Mutex::new(None),
             measuring: Mutex::new(None),
             measure_attempts: Mutex::new(HashMap::new()),
         }
@@ -107,12 +124,38 @@ impl AppState {
         lock(&self.store)
     }
 
-    pub fn request_tab(&self, tab: HomeTab) {
-        *lock(&self.pending_tab) = Some(tab);
+    pub fn request(&self, navigation: Navigation) {
+        *lock(&self.pending) = Some(navigation);
     }
 
-    /// A aba pedida (uma vez); sem pedido, Grupos.
-    pub fn take_tab(&self) -> HomeTab {
-        lock(&self.pending_tab).take().unwrap_or(HomeTab::Groups)
+    /// O destino pedido (uma vez); sem pedido, Grupos.
+    pub fn take_request(&self) -> Navigation {
+        lock(&self.pending)
+            .take()
+            .unwrap_or(Navigation::to(HomeTab::Groups))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    /// O atalho de cada conta leva a conta junto com a aba — no evento
+    /// `navigate` e no `app_info` da janela que ainda vai abrir.
+    #[test]
+    fn the_history_shortcut_travels_with_the_account() {
+        let shortcut = Navigation {
+            tab: HomeTab::History,
+            account: Some("AAAAAAAA-0000-4000-8000-000000000001".into()),
+        };
+        assert_eq!(
+            serde_json::to_value(&shortcut).unwrap(),
+            json!({"tab": "history", "account": "AAAAAAAA-0000-4000-8000-000000000001"})
+        );
+        assert_eq!(
+            serde_json::to_value(Navigation::to(HomeTab::Settings)).unwrap(),
+            json!({"tab": "settings", "account": null})
+        );
     }
 }

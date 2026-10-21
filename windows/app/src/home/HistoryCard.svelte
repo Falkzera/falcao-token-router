@@ -1,13 +1,21 @@
 <script lang="ts">
   // Uma conta no Histórico: quem é, quando foi medida (e quando volta a ser,
-  // com a agenda ligada) e os dois gráficos, com o limiar do grupo.
+  // com a agenda ligada) e os dois gráficos, com o limiar do grupo. Os
+  // `data-*` são o endereço do atalho de cada conta; `highlight`, o destaque de
+  // quem chegou por ele.
   import { clock } from "../lib/clock.svelte";
   import { ageSeconds, duration } from "../lib/format";
   import { t } from "../lib/i18n";
   import LineChart from "../lib/LineChart.svelte";
   import type { AccountHistory } from "../lib/types";
 
-  let { account, threshold, scheduleOn }: { account: AccountHistory; threshold: number; scheduleOn: boolean } =
+  let {
+    account,
+    group,
+    threshold,
+    scheduleOn,
+    highlight = false,
+  }: { account: AccountHistory; group: string; threshold: number; scheduleOn: boolean; highlight?: boolean } =
     $props();
 
   const measured = $derived(
@@ -26,7 +34,7 @@
   );
 </script>
 
-<article class="card">
+<article class="card" class:highlight data-account={account.id} data-group={group}>
   <header>
     <span class="label">{account.label}</span>
     <span class="email">{account.email}</span>
@@ -45,6 +53,25 @@
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: var(--surface);
+    scroll-margin-top: 12px;
+  }
+  /* Quem chegou pelo atalho: um contorno que some sozinho. */
+  .card.highlight {
+    animation: flash 1.8s ease-out;
+  }
+  @keyframes flash {
+    from {
+      box-shadow: 0 0 0 2px var(--accent);
+    }
+    to {
+      box-shadow: 0 0 0 2px transparent;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .card.highlight {
+      animation: none;
+      box-shadow: 0 0 0 2px var(--accent);
+    }
   }
   header {
     display: flex;
