@@ -5,8 +5,10 @@ mod common;
 use common::*;
 
 use chrono::{Duration, SecondsFormat};
-use router_core::engine::group_usage::GroupUsageStore;
+use router_core::engine::group_usage::{GroupUsageStore, UsageOrigin};
 use router_core::engine::usage_history::{UsageHistory, UsageHistoryPoint};
+use router_core::usage::claude_usage_probe::{ClaudeUsageProbe, ProbeOutput, ProbeTarget};
+use router_core::{ConfigDir, Id};
 
 const EMAIL: &str = "conta1@exemplo.com";
 /// Outubro de 2026.
@@ -131,4 +133,92 @@ fn a_line_has_dates_without_fraction_and_no_absent_window() {
     assert!(!text.contains("fiveHourPercent"), "{text}");
     assert!(text.contains("\"sevenDayPercent\":0.5"), "{text}");
     assert!(!text.contains("models"), "sem janela por modelo, nem a chave");
+}
+
+// --- a sonda grava o ponto ---
+
+/// A captura do Windows, anonimizada (a mesma do `probe_tests.rs`).
+const WINDOWS_OUTPUT: &str = "You are currently using your subscription to power your Claude Code usage\r\n\r\nCurrent session: 12% used · resets Sep 22, 8:40pm (America/Sao_Paulo)\r\nCurrent week (all models): 34% used · resets Sep 23, 4am (America/Sao_Paulo)\r\nCurrent week (Fable): 56% used · resets Sep 23, 4am (America/Sao_Paulo)\r\n";
+
+fn probe(stdout: &'static str) -> ClaudeUsageProbe {
+    ClaudeUsageProbe::new(move |_| {
+        Ok(ProbeOutput {
+            exit_code: Some(0),
+            stdout: stdout.to_string(),
+        })
+    })
+}
+
+fn target() -> ProbeTarget {
+    ProbeTarget {
+        account_id: Id::new(),
+        label: "conta1".into(),
+        email: EMAIL.into(),
+        dir: ConfigDir::dedicated("C:/Users/exemplo/casa"),
+    }
+}
+
+#[test]
+fn the_probe_writes_the_sample_and_a_history_point() {
+    let tmp = tempfile::tempdir().unwrap();
+    let base = tmp.path();
+    probe(WINDOWS_OUTPUT)
+        .measure_into(&target(), &base.join("usage"), base, ts(T0))
+        .unwrap();
+
+    let sample = GroupUsageStore::read(EMAIL, &base.join("usage")).unwrap();
+    assert_eq!(sample.origin(), UsageOrigin::Probe);
+    let history = UsageHistory::read(EMAIL, &UsageHistory::directory(base));
+    assert_eq!(history.len(), 1);
+    assert_eq!(history[0].sampled_at, ts(T0));
+    assert_eq!(history[0].five_hour_percent, Some(0.12));
+    assert_eq!(history[0].seven_day_percent, Some(0.34));
+    assert!(history[0].five_hour_resets_at.is_some());
+    assert_eq!(history[0].models[0].name, "Fable");
+}
+
+/// Uma pasta de histórico que não se grava não desfaz a medição: a amostra
+/// (o que decide a rotação) já está no disco.
+#[test]
+fn a_history_that_cannot_be_written_does_not_fail_the_measurement() {
+    let tmp = tempfile::tempdir().unwrap();
+    let base = tmp.path();
+    // Um ARQUIVO onde a pasta do histórico deveria estar.
+    std::fs::write(UsageHistory::directory(base), b"nao e pasta").unwrap();
+
+    let reading = probe(WINDOWS_OUTPUT).measure_into(&target(), &base.join("usage"), base, ts(T0));
+
+    assert!(reading.is_ok(), "{reading:?}");
+    assert!(GroupUsageStore::read(EMAIL, &base.join("usage")).is_some());
+}
+
+/// A leitura sem a linha da sessão deixa o ponto SEM a janela de 5h — o
+/// gráfico não a desenha em zero.
+#[test]
+fn a_reading_without_the_session_line_leaves_no_five_hour_value() {
+    let tmp = tempfile::tempdir().unwrap();
+    let base = tmp.path();
+    probe("Current week (all models): 40% used\r\n")
+        .measure_into(&target(), &base.join("usage"), base, ts(T0))
+        .unwrap();
+
+    let history = UsageHistory::read(EMAIL, &UsageHistory::directory(base));
+    assert_eq!(history[0].five_hour_percent, None);
+    assert_eq!(history[0].seven_day_percent, Some(0.4));
+}
+
+/// Medição que falhou (perfil sem login) não deixa ponto: o buraco no gráfico
+/// é o registro honesto.
+#[test]
+fn a_failed_measurement_leaves_no_point() {
+    let tmp = tempfile::tempdir().unwrap();
+    let base = tmp.path();
+    let result = probe("Total cost:            $0.0000\r\n").measure_into(
+        &target(),
+        &base.join("usage"),
+        base,
+        ts(T0),
+    );
+    assert!(result.is_err());
+    assert!(UsageHistory::read(EMAIL, &UsageHistory::directory(base)).is_empty());
 }
