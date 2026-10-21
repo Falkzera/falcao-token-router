@@ -21,3 +21,4 @@ pub mod session_launcher;
 pub mod session_registry;
 pub mod shell_integration;
 pub mod terminal_report;
+pub mod usage_history;
