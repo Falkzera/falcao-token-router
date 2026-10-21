@@ -10,7 +10,7 @@
 
 **Where the design comes from:** `windows/docs/specs/2026-10-21-usage-history-design.md` (on the `feat/windows-historico` branch / PR #35 until it merges). Read it first; this plan only adapts it. The Windows code is the reference for every rule: `windows/crates/router-core/src/engine/usage_history.rs`, `engine/measure_schedule.rs`, `engine/router_config_store/rotation.rs`, `windows/app/src-tauri/src/history.rs`. While #35 is open: `git show fork/feat/windows-historico:<path>` (or browse the PR).
 
-> ⚠️ **This plan was written on a Windows machine, without a Swift toolchain.** The Swift below was checked against the current sources by reading them, not by compiling. Expect small fixes when `./Scripts/test.sh` first runs; the tests are the contract — fix the code, not the tests.
+> ⚠️ **This plan was written on a Windows machine, without a Swift toolchain.** Every type, signature and call site below was checked against the sources of `main` at `fdb3024` by reading them (21/10/2026), not by compiling. Expect small fixes when `./Scripts/test.sh` first runs; the tests are the contract — fix the code, not the tests.
 
 ## Before starting
 
@@ -25,7 +25,7 @@
 - Comments and `agent.md` in **pt-BR**; identifiers in English; README/CHANGELOG/docs in English.
 - **No network calls.** The probe is the official `claude --print /usage`, as today.
 - **Never write `@State`** — use `@ViewState` (`Sources/FalcaoTokenRouter/ViewState.swift`).
-- Every UI string from `Resources/{en,pt-BR}.lproj/Localizable.strings`; `check-strings.sh` must pass (new prefix `history`). Computed text goes through `Text(verbatim:)`.
+- Every UI string from `Resources/{en,pt-BR}.lproj/Localizable.strings`; `check-strings.sh` must pass. The History tab's keys live under the existing prefix **`home.history.*`** — *not* a new `history` prefix: `Engine/ProfileSharing.swift` has the literal `"history.jsonl"` (Claude Code's file), and the checker would take it for a missing key. Computed text goes through `Text(verbatim:)`.
 - State the UI shows live is a stored **observable** property of the store (a computed property that reads disk does not re-render).
 - No production file over 600 lines. `RouterConfigStore.swift` is at 545: the new store code goes in `Engine/RouterConfigStore+History.swift`.
 - **The file format is the contract with Windows** — identical: `<base>/history/<email>.jsonl`, same e-mail sanitization as `GroupUsageStore`, one JSON object per line, keys `sampledAt`, `fiveHourPercent`, `fiveHourResetsAt`, `sevenDayPercent`, `sevenDayResetsAt`, `models` (`name`, `percent`, `resetsAt`), fractions 0–1, ISO-8601 dates **without fractional seconds**, absent window = absent key (never 0), `models` omitted when empty, retention **90 days**, whole file rewritten atomically.
@@ -140,7 +140,7 @@ struct UsageHistoryTests {
         let text = try String(contentsOf: dir.appending(path: UsageHistory.fileName(forEmail: email)),
                               encoding: .utf8)
         #expect(text.contains(#""sampledAt":"2026-10-14T"#))
-        #expect(!text.contains("."+"5Z"))
+        #expect(!text.contains(".5Z"))
         #expect(!text.contains("fiveHourPercent"))
         #expect(text.contains(#""sevenDayPercent":0.5"#))
         #expect(!text.contains("models"))
@@ -499,8 +499,9 @@ Doc comment of `Measure`: "…então aqui é comando; a medição de 5 em 5 hora
 
 **Interfaces:**
 - `public enum MeasureSchedule { static let every: TimeInterval; static func nextAt(lastMeasured:lastAttempt:) -> Date?; static func isDue(lastMeasured:lastAttempt:now:) -> Bool }`
-- `public struct ProbeTarget: Sendable, Equatable { accountID, email, dir }`
-- On `RouterConfigStore`: `historyByAccount: [UUID: [UsageHistoryPoint]]` (observable), `measureAttempts: [UUID: Date]` (ignored), `signingIn: Bool` (ignored), `probeTargets(in:)`, `scheduledMeasurePlans(now:) -> [(groupID: UUID, targets: [ProbeTarget])]`, `runScheduledMeasure(now:) async`, `clearHistory() throws -> Int`, `refreshHistory()`.
+- `public struct ProbeTarget: Sendable, Equatable { accountID: UUID, email: String, dir: ConfigDir }`
+- `public struct MeasurePlan: Sendable, Equatable { groupID: UUID, targets: [ProbeTarget] }` — a struct, not a labeled tuple: the tests use `plans.map(\.groupID)`, and key paths into tuples are not something to bet a compile on.
+- On `RouterConfigStore`: `historyByAccount: [UUID: [UsageHistoryPoint]]` (observable), `measureAttempts: [UUID: Date]` (ignored), `signingIn: Bool` (ignored), `probeTargets(in:)`, `scheduledMeasurePlans(now:) -> [MeasurePlan]`, `runScheduledMeasure(now:) async`, `clearHistory() throws -> Int`, `refreshHistory()`.
 
 - [ ] **Step 1: Failing tests**
 
@@ -570,9 +571,11 @@ struct HistoryStoreTests {
         return (RouterConfigStore(paths: paths, keychain: kc, adapters: [adapter]), kc, adapter, paths)
     }
 
-    /// Login completo numa casa nova, adicionado ao grupo.
+    /// Login completo numa casa nova, adicionado ao grupo — o `seedLogin` do
+    /// `StoreTests`, mais o `finishPendingLogin`. `nil` se o login não entrou:
+    /// quem chama falha no `#require`, sem derrubar a suíte.
     private func addAccount(_ email: String, to groupID: UUID, store: RouterConfigStore,
-                            kc: FakeKeychain, adapter: FakeAdapter) -> Account {
+                            kc: FakeKeychain, adapter: FakeAdapter) -> Account? {
         let begun = store.newAccountHome()
         let identity = AccountIdentity(email: email, organizationName: "Acme",
                                        rateLimitTier: "default_claude_max_5x",
@@ -580,9 +583,7 @@ struct HistoryStoreTests {
         try? adapter.writeIdentity(identity, toConfigDir: begun.home)
         try? kc.write("cred-\(email)", service: adapter.keychainService(forConfigDir: begun.home))
         guard case .added(let account) = store.finishPendingLogin(
-            home: begun.home, accountID: begun.accountID, into: groupID) else {
-            fatalError("login não entrou")
-        }
+            home: begun.home, accountID: begun.accountID, into: groupID) else { return nil }
         return account
     }
 
@@ -599,14 +600,15 @@ struct HistoryStoreTests {
         let (store, kc, adapter, paths) = makeStore()
         let work = store.addGroup(name: "trabalho")
         let personal = store.addGroup(name: "pessoal")
-        let a = addAccount("conta1@exemplo.com", to: work.id, store: store, kc: kc, adapter: adapter)
-        let b = addAccount("conta2@exemplo.com", to: work.id, store: store, kc: kc, adapter: adapter)
-        let c = addAccount("conta3@exemplo.com", to: personal.id, store: store, kc: kc, adapter: adapter)
+        let a = try #require(addAccount("conta1@exemplo.com", to: work.id, store: store, kc: kc, adapter: adapter))
+        let b = try #require(addAccount("conta2@exemplo.com", to: work.id, store: store, kc: kc, adapter: adapter))
+        let c = try #require(addAccount("conta3@exemplo.com", to: personal.id, store: store, kc: kc, adapter: adapter))
         try measured("conta1@exemplo.com", hoursAgo: 1, paths: paths)  // não vence
         try measured("conta3@exemplo.com", hoursAgo: 6, paths: paths)  // vence
         // a conta2 nunca foi medida: vence
 
         let plans = store.scheduledMeasurePlans()
+        try #require(plans.count == 2)
         #expect(plans.map(\.groupID) == [work.id, personal.id])
         #expect(plans[0].targets.map(\.accountID) == [b.id])
         #expect(plans[1].targets.map(\.accountID) == [c.id])
@@ -618,8 +620,8 @@ struct HistoryStoreTests {
         let (store, kc, adapter, paths) = makeStore()
         let work = store.addGroup(name: "trabalho")
         let personal = store.addGroup(name: "pessoal")
-        let shared = addAccount("conta1@exemplo.com", to: work.id, store: store, kc: kc, adapter: adapter)
-        _ = addAccount("conta2@exemplo.com", to: personal.id, store: store, kc: kc, adapter: adapter)
+        let shared = try #require(addAccount("conta1@exemplo.com", to: work.id, store: store, kc: kc, adapter: adapter))
+        _ = try #require(addAccount("conta2@exemplo.com", to: personal.id, store: store, kc: kc, adapter: adapter))
         // A compartilhada entra também no 2º grupo, pelo `config.json`.
         var config = store.config
         config.groups[1].accountIDs.insert(shared.id, at: 0)
@@ -632,10 +634,10 @@ struct HistoryStoreTests {
     }
 
     @Test("a tentativa recente segura a conta fora do plano")
-    func tentativaRecente() {
+    func tentativaRecente() throws {
         let (store, kc, adapter, _) = makeStore()
         let group = store.addGroup(name: "trabalho")
-        let a = addAccount("conta1@exemplo.com", to: group.id, store: store, kc: kc, adapter: adapter)
+        let a = try #require(addAccount("conta1@exemplo.com", to: group.id, store: store, kc: kc, adapter: adapter))
 
         store.measureAttempts[a.id] = Date().addingTimeInterval(-3600)
         #expect(store.scheduledMeasurePlans().isEmpty)
@@ -649,8 +651,11 @@ struct HistoryStoreTests {
     func ativaPeloGrupo() throws {
         let (store, kc, adapter, _) = makeStore()
         let group = store.addGroup(name: "trabalho")
-        let a = addAccount("conta1@exemplo.com", to: group.id, store: store, kc: kc, adapter: adapter)
+        let a = try #require(addAccount("conta1@exemplo.com", to: group.id, store: store, kc: kc, adapter: adapter))
+        // Como o `activate()` do `StoreTests`: o 1º grupo é o padrão, mas
+        // identidade e chaveiro são os falsos, em memória.
         store.activate(a, in: try #require(store.config.groups.first))
+        #expect(store.lastError == nil)
 
         let target = try #require(store.scheduledMeasurePlans().first?.targets.first)
         #expect(target.dir.raw == store.config.groups[0].configDir.raw)
@@ -660,8 +665,8 @@ struct HistoryStoreTests {
     func apagar() throws {
         let (store, kc, adapter, paths) = makeStore()
         let group = store.addGroup(name: "trabalho")
-        let a = addAccount("conta1@exemplo.com", to: group.id, store: store, kc: kc, adapter: adapter)
-        _ = addAccount("conta2@exemplo.com", to: group.id, store: store, kc: kc, adapter: adapter)
+        let a = try #require(addAccount("conta1@exemplo.com", to: group.id, store: store, kc: kc, adapter: adapter))
+        _ = try #require(addAccount("conta2@exemplo.com", to: group.id, store: store, kc: kc, adapter: adapter))
         try measured("conta1@exemplo.com", hoursAgo: 1, paths: paths)
         try measured("conta2@exemplo.com", hoursAgo: 7, paths: paths)
         store.refreshHistory()
@@ -725,7 +730,8 @@ In `RouterConfigStore.swift`:
     /// do app — o que segura uma conta deslogada (ver `MeasureSchedule`).
     @ObservationIgnored public internal(set) var measureAttempts: [UUID: Date] = [:]
     /// Um login (ou relogin) está aberto na tela: a agenda espera. A sonda
-    /// poderia mexer na casa que está sendo relogada.
+    /// poderia mexer na casa que está sendo relogada. Quem liga e desliga é a
+    /// `LoginSheet`, do aparecer ao sumir.
     @ObservationIgnored public var signingIn = false
 ```
 
@@ -741,6 +747,13 @@ public struct ProbeTarget: Sendable, Equatable {
     public let accountID: UUID
     public let email: String
     public let dir: ConfigDir
+}
+
+/// Um grupo na medição automática: as contas dele que venceram, na ordem da
+/// lista. A marca "medindo" do grupo acompanha o plano.
+public struct MeasurePlan: Sendable, Equatable {
+    public let groupID: UUID
+    public let targets: [ProbeTarget]
 }
 
 /// O histórico e a medição de 5 em 5 horas (21/10/2026). Arquivo à parte do
@@ -759,10 +772,10 @@ extension RouterConfigStore {
     /// A medição automática: por grupo, na ordem da lista, um plano só com as
     /// contas VENCIDAS (`MeasureSchedule`). Cada conta vai uma vez — a que está
     /// em dois grupos, no primeiro —, e grupo sem conta vencida fica de fora.
-    public func scheduledMeasurePlans(now: Date = Date()) -> [(groupID: UUID, targets: [ProbeTarget])] {
+    public func scheduledMeasurePlans(now: Date = Date()) -> [MeasurePlan] {
         let history = paths.historyDir
         var planned = Set<UUID>()
-        var plans: [(groupID: UUID, targets: [ProbeTarget])] = []
+        var plans: [MeasurePlan] = []
         for group in config.groups {
             let targets = probeTargets(in: group).filter { target in
                 !planned.contains(target.accountID) && MeasureSchedule.isDue(
@@ -771,7 +784,7 @@ extension RouterConfigStore {
             }
             guard !targets.isEmpty else { continue }
             planned.formUnion(targets.map(\.accountID))
-            plans.append((group.id, targets))
+            plans.append(MeasurePlan(groupID: group.id, targets: targets))
         }
         return plans
     }
@@ -941,7 +954,22 @@ In `StatusLineFormat.swift`, extract the weekday names (and use them in `resetWh
     }
 ```
 
-and in `resetWhen`, replace the local arrays and the weekday lookup with `weekdayName(date, portuguese: portuguese, calendar: calendar)`.
+and `resetWhen` keeps its output byte for byte, now reading the names from there:
+
+```swift
+    public static func resetWhen(_ date: Date, withDay: Bool,
+                                 portuguese: Bool = Locale.current.language.languageCode?.identifier == "pt",
+                                 calendar: Calendar = .current) -> String {
+        let parts = calendar.dateComponents([.day, .hour, .minute], from: date)
+        let hour = parts.hour ?? 0, minute = parts.minute ?? 0
+        guard withDay else { return String(format: "%02d:%02d", hour, minute) }
+
+        // Hora sem zero à esquerda no formato semanal, de propósito — é o que o
+        // porte Windows imprime, e as duas plataformas escrevem igual.
+        let day = weekdayName(date, portuguese: portuguese, calendar: calendar)
+        return "\(day) (\(parts.day ?? 0)) \(hour):\(String(format: "%02d", minute))"
+    }
+```
 
 Create `Sources/CCUsageCore/Engine/UsageHistoryChart.swift`:
 
@@ -1035,7 +1063,7 @@ public enum UsageHistoryChart {
 /// A medição de 5 em 5 horas vem ligada de fábrica — e um payload de antes
 /// dela (sem o campo) também a liga. Desligada, fica desligada.
 @MainActor
-@Test func scheduledMeasureIsOnUnlessTurnedOff() throws {
+@Test func scheduledMeasureIsOnUnlessTurnedOff() {
     let defaults = freshDefaults()
     #expect(AppSettings(defaults: defaults, detectPlan: { nil }).scheduledMeasure)
 
@@ -1062,7 +1090,29 @@ public enum UsageHistoryChart {
     }
 ```
 
-`init`: `self.scheduledMeasure = stored?.scheduledMeasure ?? true` (before `self.alerts`). `Payload`: `var scheduledMeasure: Bool?`. `save()`: pass `scheduledMeasure: scheduledMeasure`.
+`init`, right after `self.showInDock = …`:
+
+```swift
+        self.scheduledMeasure = stored?.scheduledMeasure ?? true
+```
+
+`Payload`, after `showInDock`:
+
+```swift
+        /// Ausente em payload de antes da medição automática: resolve para
+        /// ligado no init.
+        var scheduledMeasure: Bool?
+```
+
+`save()`:
+
+```swift
+        let payload = Payload(plan: plan, manualBlockCeiling: manualBlockCeiling,
+                              liveUsageEnabled: liveUsageEnabled,
+                              showInDock: showInDock,
+                              scheduledMeasure: scheduledMeasure,
+                              alertsEnabled: nil, alerts: alerts)
+```
 
 - [ ] **Step 4: Run** — green. **Step 5: Commit** — `feat(macos): ajuste para medir as contas a cada 5 horas`
 
@@ -1070,7 +1120,7 @@ public enum UsageHistoryChart {
 
 ### Task 6: The app runs the schedule
 
-**Files:** Modify `Sources/FalcaoTokenRouter/App.swift`, `Sources/FalcaoTokenRouter/Settings/GroupsView.swift`.
+**Files:** Modify `Sources/FalcaoTokenRouter/App.swift`, `Sources/FalcaoTokenRouter/Settings/LoginSheet.swift`.
 
 - [ ] **Step 1: The loop** — replace `startRotation()`:
 
@@ -1101,12 +1151,19 @@ public enum UsageHistoryChart {
     }
 ```
 
-- [ ] **Step 2: The sign-in guard** — in `GroupsView`, after `.sheet(item: $pendingLogin)`:
+- [ ] **Step 2: The sign-in guard** — on the login sheet itself, whose lifetime *is* the login: it also disappears when the window closes with a login open, which an `.onChange` on `GroupsView.pendingLogin` would miss (the view goes away without ever seeing `nil`, and the schedule would stay blocked until the app quits). In `LoginSheet`, the existing `.onAppear` becomes:
 
 ```swift
-        // Com um login aberto a agenda espera: a sonda poderia mexer na casa
-        // que está sendo relogada (21/10/2026).
-        .onChange(of: pendingLogin?.id) { _, id in store.signingIn = id != nil }
+        .onAppear {
+            // Com um login aberto a agenda de 5 em 5 horas espera: a sonda
+            // poderia mexer na casa que está sendo relogada (21/10/2026).
+            store.signingIn = true
+            let s = LoginSession(home: pending.home, accountID: pending.accountID,
+                                 groupID: pending.groupID)
+            session = s
+            s.start()
+        }
+        .onDisappear { store.signingIn = false }
 ```
 
 - [ ] **Step 3: Build** — `./Scripts/test.sh` (it builds every target) → green.
@@ -1226,7 +1283,7 @@ struct HistoryChart: View {
                     .foregroundStyle(UsageColor.critical.opacity(0.75))
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 3]))
                     .annotation(position: .top, alignment: .trailing) {
-                        Text(verbatim: String(format: String(localized: "history.chart.threshold.format"),
+                        Text(verbatim: String(format: String(localized: "home.history.chart.threshold.format"),
                                               "\(Int(threshold))%"))
                             .font(.system(size: 9)).foregroundStyle(.secondary)
                     }
@@ -1278,10 +1335,10 @@ struct HistoryChart: View {
             .frame(height: 110)
             .overlay {
                 if series.points.isEmpty {
-                    Text("history.chart.empty").font(.caption).foregroundStyle(.tertiary)
+                    Text("home.history.chart.empty").font(.caption).foregroundStyle(.tertiary)
                 }
             }
-            .accessibilityLabel(Text(verbatim: String(format: String(localized: "history.chart.label.format"),
+            .accessibilityLabel(Text(verbatim: String(format: String(localized: "home.history.chart.label.format"),
                                                       title, series.latest.map { UsagePercent.text($0.fraction) } ?? "—")))
         }
     }
@@ -1293,7 +1350,7 @@ struct HistoryChart: View {
             Text(verbatim: UsagePercent.text(point.fraction)).font(.callout.weight(.semibold))
             Text(verbatim: StatusLineFormat.resetWhen(point.at, withDay: true)).font(.caption2)
             if let reset = point.resetsAt {
-                Text(verbatim: String(format: String(localized: "history.point.resets.format"),
+                Text(verbatim: String(format: String(localized: "home.history.point.resets.format"),
                                       StatusLineFormat.resetWhen(reset, withDay: weekly)))
                     .font(.caption2)
             }
@@ -1340,10 +1397,10 @@ struct HistoryCard: View {
                     .font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
             Text(verbatim: status(now: now)).font(.caption).foregroundStyle(.tertiary)
-            HistoryChart(title: String(localized: "history.chart.fiveHour"),
+            HistoryChart(title: String(localized: "home.history.chart.fiveHour"),
                          series: UsageHistoryChart.series(points, window: .fiveHour, now: now),
                          threshold: threshold, weekly: false)
-            HistoryChart(title: String(localized: "history.chart.sevenDay"),
+            HistoryChart(title: String(localized: "home.history.chart.sevenDay"),
                          series: UsageHistoryChart.series(points, window: .sevenDay, now: now),
                          threshold: threshold, weekly: true)
         }
@@ -1363,18 +1420,18 @@ struct HistoryCard: View {
     private func status(now: Date) -> String {
         let last = points.last?.sampledAt
         let measured = last.map {
-            String(format: String(localized: "history.account.measured.format"),
+            String(format: String(localized: "home.history.account.measured.format"),
                    Format.duration(now.timeIntervalSince($0)))
-        } ?? String(localized: "history.account.never")
+        } ?? String(localized: "home.history.account.never")
         let next: String
         if !scheduleOn {
-            next = String(localized: "history.account.scheduleOff")
+            next = String(localized: "home.history.account.scheduleOff")
         } else if let at = MeasureSchedule.nextAt(lastMeasured: last, lastAttempt: attempt),
                   at > now.addingTimeInterval(180) {
-            next = String(format: String(localized: "history.account.next.format"),
+            next = String(format: String(localized: "home.history.account.next.format"),
                           StatusLineFormat.resetWhen(at, withDay: false))
         } else {
-            next = String(localized: "history.account.nextSoon")
+            next = String(localized: "home.history.account.nextSoon")
         }
         return "\(measured) · \(next)"
     }
@@ -1407,8 +1464,8 @@ struct HistoryView: View {
         if store.config.groups.isEmpty {
             VStack(spacing: 12) {
                 Image(systemName: "chart.xyaxis.line").font(.system(size: 34)).foregroundStyle(.tertiary)
-                Text("history.empty.title").font(.callout)
-                Text("history.empty.detail").font(.caption)
+                Text("home.history.empty.title").font(.callout)
+                Text("home.history.empty.detail").font(.caption)
                     .foregroundStyle(.secondary).multilineTextAlignment(.center)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -1417,7 +1474,7 @@ struct HistoryView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
-                        Text("history.intro").font(.caption).foregroundStyle(.secondary)
+                        Text("home.history.intro").font(.caption).foregroundStyle(.secondary)
                         ForEach(store.config.groups) { group in
                             groupSection(group)
                         }
@@ -1438,7 +1495,7 @@ struct HistoryView: View {
         return VStack(alignment: .leading, spacing: 10) {
             Text(verbatim: group.name).font(.headline)
             if accounts.isEmpty {
-                Text("history.group.empty").font(.caption).foregroundStyle(.tertiary)
+                Text("home.history.group.empty").font(.caption).foregroundStyle(.tertiary)
             }
             ForEach(accounts) { account in
                 let key = Self.anchor(group.id, account.id)
@@ -1486,7 +1543,37 @@ struct HistoryView: View {
                 .help(String(localized: "groups.account.history"))
 ```
 
-`GroupCard`: add `let onHistory: (Account) -> Void` and pass `onHistory: { onHistory(account) }` to `AccountRow`. `GroupsView`: add `let navigation: HomeNavigation` and pass `onHistory: { navigation.showHistory(of: $0.id, in: group.id) }` to `GroupCard`.
+`GroupCard`: a new stored property after `onRelogin` (the memberwise init takes the parameters in declaration order):
+
+```swift
+    let onRelogin: (Account) -> Void
+    /// O atalho de cada conta para o Histórico, já neste grupo.
+    let onHistory: (Account) -> Void
+```
+
+and the row in `accountList`:
+
+```swift
+                AccountRow(account: account,
+                           isActive: account.id == active?.id,
+                           usage: store.usageDetail[account.id],
+                           sampledAt: store.usageSampledAt[account.id],
+                           onSwitch: { store.activate(account, in: group) },
+                           onHistory: { onHistory(account) },
+                           onRelogin: { onRelogin(account) },
+                           onRemove: { pendingDelete = account })
+```
+
+`GroupsView`: `let navigation: HomeNavigation` after `store`, and the card:
+
+```swift
+                            GroupCard(store: store, group: group,
+                                      onAddAccount: { startAddAccount(to: group.id) },
+                                      onRelogin: { startRelogin($0, in: group.id) },
+                                      onHistory: { navigation.showHistory(of: $0.id, in: group.id) })
+```
+
+(`HomeWindow` already passes `navigation` — Step 1.)
 
 - [ ] **Step 7: The shortcut in the panel** — in `UsagePanel.accountSection`, after the `if let usage { … } else { … }`:
 
@@ -1510,7 +1597,7 @@ struct HistoryView: View {
 
 ### Task 8: Settings section and strings
 
-**Files:** Modify `Sources/FalcaoTokenRouter/Settings/SettingsView.swift`, `Resources/en.lproj/Localizable.strings`, `Resources/pt-BR.lproj/Localizable.strings`, `Scripts/check-strings.sh`.
+**Files:** Modify `Sources/FalcaoTokenRouter/Settings/SettingsView.swift`, `Resources/en.lproj/Localizable.strings`, `Resources/pt-BR.lproj/Localizable.strings`.
 
 - [ ] **Step 1: Settings** — in `SettingsView` add state and a section before `Section("settings.section.system")`:
 
@@ -1560,26 +1647,26 @@ struct HistoryView: View {
     }
 ```
 
-- [ ] **Step 2: Strings** — `Scripts/check-strings.sh`: `PREFIXES='panel|settings|alerts|format|groups|home|history'`. Then add to `en.lproj/Localizable.strings`:
+- [ ] **Step 2: Strings** — `Scripts/check-strings.sh` stays as it is: every new key is under a prefix it already knows (`home`, `groups`, `panel`, `settings`). A new `history` prefix would break it — `Engine/ProfileSharing.swift` has the literal `"history.jsonl"`, which the checker would read as a key missing from both catalogs. Add to `en.lproj/Localizable.strings`:
 
 ```
 /* History tab (21/10/2026) */
 "home.tab.history" = "History";
-"history.intro" = "Each point is one measurement of Claude Code's `/usage`: every 5 hours while the app is open, plus each Measure accounts and `router measure`.";
-"history.empty.title" = "No groups yet";
-"history.empty.detail" = "Create a group on the Groups tab. Its accounts show up here, with a point for each measurement.";
-"history.group.empty" = "No accounts in this group yet.";
-"history.account.measured.format" = "measured %@ ago";
-"history.account.never" = "no measurements yet";
-"history.account.next.format" = "next at %@";
-"history.account.nextSoon" = "next in a moment";
-"history.account.scheduleOff" = "automatic measuring is off";
-"history.chart.fiveHour" = "5 hours · last 7 days";
-"history.chart.sevenDay" = "Weekly · last 4 weeks";
-"history.chart.threshold.format" = "switch at %@";
-"history.chart.empty" = "No points in this period.";
-"history.chart.label.format" = "%1$@ — latest %2$@";
-"history.point.resets.format" = "resets %@";
+"home.history.intro" = "Each point is one measurement of Claude Code's `/usage`: every 5 hours while the app is open, plus each Measure accounts and `router measure`.";
+"home.history.empty.title" = "No groups yet";
+"home.history.empty.detail" = "Create a group on the Groups tab. Its accounts show up here, with a point for each measurement.";
+"home.history.group.empty" = "No accounts in this group yet.";
+"home.history.account.measured.format" = "measured %@ ago";
+"home.history.account.never" = "no measurements yet";
+"home.history.account.next.format" = "next at %@";
+"home.history.account.nextSoon" = "next in a moment";
+"home.history.account.scheduleOff" = "automatic measuring is off";
+"home.history.chart.fiveHour" = "5 hours · last 7 days";
+"home.history.chart.sevenDay" = "Weekly · last 4 weeks";
+"home.history.chart.threshold.format" = "switch at %@";
+"home.history.chart.empty" = "No points in this period.";
+"home.history.chart.label.format" = "%1$@ — latest %2$@";
+"home.history.point.resets.format" = "resets %@";
 "groups.account.history" = "This account's usage history";
 "panel.account.history" = "View history";
 "settings.section.history" = "History";
@@ -1599,21 +1686,21 @@ and to `pt-BR.lproj/Localizable.strings`:
 ```
 /* Aba Histórico (21/10/2026) */
 "home.tab.history" = "Histórico";
-"history.intro" = "Cada ponto é uma medição do `/usage` do Claude Code: a cada 5 horas com o app aberto, mais cada Medir contas e cada `router measure`.";
-"history.empty.title" = "Nenhum grupo ainda";
-"history.empty.detail" = "Crie um grupo na aba Grupos. As contas dele aparecem aqui, com um ponto por medição.";
-"history.group.empty" = "Nenhuma conta neste grupo ainda.";
-"history.account.measured.format" = "medida há %@";
-"history.account.never" = "sem medições ainda";
-"history.account.next.format" = "próxima às %@";
-"history.account.nextSoon" = "próxima em instantes";
-"history.account.scheduleOff" = "medição automática desligada";
-"history.chart.fiveHour" = "5 horas · últimos 7 dias";
-"history.chart.sevenDay" = "Semanal · últimas 4 semanas";
-"history.chart.threshold.format" = "troca em %@";
-"history.chart.empty" = "Sem pontos neste período.";
-"history.chart.label.format" = "%1$@ — último %2$@";
-"history.point.resets.format" = "reseta %@";
+"home.history.intro" = "Cada ponto é uma medição do `/usage` do Claude Code: a cada 5 horas com o app aberto, mais cada Medir contas e cada `router measure`.";
+"home.history.empty.title" = "Nenhum grupo ainda";
+"home.history.empty.detail" = "Crie um grupo na aba Grupos. As contas dele aparecem aqui, com um ponto por medição.";
+"home.history.group.empty" = "Nenhuma conta neste grupo ainda.";
+"home.history.account.measured.format" = "medida há %@";
+"home.history.account.never" = "sem medições ainda";
+"home.history.account.next.format" = "próxima às %@";
+"home.history.account.nextSoon" = "próxima em instantes";
+"home.history.account.scheduleOff" = "medição automática desligada";
+"home.history.chart.fiveHour" = "5 horas · últimos 7 dias";
+"home.history.chart.sevenDay" = "Semanal · últimas 4 semanas";
+"home.history.chart.threshold.format" = "troca em %@";
+"home.history.chart.empty" = "Sem pontos neste período.";
+"home.history.chart.label.format" = "%1$@ — último %2$@";
+"home.history.point.resets.format" = "reseta %@";
 "groups.account.history" = "Histórico de uso desta conta";
 "panel.account.history" = "Ver histórico";
 "settings.section.history" = "Histórico";
@@ -1632,7 +1719,7 @@ and to `pt-BR.lproj/Localizable.strings`:
 - [ ] **Step 4: Look at it** — `./Scripts/bundle.sh --native --install`, open the app:
   - History tab: two charts per account (both appearances), hover a point (value · when · reset), the dashed threshold with its label, the "measured … · next …" line;
   - Groups: the chart button next to each account opens History scrolled to it, highlighted; the panel's account card → **View history** does the same from the menu bar;
-  - Settings → History: the switch, **Delete history…** → confirmation → "History deleted ✓";
+  - **Meter** tab (or ⌘,) → **History** section: the switch, **Delete history…** → confirmation → "History deleted ✓";
   - ~3 minutes after launching, `ls ~/Library/Application\ Support/com.synqo.falcao-router/history/` shows one `.jsonl` per account (the first scheduled measurement), and a second pass 3 minutes later measures nothing new.
 - [ ] **Step 5: Commit** — `feat(macos): a aba Histórico, os gráficos e o atalho de cada conta` (Tasks 7–8 together).
 
