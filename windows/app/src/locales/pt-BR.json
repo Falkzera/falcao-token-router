@@ -5,6 +5,7 @@
   "groups.account.add": "Adicionar conta",
   "groups.account.delete.confirm": "Remover",
   "groups.account.delete.message.format": "%@ sai deste grupo e o login dela é apagado deste computador. Para usá-la de novo será preciso entrar pelo fluxo oficial outra vez. Sessões abertas agora continuam até o token vencer.",
+  "groups.account.delete.messageActive.format": "%@ sai deste grupo e o login dela é apagado deste computador. Para usá-la de novo será preciso entrar pelo fluxo oficial outra vez. Como ela está em uso, o grupo passa para a próxima conta — as sessões abertas continuam, sem fechar, já atendidas pela nova.",
   "groups.account.delete.title": "Remover conta do grupo?",
   "groups.account.menu.help": "Mais ações",
   "groups.account.moveDown": "Mover para baixo",

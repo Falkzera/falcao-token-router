@@ -5,6 +5,7 @@
   "groups.account.add": "Add account",
   "groups.account.delete.confirm": "Remove",
   "groups.account.delete.message.format": "%@ leaves this group and its login is deleted from this computer. Using it again means signing in through the official flow once more. Sessions open right now keep going until the token expires.",
+  "groups.account.delete.messageActive.format": "%@ leaves this group and its login is deleted from this computer. Using it again means signing in through the official flow once more. Since it is in use, the group switches to the next account — open sessions keep going, without closing, now served by the new one.",
   "groups.account.delete.title": "Remove account from group?",
   "groups.account.menu.help": "More actions",
   "groups.account.moveDown": "Move down",

@@ -132,6 +132,10 @@
     | { kind: "deleteGroup" }
     | { kind: "makeDefault"; foreign: string | null };
   let pending = $state<Pending | null>(null);
+  // Em uso e com outra no grupo: ao sair, o grupo passa para a próxima (o motor
+  // escolhe qual) — a confirmação diz isso, e não "continuam até o token vencer".
+  const handsOver = (account: AccountView) =>
+    account.id === group.activeAccountId && group.accounts.length > 1;
 
   async function askMakeDefault() {
     pending = { kind: "makeDefault", foreign: await api.foreignDefaultLogin() };
@@ -284,7 +288,9 @@
 {#if pending?.kind === "removeAccount"}
   <ConfirmDialog
     title={t("groups.account.delete.title")}
-    message={t("groups.account.delete.message.format", pending.account.label)}
+    message={handsOver(pending.account)
+      ? t("groups.account.delete.messageActive.format", pending.account.label)
+      : t("groups.account.delete.message.format", pending.account.label)}
     confirm={t("groups.account.delete.confirm")}
     onConfirm={confirmPending}
     onCancel={() => (pending = null)}
