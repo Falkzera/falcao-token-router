@@ -270,6 +270,151 @@ struct RouterConfigStoreTests {
         #expect(store.config.groups.first?.accountIDs.isEmpty == true)
     }
 
+    // MARK: - Remover a conta em uso
+
+    /// Loga estas contas no grupo, na ordem — uma casa nova para cada.
+    private func addAccounts(_ emails: [String], to groupID: UUID, store: RouterConfigStore,
+                             kc: FakeKeychain, adapter: FakeAdapter,
+                             paths: RouterPaths) -> [Account] {
+        emails.compactMap { email -> Account? in
+            let id = UUID(); let home = paths.accountHome(id)
+            seedLogin(email, home: home, kc: kc, adapter: adapter)
+            guard case .added(let account) = store.finishPendingLogin(
+                home: home, accountID: id, into: groupID) else { return nil }
+            return account
+        }
+    }
+
+    /// O sensor mediu `fraction` (5h) para a conta, e o store releu o quadro.
+    private func seedUsage(_ email: String, _ fraction: Double, in group: AccountGroup,
+                           store: RouterConfigStore, paths: RouterPaths) throws {
+        try FileManager.default.createDirectory(at: paths.usageDir,
+                                                withIntermediateDirectories: true)
+        let sample = GroupUsageSample(
+            configDirRaw: group.configDir.raw, email: email,
+            fiveHourPercent: fraction, fiveHourResetsAt: nil,
+            sevenDayPercent: nil, sevenDayResetsAt: nil, sampledAt: Date())
+        try GroupUsageStore.write(sample, forEmail: email, in: paths.usageDir)
+        store.refreshUsage()
+    }
+
+    /// Remover a conta em uso passa o grupo para a próxima, na hora: antes o
+    /// grupo seguia servido pela conta removida, e a tela o mostrava sem conta
+    /// em uso.
+    @Test("remover a conta em uso passa o grupo para a próxima")
+    func removingActiveHandsOver() throws {
+        let (store, kc, adapter, paths) = makeStore()
+        let group = store.addGroup(name: "trabalho")
+        let accounts = addAccounts(["conta1@exemplo.com", "conta2@exemplo.com"],
+                                   to: group.id, store: store, kc: kc,
+                                   adapter: adapter, paths: paths)
+        try #require(accounts.count == 2)
+        store.activate(accounts[0], in: store.config.groups[0])
+
+        store.removeAccount(accounts[0].id)
+
+        let g = store.config.groups[0]
+        #expect(store.activeAccount(in: g)?.id == accounts[1].id)
+        #expect(kc.read(service: adapter.keychainService(forConfigDir: g.configDir))
+                == "cred-conta2@exemplo.com")
+        #expect(store.activeByGroup[g.id] == accounts[1].id,
+                "o quadro publicado não acompanhou")
+        #expect(store.lastError == nil)
+    }
+
+    /// "A próxima" é a da rotação: a primeira da ordem com folga. A que passou
+    /// do limiar fica para depois.
+    @Test("a próxima pula a conta acima do limiar")
+    func handOverSkipsOverThreshold() throws {
+        let (store, kc, adapter, paths) = makeStore()
+        let group = store.addGroup(name: "trabalho")
+        let accounts = addAccounts(
+            ["conta1@exemplo.com", "conta2@exemplo.com", "conta3@exemplo.com"],
+            to: group.id, store: store, kc: kc, adapter: adapter, paths: paths)
+        try #require(accounts.count == 3)
+        store.activate(accounts[0], in: store.config.groups[0])
+        try seedUsage("conta2@exemplo.com", 0.95, in: group, store: store, paths: paths)
+
+        store.removeAccount(accounts[0].id)
+
+        #expect(store.activeAccount(in: store.config.groups[0])?.id == accounts[2].id)
+    }
+
+    /// Sem ninguém com folga o grupo troca do mesmo jeito: ficar seria seguir
+    /// na conta que o usuário acabou de remover.
+    @Test("com as outras acima do limiar, troca do mesmo jeito")
+    func handOverEvenWhenAllOver() throws {
+        let (store, kc, adapter, paths) = makeStore()
+        let group = store.addGroup(name: "trabalho")
+        let accounts = addAccounts(["conta1@exemplo.com", "conta2@exemplo.com"],
+                                   to: group.id, store: store, kc: kc,
+                                   adapter: adapter, paths: paths)
+        try #require(accounts.count == 2)
+        store.activate(accounts[0], in: store.config.groups[0])
+        try seedUsage("conta2@exemplo.com", 0.99, in: group, store: store, paths: paths)
+
+        store.removeAccount(accounts[0].id)
+
+        #expect(store.activeAccount(in: store.config.groups[0])?.id == accounts[1].id)
+    }
+
+    /// Quem não pode assumir (aqui, sem credencial na casa — precisa de
+    /// Relogar) é pulada, e a seguinte assume.
+    @Test("quem não pode assumir é pulada")
+    func handOverSkipsUnusable() throws {
+        let (store, kc, adapter, paths) = makeStore()
+        let group = store.addGroup(name: "trabalho")
+        let accounts = addAccounts(
+            ["conta1@exemplo.com", "conta2@exemplo.com", "conta3@exemplo.com"],
+            to: group.id, store: store, kc: kc, adapter: adapter, paths: paths)
+        try #require(accounts.count == 3)
+        store.activate(accounts[0], in: store.config.groups[0])
+        kc.delete(service: adapter.keychainService(forConfigDir: accounts[1].home))
+
+        store.removeAccount(accounts[0].id)
+
+        #expect(store.activeAccount(in: store.config.groups[0])?.id == accounts[2].id)
+    }
+
+    /// Era a única: não há para onde ir, e o item do grupo fica — apagá-lo
+    /// derrubaria a sessão viva que ele atende.
+    @Test("remover a única conta deixa o item do grupo como está")
+    func removingOnlyAccountLeavesGroupItem() throws {
+        let (store, kc, adapter, paths) = makeStore()
+        let group = store.addGroup(name: "trabalho")
+        let accounts = addAccounts(["conta1@exemplo.com"], to: group.id, store: store,
+                                   kc: kc, adapter: adapter, paths: paths)
+        try #require(accounts.count == 1)
+        store.activate(accounts[0], in: store.config.groups[0])
+
+        store.removeAccount(accounts[0].id)
+
+        let g = store.config.groups[0]
+        #expect(kc.read(service: adapter.keychainService(forConfigDir: g.configDir))
+                == "cred-conta1@exemplo.com")
+        #expect(store.activeByGroup[g.id] == nil)
+    }
+
+    /// Remover uma conta que não está em uso não mexe no grupo.
+    @Test("remover conta ociosa mantém a ativa")
+    func removingIdleKeepsActive() throws {
+        let (store, kc, adapter, paths) = makeStore()
+        let group = store.addGroup(name: "trabalho")
+        let accounts = addAccounts(["conta1@exemplo.com", "conta2@exemplo.com"],
+                                   to: group.id, store: store, kc: kc,
+                                   adapter: adapter, paths: paths)
+        try #require(accounts.count == 2)
+        store.activate(accounts[0], in: store.config.groups[0])
+        let groupService = adapter.keychainService(
+            forConfigDir: store.config.groups[0].configDir)
+        let writes = kc.writes.filter { $0.service == groupService }.count
+
+        store.removeAccount(accounts[1].id)
+
+        #expect(store.activeAccount(in: store.config.groups[0])?.id == accounts[0].id)
+        #expect(kc.writes.filter { $0.service == groupService }.count == writes)
+    }
+
     @Test("a configuração persiste entre instâncias")
     func persists() {
         let tmp = URL(fileURLWithPath: NSTemporaryDirectory())

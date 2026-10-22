@@ -286,14 +286,24 @@ public final class RouterConfigStore {
     /// ficavam para trás, com um refresh token vivo, para sempre. Num produto
     /// pago isso é promessa quebrada — "remover a conta" tem de remover a conta.
     ///
-    /// O item do GRUPO não é tocado de propósito, mesmo quando é esta conta que
-    /// o serve: pode haver sessão viva atendida por ele agora, e derrubar o
-    /// trabalho de alguém não é consequência aceitável de arrumar a lista. Ele é
-    /// sobrescrito na próxima ativação, e sem a conta no registro ninguém mais a
-    /// escolhe.
+    /// Se ela serve um grupo agora, o grupo passa para a próxima conta (ver
+    /// `handOver`) — a troca a quente de sempre, então a sessão viva segue, só
+    /// que atendida pela próxima. Até 22/10/2026 o item do grupo ficava
+    /// intocado: o grupo seguia servido pela conta removida, e a tela o
+    /// mostrava sem conta em uso.
+    ///
+    /// Sem próxima (era a única, ou nenhuma pode assumir), o item do GRUPO
+    /// segue intocado: pode haver sessão viva atendida por ele agora, e
+    /// derrubar o trabalho de alguém não é consequência aceitável de arrumar a
+    /// lista.
     public func removeAccount(_ accountID: UUID) {
         guard let account = config.account(accountID) else { return }
         let service = engine.homeKeychainService(for: account)
+        // Apurado ANTES de a conta sair do registro: depois, a identidade no
+        // perfil do grupo não casa com conta nenhuma.
+        let served = config.groups
+            .filter { engine.activeAccount(in: $0, config: config)?.id == accountID }
+            .map(\.id)
 
         config.accounts.removeAll { $0.id == accountID }
         for i in config.groups.indices {
@@ -301,8 +311,26 @@ public final class RouterConfigStore {
         }
         save()
 
+        for groupID in served { handOver(groupID) }
+
         keychain.delete(service: service)
         try? FileManager.default.removeItem(at: account.home.url)
+        refreshUsage()
+    }
+
+    /// Passa o grupo cuja conta ativa acabou de ser removida para a primeira
+    /// de `RotationEngine.successors` que aceitar a ativação — quem não pode
+    /// (sem credencial na casa, ativa noutro grupo) é pulada. Com a conta já
+    /// fora do registro, o `activate` não espelha a que sai: a casa dela vai
+    /// ser apagada. Se outra conta do registro já está no grupo (a CLI rodou a
+    /// rotação no meio), fica a escolha dela.
+    private func handOver(_ groupID: UUID) {
+        guard let group = config.groups.first(where: { $0.id == groupID }),
+              engine.activeAccount(in: group, config: config) == nil
+        else { return }
+        for candidate in engine.successors(for: group, config: config, usage: usageSnapshot) {
+            if (try? engine.activate(candidate, in: group, config: config)) != nil { return }
+        }
     }
 
     public func setNickname(_ accountID: UUID, _ nickname: String?) {

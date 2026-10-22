@@ -17,6 +17,14 @@ All notable changes to this project are documented here. The format follows
   today would go by in silence. And GitHub's `releases/latest` is now
   **ambiguous**, because it resolves to whichever platform released last: links
   to a download have to name a tag.
+- **Removing the account in use hands the group to the next one.** Before, the
+  group kept being served by the removed account — off the list, its login gone
+  from the keychain but still alive in the group's item — and the window showed
+  the group with no account in use. Now the next account takes over right away
+  (the first in the preference order with room under the threshold, the same
+  rule as rotation), through the usual hot swap, so open sessions keep going on
+  it. If it was the group's only account, the group's item is left alone, so a
+  live session isn't cut off.
 
 ### Added
 
