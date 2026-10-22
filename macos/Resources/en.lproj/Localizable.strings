@@ -148,6 +148,7 @@
 "groups.account.delete.title" = "Remove account from group?";
 "groups.account.delete.confirm" = "Remove";
 "groups.account.delete.message.format" = "%@ leaves this group and its login is deleted from your Mac keychain. Using it again means signing in through the official flow once more. Sessions open right now keep going until the token expires.";
+"groups.account.delete.messageActive.format" = "%@ leaves this group and its login is deleted from your Mac keychain. Using it again means signing in through the official flow once more. Since it is in use, the group switches to the next account — open sessions keep going, without closing, now served by the new one.";
 "groups.login.duplicate.title" = "The browser signed in the previous account";
 "groups.login.duplicate.detail.format" = "Login came back as %@, which is already in the group. The browser was probably still signed in to it. Sign out of that account at claude.ai and try again — or use a private window.";
 "groups.login.duplicate.logout" = "Sign out at claude.ai";

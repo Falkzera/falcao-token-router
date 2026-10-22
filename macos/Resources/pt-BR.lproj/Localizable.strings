@@ -148,6 +148,7 @@
 "groups.account.delete.title" = "Remover conta do grupo?";
 "groups.account.delete.confirm" = "Remover";
 "groups.account.delete.message.format" = "%@ sai deste grupo e o login dela é apagado do chaveiro do Mac. Para usá-la de novo será preciso entrar pelo fluxo oficial outra vez. Sessões abertas agora continuam até o token vencer.";
+"groups.account.delete.messageActive.format" = "%@ sai deste grupo e o login dela é apagado do chaveiro do Mac. Para usá-la de novo será preciso entrar pelo fluxo oficial outra vez. Como ela está em uso, o grupo passa para a próxima conta — as sessões abertas continuam, sem fechar, já atendidas pela nova.";
 "groups.login.duplicate.title" = "O navegador entrou na conta anterior";
 "groups.login.duplicate.detail.format" = "O login voltou como %@, que já está no grupo. O navegador provavelmente ainda estava logado nela. Saia dessa conta no claude.ai e tente de novo — ou use uma janela anônima.";
 "groups.login.duplicate.logout" = "Sair no claude.ai";

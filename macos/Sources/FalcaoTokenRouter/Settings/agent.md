@@ -9,7 +9,8 @@ A janela única, em duas abas: **Grupos** (o produto — rodízio, contas, integ
   compõe. Era um arquivo de 699 linhas com seis views dentro; quebrado em 24/09/2026 pela
   régua de 600 linhas de produção, uma view por arquivo como no `Panel/`.
 - `GroupCard.swift` — o cartão de um grupo: nome editável, contas, ordem por arrastar,
-  limiar, troca automática, "Medir contas" e as confirmações destrutivas.
+  limiar, troca automática, "Medir contas" e as confirmações destrutivas (remover a conta em
+  uso, com outra no grupo, diz que o grupo passa para a próxima).
 - `AccountRow.swift` — uma conta na lista: uso por janela com a idade e a procedência da
   amostra, e o menu ⋯ (Usar, Relogar, Remover).
 - `LoginSheet.swift` — a folha do login oficial (pty): link, código, e os desfechos

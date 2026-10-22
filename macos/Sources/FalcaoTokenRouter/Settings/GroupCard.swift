@@ -25,6 +25,12 @@ struct GroupCard: View {
     private var active: Account? {
         store.activeByGroup[group.id].flatMap { id in store.config.account(id) }
     }
+    /// Em uso e com outra no grupo: ao sair, o grupo passa para a próxima (o
+    /// motor escolhe qual) — a confirmação diz isso, e não "continuam até o
+    /// token vencer".
+    private func handsOver(_ account: Account) -> Bool {
+        active?.id == account.id && accounts.count > 1
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -64,8 +70,10 @@ struct GroupCard: View {
             }
             Button("groups.cancel", role: .cancel) { pendingDelete = nil }
         } message: { account in
-            Text(String(format: String(localized: "groups.account.delete.message.format"),
-                        account.label))
+            let format = handsOver(account)
+                ? String(localized: "groups.account.delete.messageActive.format")
+                : String(localized: "groups.account.delete.message.format")
+            Text(String(format: format, account.label))
         }
         .confirmationDialog("groups.delete.confirm.title",
                             isPresented: $confirmingGroupDelete) {
