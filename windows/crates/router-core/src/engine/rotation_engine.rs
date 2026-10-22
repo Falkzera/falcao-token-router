@@ -278,4 +278,27 @@ impl RotationEngine {
             Some(target)
         }
     }
+
+    /// Quem pode assumir um grupo cuja conta ativa acabou de ser removida, na
+    /// ordem de tentar: primeiro as que a rotação escolheria (com folga, ou sem
+    /// medição — a regra do `next_account`), depois as demais, cada parte na
+    /// ordem de preferência.
+    ///
+    /// Diferente da rotação, "ninguém com folga" não é motivo para ficar: ficar
+    /// é o grupo seguir servido pela conta que o usuário acabou de remover —
+    /// fora da lista, sem casa e sem espelho. Uma conta acima do limiar ainda é
+    /// melhor que essa.
+    pub fn successors<'c>(
+        &self,
+        group: &AccountGroup,
+        config: &'c RouterConfig,
+        usage: &HashMap<Id, f64>,
+    ) -> Vec<&'c Account> {
+        let threshold = group.threshold_percent / 100.0;
+        let (with_room, rest): (Vec<_>, Vec<_>) = config
+            .accounts_in(group)
+            .into_iter()
+            .partition(|account| usage.get(&account.id).is_none_or(|used| *used < threshold));
+        with_room.into_iter().chain(rest).collect()
+    }
 }

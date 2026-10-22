@@ -138,15 +138,34 @@ impl RouterConfigStore {
 
     /// Remove a conta do registro **e apaga a credencial dela** (e a casa).
     ///
-    /// A cópia do GRUPO não é tocada de propósito, mesmo quando é esta conta que
-    /// o serve: pode haver sessão viva atendida por ela agora. Ela é sobrescrita
-    /// na próxima ativação. A pasta da casa só é apagada se for uma que o router
-    /// criou (`<base>\accounts\…`) — nunca uma pasta qualquer de um config editado.
+    /// Se ela serve um grupo agora, o grupo passa para a próxima conta (ver
+    /// `hand_over`) — a troca a quente de sempre, então a sessão viva segue, só
+    /// que atendida pela próxima. Até 22/10/2026 a cópia do grupo ficava
+    /// intocada: o grupo seguia servido pela conta removida, e a tela o mostrava
+    /// sem conta em uso.
+    ///
+    /// Sem próxima (era a única, ou nenhuma pode assumir), a cópia do grupo
+    /// segue intocada: apagá-la derrubaria a sessão viva atendida por ela. A
+    /// pasta da casa só é apagada se for uma que o router criou
+    /// (`<base>\accounts\…`) — nunca uma pasta qualquer de um config editado.
     pub fn remove_account(&mut self, account_id: Id) {
         let Some(account) = self.config.account(account_id).cloned() else {
             return;
         };
         let location = self.engine.home_credential_location(&account);
+        // Apurado ANTES de a conta sair do registro: depois, a identidade no
+        // perfil do grupo não casa com conta nenhuma.
+        let served: Vec<Id> = self
+            .config
+            .groups
+            .iter()
+            .filter(|g| {
+                self.engine
+                    .active_account(g, &self.config)
+                    .is_some_and(|a| a.id == account_id)
+            })
+            .map(|g| g.id)
+            .collect();
 
         self.config.accounts.retain(|a| a.id != account_id);
         for group in &mut self.config.groups {
@@ -154,10 +173,46 @@ impl RouterConfigStore {
         }
         self.save();
 
+        for group_id in served {
+            self.hand_over(group_id);
+        }
+
         self.credentials.delete(&location);
         let home = account.home.path();
         if is_strictly_inside(&home, &self.paths.base.join("accounts")) {
             let _ = fs::remove_dir_all(&home);
+        }
+        self.refresh_usage();
+    }
+
+    /// Passa o grupo cuja conta ativa acabou de ser removida para a primeira
+    /// de `RotationEngine::successors` que aceitar a ativação — quem não pode
+    /// (sem credencial na casa, ativa noutro grupo) é pulada. Com a conta já
+    /// fora do registro, o `activate` não espelha a que sai: a casa dela vai
+    /// ser apagada. Se outro processo já pôs uma conta do registro no grupo
+    /// (a rotação da CLI), fica a escolha dele.
+    fn hand_over(&self, group_id: Id) {
+        let Some(group) = self
+            .group_index(group_id)
+            .map(|i| self.config.groups[i].clone())
+        else {
+            return;
+        };
+        let _lock = EngineLock::acquire(&self.paths.base, EngineLock::WAIT);
+        if self.engine.active_account(&group, &self.config).is_some() {
+            return;
+        }
+        for candidate in self
+            .engine
+            .successors(&group, &self.config, &self.usage_snapshot)
+        {
+            if self
+                .engine
+                .activate(candidate, &group, &self.config)
+                .is_ok()
+            {
+                return;
+            }
         }
     }
 

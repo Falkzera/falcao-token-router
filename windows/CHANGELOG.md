@@ -7,6 +7,19 @@ a fix on one platform never waits for the other's calendar.
 > ⚠️ `releases/latest` is **ambiguous** in this repository — it resolves to
 > whichever platform released last. Link to a tag, never to `/latest`.
 
+## [Unreleased]
+
+### Changed
+
+- **Removing the account in use hands the group to the next one.** Before, the
+  group kept being served by the removed account — off the list, its login gone
+  from this computer but still alive in the group's profile — and the window
+  showed the group with no account in use. Now the next account takes over right
+  away (the first in the preference order with room under the threshold, the
+  same rule as rotation), through the usual hot swap, so open sessions keep
+  going on it. If it was the group's only account, the group's profile is left
+  alone, so a live session isn't cut off.
+
 ## [1.0.0] — 2026-09-24
 
 First Windows release. The port reads and writes the same files as the macOS
@@ -54,4 +67,5 @@ instead, so an update over a live session works.
 The inherited token meter (JSONL cost, pricing, alerts), code signing and arm64
 are out of scope for this first release.
 
+[Unreleased]: https://github.com/Falkzera/falcao-token-router/compare/windows-v1.0.0...HEAD
 [1.0.0]: https://github.com/Falkzera/falcao-token-router/releases/tag/windows-v1.0.0

@@ -442,6 +442,34 @@ fn the_next_account_follows_the_preference_order() {
     assert_eq!(next.map(|n| n.id), Some(c.id));
 }
 
+/// Quem assume o grupo de uma conta removida: as com folga (ou sem medição)
+/// primeiro, depois as estouradas — que ainda ganham da conta removida —, cada
+/// parte na ordem de preferência.
+#[test]
+fn successors_put_the_ones_with_room_first_then_the_rest_in_order() {
+    let s = setup();
+    let c = account("conta-c@exemplo.com", "C:/Users/exemplo/.claude-c");
+    let d = account("conta-d@exemplo.com", "C:/Users/exemplo/.claude-d");
+    let group = group_of(
+        "g",
+        ConfigDir::standard("C:/Users/exemplo"),
+        &[&s.a, &s.b, &c, &d],
+    );
+    let config = config_of(&[&s.a, &s.b, &c, &d], &[&group]);
+
+    let order: Vec<Id> = s
+        .engine
+        .successors(
+            &group,
+            &config,
+            &usage(&[(s.a.id, 0.95), (s.b.id, 0.10), (c.id, 0.99)]),
+        )
+        .iter()
+        .map(|a| a.id)
+        .collect();
+    assert_eq!(order, vec![s.b.id, d.id, s.a.id, c.id]);
+}
+
 // --- Ponta a ponta com arquivos reais do Windows ---
 
 fn long_ago() -> SystemTime {
