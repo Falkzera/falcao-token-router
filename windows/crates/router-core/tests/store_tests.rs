@@ -660,11 +660,18 @@ fn measuring_a_group_probes_the_active_account_through_the_group() {
     assert_eq!(
         summary,
         MeasureSummary {
-            measured: 1,
-            failed: 1
+            measured: vec![a.id],
+            failed: 1,
+            signed_out: vec![b.id],
         }
     );
     assert_eq!(env.store.last_error(), Some(&StoreError::ProbeFailures(1)));
+    // O aviso dizia só QUANTAS: a conta deslogada tem de ficar marcada.
+    assert!(
+        env.store.is_signed_out(b.id),
+        "a deslogada não ficou marcada"
+    );
+    assert!(!env.store.is_signed_out(a.id));
     let asked = asked.lock().unwrap();
     assert!(asked.contains(&group_raw), "a ativa não foi pelo grupo");
     assert!(asked.contains(&b.home.raw), "a ociosa devia ir pela casa");
@@ -683,6 +690,163 @@ fn measuring_without_claude_installed_is_a_named_error() {
     let summary = env.store.measure_accounts(&env.group(group.id), None);
     assert_eq!(summary, MeasureSummary::default());
     assert_eq!(env.store.last_error(), Some(&StoreError::ProbeUnavailable));
+}
+
+/// A marca de "sem login" é o veredito da última medição QUE DISSE algo sobre
+/// o login: fica enquanto a conta não responde, um prazo estourado não a mexe
+/// (nem para pôr, nem para tirar), e responder de novo a tira.
+#[test]
+fn a_signed_out_account_stays_marked_until_it_answers_again() {
+    use router_core::usage::claude_usage_probe::{ClaudeUsageProbe, ProbeError, ProbeOutput};
+
+    let mut env = make_store();
+    let group = env.store.add_group_with("pessoal", false);
+    let a = env.add_account("conta1@exemplo.com", group.id);
+    let b = env.add_account("conta2@exemplo.com", group.id);
+    env.store.activate(&a, &env.group(group.id));
+    const ANSWER: &str = "Current session: 10% used\r\nCurrent week (all models): 20% used\r\n";
+
+    let b_home = b.home.raw.clone();
+    let b_logged_out = ClaudeUsageProbe::new(move |dir| {
+        Ok(ProbeOutput {
+            exit_code: Some(0),
+            stdout: if dir.raw == b_home {
+                "Total cost:            $0.0000\r\n".to_string()
+            } else {
+                ANSWER.to_string()
+            },
+        })
+    });
+    env.store
+        .measure_accounts(&env.group(group.id), Some(&b_logged_out));
+    assert!(env.store.is_signed_out(b.id));
+
+    let stuck = ClaudeUsageProbe::new(|_| Err(ProbeError::TimedOut));
+    let summary = env
+        .store
+        .measure_accounts(&env.group(group.id), Some(&stuck));
+    assert_eq!(summary.failed, 2);
+    assert!(
+        summary.signed_out.is_empty(),
+        "prazo estourado não é deslogado"
+    );
+    assert!(
+        env.store.is_signed_out(b.id),
+        "um prazo estourado tirou a marca"
+    );
+    assert!(
+        !env.store.is_signed_out(a.id),
+        "um prazo estourado pôs a marca"
+    );
+
+    let answering = ClaudeUsageProbe::new(|_| {
+        Ok(ProbeOutput {
+            exit_code: Some(0),
+            stdout: ANSWER.to_string(),
+        })
+    });
+    env.store
+        .measure_accounts(&env.group(group.id), Some(&answering));
+    assert!(!env.store.is_signed_out(b.id), "respondeu e seguiu marcada");
+}
+
+/// A sessão que serviu a conta DEPOIS da marca prova que o login voltou (um
+/// `/login` no próprio terminal, sem passar pelo app): a amostra nova do sensor
+/// tira a marca. Uma amostra de antes da marca, não.
+#[test]
+fn a_sensor_sample_newer_than_the_mark_clears_it() {
+    use router_core::engine::router_config_store::MeasureSummary;
+
+    let mut env = make_store();
+    let group = env.store.add_group("trabalho");
+    let account = env.add_account("conta1@exemplo.com", group.id);
+    let write_sample = |at| {
+        let sample = GroupUsageSample::new(
+            group.config_dir.raw.clone(),
+            Some("conta1@exemplo.com".into()),
+            Some(0.1),
+            None,
+            Some(0.2),
+            None,
+            at,
+            None,
+            UsageOrigin::Sensor,
+        );
+        GroupUsageStore::write(&sample, "conta1@exemplo.com", &env.paths.usage_dir()).unwrap();
+    };
+    write_sample(Utc::now() - chrono::Duration::minutes(5));
+    env.store.finish_measure(MeasureSummary {
+        failed: 1,
+        signed_out: vec![account.id],
+        ..MeasureSummary::default()
+    });
+    assert!(
+        env.store.is_signed_out(account.id),
+        "a amostra velha tirou a marca"
+    );
+
+    // A data vai ao disco sem fração de segundo: a "depois" fica bem depois.
+    write_sample(Utc::now() + chrono::Duration::seconds(2));
+    env.store.refresh_usage();
+    assert!(!env.store.is_signed_out(account.id));
+}
+
+/// Relogar com sucesso tira a marca na hora, sem esperar medição; remover a
+/// conta também (a marca não sobrevive à conta).
+#[test]
+fn a_renewed_login_or_a_removed_account_leaves_no_mark() {
+    use router_core::engine::router_config_store::MeasureSummary;
+
+    let mut env = make_store();
+    let group = env.store.add_group("trabalho");
+    let renewed = env.add_account("conta1@exemplo.com", group.id);
+    let removed = env.add_account("conta2@exemplo.com", group.id);
+    env.store.finish_measure(MeasureSummary {
+        failed: 2,
+        signed_out: vec![renewed.id, removed.id],
+        ..MeasureSummary::default()
+    });
+
+    env.creds
+        .write(
+            &cred("cred-NOVA"),
+            &env.adapter.credential_location(&renewed.home),
+        )
+        .unwrap();
+    let outcome = env.store.finish_relogin(renewed.id);
+    assert!(matches!(outcome, ReloginOutcome::Renewed(_)), "{outcome:?}");
+    assert!(!env.store.is_signed_out(renewed.id));
+
+    env.store.remove_account(removed.id);
+    assert!(!env.store.is_signed_out(removed.id));
+}
+
+/// "Usar" numa conta sem credencial na casa: ela está sem login neste
+/// computador — marcada como a sonda a marcaria, além do aviso.
+#[test]
+fn using_an_account_without_a_credential_marks_it_signed_out() {
+    use router_core::engine::rotation_engine::RotationError;
+    use router_core::engine::router_config_store::StoreError;
+
+    let mut env = make_store();
+    let group = env.store.add_group("trabalho");
+    let account = env.add_account("conta1@exemplo.com", group.id);
+    env.creds
+        .delete(&env.adapter.credential_location(&account.home));
+
+    env.store.activate(&account, &env.group(group.id));
+
+    assert!(
+        matches!(
+            env.store.last_error(),
+            Some(StoreError::ActivateFailed(
+                RotationError::NoCredential { .. }
+            ))
+        ),
+        "{:?}",
+        env.store.last_error()
+    );
+    assert!(env.store.is_signed_out(account.id));
 }
 
 /// A volta de rotação: primeiro o espelho (a casa da ativa recebe o token vivo
@@ -848,7 +1012,7 @@ fn measuring_in_steps_needs_the_store_only_to_plan_and_publish() {
     let mut env = make_store();
     let group = env.store.add_group_with("pessoal", false);
     let a = env.add_account("conta1@exemplo.com", group.id);
-    env.add_account("conta2@exemplo.com", group.id);
+    let b = env.add_account("conta2@exemplo.com", group.id);
     env.store.activate(&a, &env.group(group.id));
 
     let plan = env.store.measure_plan(&env.group(group.id));
@@ -873,8 +1037,9 @@ fn measuring_in_steps_needs_the_store_only_to_plan_and_publish() {
     assert_eq!(
         summary,
         MeasureSummary {
-            measured: 2,
-            failed: 0
+            measured: vec![a.id, b.id],
+            failed: 0,
+            signed_out: vec![],
         }
     );
 

@@ -111,3 +111,11 @@ Modelos, formato da amostra, leitor de uso, credencial, rotação e o store. Sem
   na casa desta, e "Usar" serviria a outra conta com o nome desta (o macOS deixava). A credencial
   estranha sai (a conta fica sem login, o estado honesto); só age quando a casa tem mesmo outra
   identidade.
+- 23/10/2026: a conta SEM LOGIN fica marcada (`is_signed_out`). O aviso da medição dizia só
+  "N conta(s) não responderam" e não deixava saber qual relogar. `MeasureSummary` passou a ser
+  conta por conta (`measured: Vec<Id>`, `failed`, `signed_out: Vec<Id>` — só o `NotSignedIn`
+  da sonda; prazo/formato novo falham sem veredito sobre o login). Marca também "Usar" sem
+  credencial na casa (`NoCredential`). Sai quando a conta prova o contrário: responde à sonda,
+  relogin renovado, ou amostra do sensor MAIS NOVA que a marca (um `/login` no terminal, sem o
+  app; a data da amostra não tem fração, então a do mesmo segundo não conta). Só em memória —
+  o formato em disco é o contrato com o macOS.

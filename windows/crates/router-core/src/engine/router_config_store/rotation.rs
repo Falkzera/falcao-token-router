@@ -24,7 +24,15 @@ impl RouterConfigStore {
                 self.last_error = None;
                 self.refresh_usage();
             }
-            Err(e) => self.last_error = Some(StoreError::ActivateFailed(e)),
+            Err(e) => {
+                // Sem credencial na casa a conta está sem login neste
+                // computador — a mesma marca que a sonda poria. Achar a
+                // credencial não tira a marca: ela pode estar vencida.
+                if let RotationError::NoCredential { account_id } = &e {
+                    self.signed_out.insert(*account_id, Utc::now());
+                }
+                self.last_error = Some(StoreError::ActivateFailed(e));
+            }
         }
     }
 
@@ -60,7 +68,7 @@ impl RouterConfigStore {
             return MeasureSummary::default();
         };
         let summary = self.measure_plan(group).run(probe);
-        self.finish_measure(summary);
+        self.finish_measure(summary.clone());
         summary
     }
 
@@ -76,10 +84,18 @@ impl RouterConfigStore {
         }
     }
 
-    /// Publica o saldo de uma medição: o erro (contas que não responderam) e o
-    /// quadro relido com as amostras novas.
+    /// Publica o saldo de uma medição: o erro (contas que não responderam), QUAIS
+    /// estão sem login, e o quadro relido com as amostras novas. A conta que
+    /// falhou por outro motivo (prazo, formato novo) fica como estava: a falha
+    /// não diz nada sobre o login dela.
     pub fn finish_measure(&mut self, summary: MeasureSummary) {
         self.last_error = (summary.failed > 0).then_some(StoreError::ProbeFailures(summary.failed));
+        for id in &summary.measured {
+            self.signed_out.remove(id);
+        }
+        let now = Utc::now();
+        self.signed_out
+            .extend(summary.signed_out.iter().map(|id| (*id, now)));
         self.refresh_usage();
     }
 
@@ -100,6 +116,13 @@ impl RouterConfigStore {
             .into_iter()
             .map(|(id, s)| (id, s.sampled_at))
             .collect();
+        // Amostra mais nova que a marca: a conta serviu uma sessão DEPOIS de se
+        // mostrar sem login (um `/login` no próprio terminal, sem o app) — o
+        // login voltou. A data da amostra vai ao disco sem fração de segundo,
+        // então uma do mesmo segundo da marca não conta: fica para a próxima.
+        let sampled_at = &self.usage_sampled_at;
+        self.signed_out
+            .retain(|id, marked| sampled_at.get(id).is_none_or(|at| at <= marked));
         self.active_by_group = self
             .config
             .groups

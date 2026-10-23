@@ -97,6 +97,7 @@ impl RouterConfigStore {
         }
         self.config.accounts[i].identity = identity; // tier/organização podem ter mudado
         self.save();
+        self.signed_out.remove(&account_id);
         let account = self.config.accounts[i].clone();
         // Conta ativa num grupo: o grupo guarda a credencial MORTA que motivou o
         // relogin — a nova vai por cima, senão a sessão segue no "Login expired".
@@ -153,6 +154,7 @@ impl RouterConfigStore {
             group.account_ids.retain(|id| *id != account_id);
         }
         self.save();
+        self.signed_out.remove(&account_id);
 
         self.credentials.delete(&location);
         let home = account.home.path();

@@ -11,12 +11,14 @@ tocada e o rodapé. Sem as seções do medidor (sessão local, valor): o porte �
 - `AccountsTable.svelte` — a TABELA (≙ AccountsSection): rótulo da janela no cabeçalho, colunas
   de largura fixa (40/34/34, respiro 8) iguais no cabeçalho e nas linhas.
 - `AccountRow.svelte` — a linha inteira é alvo do clique e dona do tooltip; ponto cheio na
-  ativa; só a janela que MANDA tem peso e cor; >1 h esmaece; >12 h relógio com a idade.
+  ativa; só a janela que MANDA tem peso e cor; >1 h esmaece; >12 h relógio com a idade; conta
+  sem login com o selo amarelo "sem login" (e, sem amostra, "—" em vez de "pronta").
 - `AccountDetail.svelte` + `Gauge.svelte` — o cartão da conta: 5h e 7d com barra e reset
   ("reseta 13:20 · em 4h 6m", "reseta seg (28) 9:00 · em 4d 13h" — o "quando" escrito pelo núcleo,
   o que falta contado de AGORA; a de 5h que não começou diz "começa na próxima mensagem" — o
   `session` do `Gauge`), quem mediu (antena = sensor, medidor = sonda) e
-  a janela por modelo embaixo com carimbo próprio. Janela vencida = "sem medida válida".
+  a janela por modelo embaixo com carimbo próprio. Janela vencida = "sem medida válida". Conta
+  sem login: o aviso em âmbar no topo, com o caminho do Relogar.
 - `MiniBar.svelte` (a barra desenha a de 5h, a coluna vizinha; sem medida a trilha fica vazia),
   `ModelBadge.svelte` (quando quem manda é a janela por modelo), `SessionsBadge.svelte` (ponto
   cheio se alguma sessão trabalha ou espera o usuário).
@@ -37,3 +39,6 @@ tocada e o rodapé. Sem as seções do medidor (sessão local, valor): o porte �
   para o cartão de SESSÃO, que o porte não tem.
 - 22/09/2026: o tooltip nativo de uma linha sob o mouse trava a captura de tela do Chrome pela
   extensão — conferir com o mouse fora das linhas ou pelo Chrome headless.
+- 23/10/2026: "sem login" é um SELO (texto em âmbar), não um ponto amarelo: o ponto da linha já
+  é o da ativa, e em `warning` ele é amarelo — um ponto a mais leria como "ativa a 80%". O
+  cenário `erro` do backend simulado marca equipe-3 e conta2.

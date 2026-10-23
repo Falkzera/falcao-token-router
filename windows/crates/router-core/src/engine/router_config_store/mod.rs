@@ -37,7 +37,7 @@ use super::shell_integration::{ShellIntegration, ShellTargets, StatusShell};
 use crate::ids::Id;
 use crate::platform::atomic_write::{read_retrying, write_atomic};
 use crate::platform::paths::is_strictly_inside;
-use crate::usage::claude_usage_probe::{ClaudeUsageProbe, ProbeTarget};
+use crate::usage::claude_usage_probe::{ClaudeUsageProbe, ProbeError, ProbeTarget};
 
 // O `impl RouterConfigStore` é dividido por responsabilidade, um arquivo cada.
 // Um tipo só continua sendo a fachada que a UI chama — o que muda é que cada
@@ -68,11 +68,17 @@ pub enum StoreError {
     ProbeFailures(usize),
 }
 
-/// O saldo de uma medição com a sonda.
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+/// O saldo de uma medição com a sonda — conta por conta, não só quantas: o
+/// aviso que dizia "N conta(s) não responderam" não deixava saber QUAL relogar.
+#[derive(Clone, PartialEq, Eq, Debug, Default)]
 pub struct MeasureSummary {
-    pub measured: usize,
+    /// As contas que responderam (o login delas está vivo).
+    pub measured: Vec<Id>,
+    /// Quantas não responderam, por qualquer motivo.
     pub failed: usize,
+    /// As que a sonda achou SEM LOGIN (parte das `failed`). Prazo estourado ou
+    /// formato novo também falham, mas não dizem nada sobre o login.
+    pub signed_out: Vec<Id>,
 }
 
 /// Uma medição planejada: as contas com o perfil de cada uma e onde gravar.
@@ -90,7 +96,11 @@ impl MeasurePlan {
         let mut summary = MeasureSummary::default();
         for target in &self.targets {
             match probe.measure_into(target, &self.usage_dir, &self.base, Utc::now()) {
-                Ok(_) => summary.measured += 1,
+                Ok(_) => summary.measured.push(target.account_id),
+                Err(ProbeError::NotSignedIn) => {
+                    summary.failed += 1;
+                    summary.signed_out.push(target.account_id);
+                }
                 Err(_) => summary.failed += 1,
             }
         }
@@ -148,6 +158,13 @@ pub struct RouterConfigStore {
     /// registro é POR PERFIL: diz qual sessão roda em qual grupo, e por qual
     /// conta ela é atendida — a resposta que o `/status` não dá.
     live_sessions: HashMap<Id, Vec<LiveSession>>,
+    /// As contas que se mostraram SEM LOGIN, com quando: a sonda não achou login
+    /// no perfil, ou "Usar" não achou credencial na casa. É a marca amarela da
+    /// tela. Sai quando a conta prova o contrário (responde à sonda, relogin
+    /// renovado, amostra do sensor mais nova que a marca). Só em memória: o
+    /// formato em disco é o contrato com o macOS, e o app que reabre mede de
+    /// novo quando pedirem.
+    signed_out: HashMap<Id, DateTime<Utc>>,
     /// De onde vêm as sessões de um perfil. Injetável: os testes do macOS liam o
     /// `~/.claude/sessions` real sem perceber.
     session_reader: SessionReader,
@@ -190,6 +207,7 @@ impl RouterConfigStore {
             usage_detail: HashMap::new(),
             active_by_group: HashMap::new(),
             live_sessions: HashMap::new(),
+            signed_out: HashMap::new(),
             session_reader: Box::new(SessionRegistry::live_sessions),
             last_error: None,
             unreadable_on_disk,
@@ -244,6 +262,11 @@ impl RouterConfigStore {
 
     pub fn live_sessions(&self) -> &HashMap<Id, Vec<LiveSession>> {
         &self.live_sessions
+    }
+
+    /// A conta se mostrou sem login e ainda não provou o contrário.
+    pub fn is_signed_out(&self, account_id: Id) -> bool {
+        self.signed_out.contains_key(&account_id)
     }
 
     /// Quantas sessões vivas um grupo tem agora.

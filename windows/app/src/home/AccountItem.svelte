@@ -47,7 +47,7 @@
 
   const usage = $derived(account.usage);
   const veryStale = $derived(usage ? ageSeconds(usage.sampledAt, clock.now) > VERY_STALE_SECONDS : false);
-  const help = $derived(accountHelp(usage, clock.now));
+  const help = $derived(accountHelp(usage, clock.now, account.signedOut));
 
   const shows = (item: SummaryItem) => !hidden.includes(item);
   /** As janelas que o resumo mostra, cada uma com o item do reset dela. */
@@ -94,7 +94,16 @@
   <span class="dot {active ? severity(usage?.fraction ?? 0) : 'idle'}" aria-hidden="true"></span>
 
   <span class="who" title={help}>
-    <span class="label" class:active>{account.label}</span>
+    <span class="name">
+      <span class="label" class:active>{account.label}</span>
+      {#if account.signedOut}
+        <!-- O aviso da medição diz quantas; o selo diz QUAL — e já leva ao
+             Relogar, que é a saída. -->
+        <button class="signed-out" title={t("groups.account.signedOut.help")} onclick={onRelogin}>
+          {t("groups.account.signedOut")}
+        </button>
+      {/if}
+    </span>
     {#if account.organization}
       <span class="org">{account.organization}</span>
     {/if}
@@ -221,6 +230,12 @@
     flex: 1;
     min-width: 0;
   }
+  .name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
   .label {
     overflow: hidden;
     text-overflow: ellipsis;
@@ -228,6 +243,23 @@
   }
   .label.active {
     font-weight: 600;
+  }
+  /* O âmbar do `warning`, como o selo do modelo — mas sem número: é estado. */
+  .signed-out {
+    flex: none;
+    padding: 0 6px;
+    border: none;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--warning) 22%, transparent);
+    color: var(--warning-text);
+    font: inherit;
+    font-size: var(--font-small);
+    line-height: 16px;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .signed-out:hover {
+    background: color-mix(in srgb, var(--warning) 34%, transparent);
   }
   .org {
     font-size: var(--font-small);
