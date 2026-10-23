@@ -33,6 +33,13 @@ public final class RouterConfigStore {
     /// A conta ativa de cada grupo (grupo → conta). Observável, para a barra e o
     /// painel mostrarem quem serve cada grupo sem reler o disco a cada frame.
     public private(set) var activeByGroup: [UUID: UUID] = [:]
+    /// As contas que se mostraram SEM LOGIN, com quando: a sonda não achou login
+    /// no perfil, ou "Usar" não achou credencial na casa. É o selo amarelo da
+    /// tela — o aviso da medição dizia só QUANTAS, e não havia como saber qual
+    /// relogar. Sai quando a conta prova o contrário (responde à sonda, relogin
+    /// renovado, amostra do sensor mais nova que a marca). Só em memória: o
+    /// formato em disco é o contrato com o Windows.
+    public private(set) var signedOut: [UUID: Date] = [:]
     /// Última falha de uma ação, para a UI mostrar. `nil` quando tudo correu bem.
     public private(set) var lastError: String?
     /// O grupo que está sendo sondado agora, ou `nil`. Observável porque a
@@ -269,6 +276,7 @@ public final class RouterConfigStore {
         }
         config.accounts[i].identity = identity  // tier/organização podem ter mudado
         save()
+        signedOut[accountID] = nil
         // Conta ativa num grupo: o item do grupo guarda a credencial MORTA que
         // motivou o relogin — a nova precisa ir por cima, senão a próxima
         // sessão continua no "Login expired".
@@ -300,6 +308,7 @@ public final class RouterConfigStore {
             config.groups[i].accountIDs.removeAll { $0 == accountID }
         }
         save()
+        signedOut[accountID] = nil
 
         keychain.delete(service: service)
         try? FileManager.default.removeItem(at: account.home.url)
@@ -327,9 +336,18 @@ public final class RouterConfigStore {
             lastError = nil
             refreshUsage()
         } catch {
+            // Sem credencial na casa a conta está sem login neste Mac — a mesma
+            // marca que a sonda poria. Achar a credencial não tira a marca: ela
+            // pode estar vencida.
+            if case .noCredential(let id)? = error as? RotationEngine.RotationError {
+                signedOut[id] = Date()
+            }
             lastError = "não foi possível trocar de conta: \(error)"
         }
     }
+
+    /// A conta se mostrou sem login e ainda não provou o contrário.
+    public func isSignedOut(_ accountID: UUID) -> Bool { signedOut[accountID] != nil }
 
     /// Mede as contas de um grupo com a **sonda ativa**, e publica o resultado.
     ///
@@ -341,7 +359,9 @@ public final class RouterConfigStore {
     ///
     /// Sob demanda, e não no laço: cada conta custa um processo Node subindo do
     /// zero e uma requisição de verdade. Medir cinco contas leva ~15s.
-    public func measureAccounts(in group: AccountGroup) async {
+    ///
+    /// `probe` é injetável para teste; sem ele, a sonda sobre o binário instalado.
+    public func measureAccounts(in group: AccountGroup, using probe: ClaudeUsageProbe? = nil) async {
         guard measuringGroup == nil else { return }
         measuringGroup = group.id
         defer { measuringGroup = nil }
@@ -350,17 +370,22 @@ public final class RouterConfigStore {
         // ativa vai pelo perfil do grupo, nunca pela casa (ver `probeConfigDir`
         // — sondar a casa de uma conta ativa derruba a sessão viva).
         let alvos = config.accounts(in: group).map {
-            (email: $0.identity.email, dir: engine.probeConfigDir(for: $0, config: config))
+            (id: $0.id, email: $0.identity.email,
+             dir: engine.probeConfigDir(for: $0, config: config))
         }
         let usageDir = paths.usageDir
         let scratchBase = paths.base
 
-        let falhas = await Task.detached(priority: .userInitiated) { () -> Int in
-            guard let probe = ClaudeUsageProbe.system(scratchBase: scratchBase) else { return -1 }
-            var erros = 0
+        // Conta por conta, e não só quantas: o aviso que dizia "N conta(s) não
+        // responderam" não deixava saber QUAL relogar.
+        let saldo = await Task.detached(priority: .userInitiated) {
+            () -> (responderam: [UUID], semLogin: [UUID], falhas: Int)? in
+            guard let sonda = probe ?? ClaudeUsageProbe.system(scratchBase: scratchBase)
+            else { return nil }
+            var responderam: [UUID] = [], semLogin: [UUID] = [], falhas = 0
             for alvo in alvos {
                 do {
-                    let leitura = try probe.read(configDir: alvo.dir)
+                    let leitura = try sonda.read(configDir: alvo.dir)
                     let agora = Date()
                     let amostra = GroupUsageSample(
                         configDirRaw: alvo.dir.raw, email: alvo.email,
@@ -372,20 +397,31 @@ public final class RouterConfigStore {
                         models: ModelUsage(windows: leitura.models, sampledAt: agora),
                         origin: .probe)
                     try GroupUsageStore.write(amostra, forEmail: alvo.email, in: usageDir)
+                    responderam.append(alvo.id)
+                } catch ClaudeUsageProbe.ProbeError.notSignedIn {
+                    falhas += 1
+                    semLogin.append(alvo.id)
                 } catch {
-                    erros += 1
+                    // Prazo estourado, formato novo: falha, mas não diz nada
+                    // sobre o login — a marca da conta fica como estava.
+                    falhas += 1
                 }
             }
-            return erros
+            return (responderam: responderam, semLogin: semLogin, falhas: falhas)
         }.value
 
         // Texto cru, como o resto dos `lastError` deste arquivo: o core não
         // carrega catálogo (a CLI `router` o linka e não tem bundle de app).
-        switch falhas {
-        case -1: lastError = "binário `claude` não encontrado — a sonda precisa dele"
-        case 0: lastError = nil
-        default: lastError = "\(falhas) conta(s) não responderam à sonda — veja se precisam de Relogar"
+        guard let saldo else {
+            lastError = "binário `claude` não encontrado — a sonda precisa dele"
+            refreshUsage()
+            return
         }
+        lastError = saldo.falhas == 0 ? nil
+            : "\(saldo.falhas) conta(s) não responderam à sonda — veja se precisam de Relogar"
+        for id in saldo.responderam { signedOut[id] = nil }
+        let agora = Date()
+        for id in saldo.semLogin { signedOut[id] = agora }
         refreshUsage()
     }
 
@@ -396,6 +432,16 @@ public final class RouterConfigStore {
         usageDetail = detail
         usageSnapshot = detail.mapValues(\.fraction)
         usageSampledAt = usage.samplesByAccount(config).mapValues(\.sampledAt)
+        // Amostra mais nova que a marca: a conta serviu uma sessão DEPOIS de se
+        // mostrar sem login (um `/login` no terminal, sem o app) — o login
+        // voltou. A data vai ao disco em ISO-8601 sem fração de segundo, então
+        // uma do mesmo segundo da marca não conta: fica para a próxima.
+        let amostras = usageSampledAt
+        let mantidas = signedOut.filter { marca in
+            guard let amostra = amostras[marca.key] else { return true }
+            return amostra <= marca.value
+        }
+        if mantidas.count != signedOut.count { signedOut = mantidas }
         var active: [UUID: UUID] = [:]
         var sessions: [UUID: [LiveSession]] = [:]
         for group in config.groups {

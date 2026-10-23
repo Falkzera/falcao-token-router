@@ -8,6 +8,8 @@ struct AccountRow: View {
     /// legenda é lido como o das 5 horas, e quase sempre é o semanal.
     let usage: AccountUsage?
     let sampledAt: Date?
+    /// A sonda (ou o "Usar") achou a conta sem login neste Mac.
+    let isSignedOut: Bool
     let onSwitch: () -> Void
     let onRelogin: () -> Void
     let onRemove: () -> Void
@@ -16,7 +18,7 @@ struct AccountRow: View {
         sampledAt.map { Date().timeIntervalSince($0) > UsageAge.veryStale } ?? false
     }
 
-    private var usageHelp: String { AccountHelp.text(for: usage) }
+    private var usageHelp: String { AccountHelp.text(for: usage, signedOut: isSignedOut) }
 
     private var staleHelp: String {
         String(format: String(localized: usage?.origin == .probe
@@ -36,8 +38,16 @@ struct AccountRow: View {
                 .frame(width: 7, height: 7)
 
             VStack(alignment: .leading, spacing: 1) {
-                Text(verbatim: account.label)
-                    .font(.callout).fontWeight(isActive ? .semibold : .regular)
+                HStack(spacing: 6) {
+                    Text(verbatim: account.label)
+                        .font(.callout).fontWeight(isActive ? .semibold : .regular)
+                    if isSignedOut {
+                        // O selo já leva ao Relogar, que é a saída.
+                        Button(action: onRelogin) { SignedOutBadge() }
+                            .buttonStyle(.plain)
+                            .help(String(localized: "groups.account.signedOut.help"))
+                    }
+                }
                 if let org = account.identity.organizationName, !org.isEmpty {
                     Text(verbatim: org).font(.caption2).foregroundStyle(.secondary)
                 }
@@ -68,7 +78,7 @@ struct AccountRow: View {
                 Text("groups.account.unmeasured")
                     .font(.caption2).foregroundStyle(.tertiary)
                     .frame(width: 38, alignment: .trailing)
-                    .help(AccountHelp.text(for: nil))
+                    .help(AccountHelp.text(for: nil, signedOut: isSignedOut))
             }
 
             if !isActive {

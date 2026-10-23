@@ -96,6 +96,8 @@
 "panel.accounts.window.fiveHour" = "5h";
 "panel.accounts.window.sevenDay" = "7d";
 "panel.accounts.window.absent" = "—";
+"panel.accounts.signedOut" = "signed out";
+"panel.accounts.signedOut.help" = "This account is signed out on this Mac — log in again from its ⋯ menu, in Groups → Log in again…";
 "panel.accounts.usage.help.format" = "5h %1$@ · 7d %2$@ — measured %3$@ ago. The panel shows the higher of the two, which is what triggers the switch.";
 "panel.accounts.stale.help.sensor.format" = "Not measured for %@. The sensor only reads when the account serves a message — on a shared account this number may be optimistic. \u201cMeasure accounts\u201d refreshes it now.";
 "panel.accounts.stale.help.probe.format" = "Probed %@ ago. That was a point-in-time query, and whatever was spent since is not in it. \u201cMeasure accounts\u201d refreshes it now.";
@@ -164,6 +166,7 @@
 "groups.account.relogin" = "Log in again…";
 "groups.account.remove" = "Remove account";
 "groups.account.menu.help" = "More actions";
+"groups.account.signedOut.help" = "This account is signed out on this Mac. Click to log in again.";
 "groups.relogin.waiting.title" = "Renewing login";
 "groups.relogin.done" = "Login renewed!";
 "groups.relogin.wrong.title" = "A different account came back";

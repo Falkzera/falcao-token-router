@@ -11,7 +11,9 @@ A janela única, em duas abas: **Grupos** (o produto — rodízio, contas, integ
 - `GroupCard.swift` — o cartão de um grupo: nome editável, contas, ordem por arrastar,
   limiar, troca automática, "Medir contas" e as confirmações destrutivas.
 - `AccountRow.swift` — uma conta na lista: uso por janela com a idade e a procedência da
-  amostra, e o menu ⋯ (Usar, Relogar, Remover).
+  amostra, e o menu ⋯ (Usar, Relogar, Remover). Conta sem login (`store.isSignedOut`): o
+  `SignedOutBadge` ao lado do nome, que é um botão para o Relogar (23/10/2026 — o aviso da
+  medição dizia quantas, não qual).
 - `LoginSheet.swift` — a folha do login oficial (pty): link, código, e os desfechos
   (sucesso, conta errada, duplicada, falha).
 - `NewGroupSheet.swift` — a folha de criar grupo.
