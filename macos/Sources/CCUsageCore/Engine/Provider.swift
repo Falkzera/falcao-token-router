@@ -12,13 +12,6 @@ public enum Provider: String, Sendable, Codable, CaseIterable, Identifiable {
     case anthropic
 
     public var id: String { rawValue }
-
-    /// Nome que aparece na UI. Não traduzível: é marca.
-    public var displayName: String {
-        switch self {
-        case .anthropic: "Claude"
-        }
-    }
 }
 
 /// O que o motor precisa saber de um provedor para rotacionar suas contas, sem

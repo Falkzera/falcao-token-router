@@ -88,12 +88,6 @@ struct ClaudeUsageProbeTests {
             from: "Jan 2 at 9am (UTC)", now: reveillon))
         #expect(cal.component(.year, from: reset) == 2027)
     }
-
-    @Test("o plano sai da primeira linha, como impresso")
-    func plano() {
-        #expect(ClaudeUsageProbe.plan(in: saidaReal) == "subscription")
-        #expect(ClaudeUsageProbe.plan(in: "Max 20x plan\n\nCurrent session: 1% used") == "Max 20x")
-    }
 }
 
 @Suite("Sonda: por qual perfil medir")

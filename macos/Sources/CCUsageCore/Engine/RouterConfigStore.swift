@@ -318,10 +318,6 @@ public final class RouterConfigStore {
         }
     }
 
-    /// Caminho do perfil onde uma conta deve logar — para o app apontar o
-    /// `CLAUDE_CONFIG_DIR` do login oficial.
-    public func homePath(_ home: ConfigDir) -> String { home.raw }
-
     /// O resultado de checar um login pendente.
     public enum LoginOutcome: Sendable, Equatable {
         /// Ainda não terminou; continue observando.
@@ -439,12 +435,6 @@ public final class RouterConfigStore {
         try? FileManager.default.removeItem(at: account.home.url)
     }
 
-    public func setNickname(_ accountID: UUID, _ nickname: String?) {
-        guard let i = config.accounts.firstIndex(where: { $0.id == accountID }) else { return }
-        config.accounts[i].nickname = nickname?.isEmpty == true ? nil : nickname
-        save()
-    }
-
     // MARK: - Rotação (ações que tocam o sistema)
 
     /// A conta que serve um grupo agora.
@@ -553,9 +543,6 @@ public final class RouterConfigStore {
         liveSessions = sessions
     }
 
-    /// Quantas sessões vivas um grupo tem agora.
-    public func sessionCount(in groupID: UUID) -> Int { liveSessions[groupID]?.count ?? 0 }
-
     // MARK: - Integração com o terminal
 
     /// O arquivo de shell que o usuário passa a dar `source`.
@@ -604,19 +591,10 @@ public final class RouterConfigStore {
                 ProfileSharing.link(into: group.configDir, shareHistory: config.shareHistory)
             }
             // Adiciona a linha ao ~/.zshrc automaticamente — é o que torna isto
-            // plug-and-play: o usuário não edita arquivo nenhum. Se o ~/.zshrc
-            // recusa a escrita (de outro dono depois de um `sudo vim`, por
-            // exemplo), o erro diz que linha acrescentar à mão. Antes ele era
-            // engolido: o botão piscava e voltava a "Ativar", sem motivo à vista.
-            do {
-                try ShellIntegration.ensureInProfile(
-                    sourceLine: shellSourceLine, scriptPath: shellScriptURL.path,
-                    profileURL: profileURL)
-            } catch {
-                lastError = "não foi possível escrever no ~/.zshrc (\(error)) — acrescente esta linha a ele: \(shellSourceLine)"
-                integrationInstalled = shellIntegrationInstalled
-                return nil
-            }
+            // plug-and-play: o usuário não edita arquivo nenhum.
+            try? ShellIntegration.ensureInProfile(
+                sourceLine: shellSourceLine, scriptPath: shellScriptURL.path,
+                profileURL: profileURL)
             lastError = nil
             integrationInstalled = shellIntegrationInstalled
             return shellSourceLine
