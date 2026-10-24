@@ -109,23 +109,28 @@ private func liveReportSaying(_ fraction: Double) -> UsageReport {
 }
 
 @MainActor
-@Test func expiredCredentialFallsBackToTheCacheAndSaysSo() async throws {
+@Test("sem amostra recente do sensor, o painel mostra o cache com a idade — não \"credencial expirada\"")
+func noRecentSampleFallsBackToTheCacheWithoutCallingItExpired() async throws {
+    // Até 10/2026 bastava uma hora sem usar a conta do perfil padrão para o
+    // painel afirmar "credencial expirada · rode o Claude Code" sobre um cache
+    // recente: herança da época em que "ao vivo" era uma chamada com token. O
+    // sensor não tem credencial para expirar.
     let root = try makeRootWithOneEvent()
     defer { try? FileManager.default.removeItem(at: root) }
     let cacheFile = root.appending(path: "claude.json")
-    try writeCache(0.35, agedBy: 13 * 3600, at: cacheFile)
+    try writeCache(0.35, agedBy: 600, at: cacheFile)
 
     let store = UsageStore(scanner: ProjectScanner(root: root),
                            cacheURL: root.appending(path: "cache.json"),
                            cachedUsageURL: cacheFile,
                            liveUsageEnabled: true,
-                           fetchLive: { _ in throw LiveUsageError.unauthorized })
+                           fetchLive: { _ in nil })
     await store.refresh()
     await store.refreshLive()
 
     #expect(store.snapshot.session.rawFraction == 0.35)
-    if case .credentialExpired = store.snapshot.sourceStatus {} else {
-        Issue.record("esperava credencial expirada, veio \(store.snapshot.sourceStatus)")
+    if case .cached = store.snapshot.sourceStatus {} else {
+        Issue.record("esperava o cache, veio \(store.snapshot.sourceStatus)")
     }
 }
 
