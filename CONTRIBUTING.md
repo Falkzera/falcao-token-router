@@ -57,8 +57,8 @@ cost two weeks of commits that were never compiled.
 
 Write **`@ViewState`** instead (`macos/Sources/FalcaoTokenRouter/ViewState.swift`): a
 typealias to `SwiftUICore.State`, the property wrapper the macro wraps, which *is*
-in the SDK. Same type, same `$binding`, no plugin. CI builds without Xcode, so a
-PR that reintroduces `@State` fails there too.
+in the SDK. Same type, same `$binding`, no plugin. CI runs with Xcode, where
+`@State` does compile — so a dedicated step fails any PR that writes it.
 
 `@Observable` is unaffected — its plugin does ship in CLT.
 
