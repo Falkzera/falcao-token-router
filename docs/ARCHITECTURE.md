@@ -17,9 +17,10 @@ this design follows from taking that seriously:
 - **The app makes no network calls.** Not one.
 - **The app never authenticates.** Sign-in runs the official `claude auth login`
   binary; the app never sees a password or a token.
-- **The app never refreshes OAuth.** It copies a keychain *blob* between items.
-  It never decodes it to use a token, and `ClaudeCredentials` has no field for a
-  refresh token — the guarantee is structural.
+- **The app never refreshes OAuth.** It copies the credential between items as
+  an opaque blob and never decodes it to use a token: no type in the engine has
+  a field for one, so the guarantee is structural. Even the plan the meter needs
+  is read from `.claude.json`, not from the keychain.
 
 The consequence is that usage has to come from somewhere the official client
 already put it. There are two such places, and they are the two measurement

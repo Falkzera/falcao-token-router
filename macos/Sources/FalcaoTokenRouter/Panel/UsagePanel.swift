@@ -247,16 +247,13 @@ struct UsagePanel: View {
     }
 
     /// A linha diz há muito tempo o que está errado; até aqui ela não fazia nada
-    /// a respeito. O botão aparece só onde o problema é remediável por clique.
-    ///
-    /// Credencial expirada não entra: a saída é rodar o Claude Code. Sem conexão
-    /// também não: a saída é esperar. Oferecer um botão nesses estados seria
-    /// prometer conserto que ele não faz.
+    /// a respeito. O botão aparece só onde o problema é remediável por clique:
+    /// o número ao vivo desligado.
     private var offersLiveUsage: Bool {
         guard canEnableLive else { return false }
         switch snapshot.sourceStatus {
         case .cached, .derivedOnly: return true
-        case .live, .credentialExpired, .liveUnavailable: return false
+        case .live: return false
         }
     }
 
@@ -273,12 +270,6 @@ struct UsagePanel: View {
                           Format.duration(age)), "clock", false)
                 : (String(format: String(localized: "panel.provenance.stale.format"),
                           Format.duration(age)), "exclamationmark.triangle", true)
-        case let .credentialExpired(age):
-            return (String(format: String(localized: "panel.provenance.expired.format"),
-                           Format.duration(age)), "exclamationmark.triangle", true)
-        case let .liveUnavailable(age):
-            return (String(format: String(localized: "panel.provenance.offline.format"),
-                           Format.duration(age)), "wifi.slash", true)
         case .derivedOnly:
             return (String(localized: "panel.provenance.derived"), "info.circle", false)
         }
