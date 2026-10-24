@@ -32,6 +32,45 @@ private func makeRootWithOneEvent() throws -> URL {
 }
 
 @MainActor
+@Test("escrita nova num .jsonl de projeto chega ao medidor sem reabrir o app")
+func newWritesInsideAProjectFolderReachTheMeter() async throws {
+    // Regressão: o observador (kqueue) vigiava só a raiz `projects/`, e o
+    // kqueue não desce em subpasta. O Claude Code escreve em
+    // `<projeto>/<sessão>.jsonl`, nada disparava, e o medidor ficava congelado
+    // desde a abertura do app.
+    let root = try makeRootWithOneEvent()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let store = UsageStore(scanner: ProjectScanner(root: root),
+                           cacheURL: root.appending(path: "cache.json"),
+                           cachedUsageURL: root.appending(path: "nenhum.json"),
+                           refreshInterval: .milliseconds(50))
+    store.start()
+    defer { store.stop() }
+
+    func waitFor(_ tokens: Int) async throws {
+        for _ in 0..<100 where store.snapshot.today.tokens != tokens {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(store.snapshot.today.tokens == tokens)
+    }
+    try await waitFor(1234)
+
+    let now = Date.ISO8601FormatStyle(includingFractionalSeconds: true).format(Date())
+    let line = """
+    {"type":"assistant","timestamp":"\(now)","requestId":"r2",\
+    "message":{"id":"m2","model":"claude-opus-5","usage":{"input_tokens":0,\
+    "output_tokens":1000,"cache_read_input_tokens":0}}}
+
+    """
+    let handle = try FileHandle(forWritingTo: root.appending(path: "p/s.jsonl"))
+    try handle.seekToEnd()
+    try handle.write(contentsOf: Data(line.utf8))
+    try handle.close()
+
+    try await waitFor(2234)
+}
+
+@MainActor
 @Test func historySurvivesARestart() async throws {
     // Regressão: o cache guardava só os offsets de leitura. No segundo launch
     // o ingest devolvia zero eventos ("tudo já lido") e o app acordava sem

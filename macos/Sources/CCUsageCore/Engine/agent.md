@@ -24,6 +24,7 @@ O motor do Falcão Router: contas, grupos, troca de credencial, medição passiv
 - `now: Date = Date()` como parâmetro onde o tempo decide, para teste.
 
 ## Decisões recentes
+- 2026-10-04: a função `claude()` perdeu o `exec` — o `router` tomava o lugar do shell interativo, e sair de `claude <grupo>` fechava a aba — e passou a guardar e desfazer um `alias claude` do usuário, encadeando-o no `claude` sem grupo. Com o alias, o zsh expandia até a definição da função (erro de sintaxe) e `claude <grupo>` abria o `claude` puro na conta errada. Testado num zsh de verdade, com `router` e `claude` de mentira (`ShellFunctionRunTests`).
 - 2026-08-26: reativar a conta já ativa NUNCA copia casa→grupo (o item do grupo é a cópia viva; refresh token gira). O movimento é o inverso, e o espelhamento periódico roda no `rotateAll`.
 - 2026-08-26: conta sem amostra é presumida fresca e é escolhível (o contrário criava deadlock: só mede quem serve).
 - 2026-08-26: perfil dedicado nasce com `hasCompletedOnboarding: true`, senão o Claude Code abre o assistente de login ignorando o chaveiro.
