@@ -8,12 +8,12 @@ struct SessionLauncherTests {
         let kc = FakeKeychain()
         let adapter = FakeAdapter()
         let a = Account(provider: .anthropic,
-                        identity: AccountIdentity(email: "a@k.com", organizationName: "K",
-                                                  rateLimitTier: nil, raw: ["emailAddress": .string("a@k.com")]),
+                        identity: AccountIdentity(email: "a@exemplo.com", organizationName: "Acme",
+                                                  rateLimitTier: nil, raw: ["emailAddress": .string("a@exemplo.com")]),
                         home: .dedicated("/tmp/.claude-a"))
         let b = Account(provider: .anthropic,
-                        identity: AccountIdentity(email: "b@k.com", organizationName: "K",
-                                                  rateLimitTier: nil, raw: ["emailAddress": .string("b@k.com")]),
+                        identity: AccountIdentity(email: "b@exemplo.com", organizationName: "Acme",
+                                                  rateLimitTier: nil, raw: ["emailAddress": .string("b@exemplo.com")]),
                         home: .dedicated("/tmp/.claude-b"))
         try? kc.write("ca", service: adapter.keychainService(forConfigDir: a.home))
         try? kc.write("cb", service: adapter.keychainService(forConfigDir: b.home))
@@ -53,6 +53,31 @@ struct SessionLauncherTests {
         #expect(plan.executable == "claude")
     }
 
+    /// Sem ativa e sem ninguém abaixo do limiar, o lançamento pegava a primeira
+    /// da lista às cegas — e, se ela não tinha credencial, recusava subir mesmo
+    /// com outra conta capaz de servir.
+    @Test("sem ativa e todas cheias, sobe na primeira que pode servir")
+    func coldStartSkipsAnAccountThatCannotServe() throws {
+        let kc = FakeKeychain()
+        let adapter = FakeAdapter()
+        func conta(_ email: String) -> Account {
+            Account(provider: .anthropic,
+                    identity: AccountIdentity(email: email, organizationName: "Acme",
+                                              rateLimitTier: nil, raw: ["emailAddress": .string(email)]),
+                    home: .dedicated("/tmp/casas/\(email)"))
+        }
+        let a = conta("conta1@exemplo.com"), b = conta("conta2@exemplo.com")
+        try kc.write("cb", service: adapter.keychainService(forConfigDir: b.home))  // só b tem login
+        let group = AccountGroup(name: "Trabalho", accountIDs: [a.id, b.id],
+                                 configDir: .dedicated("/tmp/grupos/t"), thresholdPercent: 90)
+        let config = RouterConfig(accounts: [a, b], groups: [group])
+        let launcher = SessionLauncher(keychain: kc, adapters: [adapter])
+
+        let plan = try launcher.prepare(group: group, config: config,
+                                        usage: [a.id: 0.95, b.id: 0.95], arguments: [])
+        #expect(plan.account.id == b.id)
+    }
+
     @Test("mantém a conta ativa enquanto ela tem folga")
     func keepsActiveWithHeadroom() throws {
         let (launcher, config, group, a, _) = fixture()
@@ -76,7 +101,7 @@ struct SessionLauncherTests {
     func dedicatedExportsEnv() throws {
         let kc = FakeKeychain(); let adapter = FakeAdapter()
         let a = Account(provider: .anthropic,
-                        identity: AccountIdentity(email: "a@k.com", organizationName: nil,
+                        identity: AccountIdentity(email: "a@exemplo.com", organizationName: nil,
                                                   rateLimitTier: nil, raw: [:]),
                         home: .dedicated("/tmp/.claude-a"))
         try? kc.write("ca", service: adapter.keychainService(forConfigDir: a.home))
@@ -178,6 +203,86 @@ struct ShellIntegrationTests {
         #expect(fn.contains("is-group"))
         #expect(fn.contains("launch"))
         #expect(fn.contains("Falcão Router.app/router"))
+    }
+}
+
+/// A função de shell EXECUTADA no zsh — com um `router` e um `claude` de
+/// mentira num PATH mínimo, `HOME` temporário e `zsh -f` (sem o `~/.zshrc` de
+/// quem roda o teste). Nada aqui alcança o `claude` de verdade.
+@Suite("ShellIntegration no zsh de verdade")
+struct ShellFunctionRunTests {
+    private func run(_ script: String) throws -> String {
+        let dir = FileManager.default.temporaryDirectory
+            .appending(path: "shellfn-\(UUID().uuidString)")
+        let bin = dir.appending(path: "bin")
+        try FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        func executable(_ name: String, _ body: String) throws {
+            let url = bin.appending(path: name)
+            try Data("#!/bin/sh\n\(body)\n".utf8).write(to: url)
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+        }
+        // O grupo é só "trabalho"; o launch e o claude dizem com o que foram chamados.
+        try executable("router", #"[ "$1" = is-group ] && { [ "$2" = trabalho ]; exit $?; }; echo "LAUNCH $*""#)
+        try executable("claude", #"echo "CLAUDE $*""#)
+
+        let shellFile = dir.appending(path: "shell.sh")
+        try Data(ShellIntegration.shellFunction(routerPath: bin.appending(path: "router").path).utf8)
+            .write(to: shellFile)
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/zsh")
+        process.arguments = ["-f", "-c", script.replacingOccurrences(of: "SHELL_SH", with: shellFile.path)]
+        process.environment = ["PATH": "\(bin.path):/usr/bin:/bin", "HOME": dir.path]
+        let out = Pipe()
+        process.standardOutput = out
+        process.standardError = out
+        try process.run()
+        process.waitUntilExit()
+        return String(decoding: out.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+    }
+
+    @Test("claude <grupo> roda como filho: o shell continua depois que a sessão sai")
+    func groupSessionDoesNotReplaceTheShell() throws {
+        // Com o `exec` de antes, o "depois" nunca era impresso: o processo do
+        // router tomava o lugar do shell, e sair da sessão fechava a aba.
+        let out = try run(#"source SHELL_SH; claude trabalho -p oi; echo "depois=$?""#)
+        #expect(out.contains("LAUNCH launch trabalho -- -p oi"))
+        #expect(out.contains("depois=0"))
+    }
+
+    @Test("sem grupo, passa direto para o claude")
+    func plainClaudePassesThrough() throws {
+        let out = try run(#"source SHELL_SH; claude --version"#)
+        #expect(out.contains("CLAUDE --version"))
+    }
+
+    @Test("um alias claude não desliga a integração, e o claude sem grupo continua passando por ele")
+    func anAliasNamedClaudeIsChainedNotFatal() throws {
+        // O instalador antigo do Claude Code deixava `alias claude=…` no .zshrc.
+        // Com ele, o zsh expandia o alias na definição da função (erro de
+        // sintaxe) e `claude trabalho` abria o claude puro, na conta errada.
+        let out = try run(#"""
+        alias claude='claude --extra'
+        source SHELL_SH
+        claude trabalho
+        claude oi
+        """#)
+        #expect(!out.contains("parse error"))
+        #expect(out.contains("LAUNCH launch trabalho --"))
+        #expect(out.contains("CLAUDE --extra oi"))
+    }
+
+    @Test("recarregar o script não esquece o alias guardado")
+    func resourcingKeepsTheChainedAlias() throws {
+        let out = try run(#"""
+        alias claude='claude --extra'
+        source SHELL_SH
+        source SHELL_SH
+        claude oi
+        """#)
+        #expect(out.contains("CLAUDE --extra oi"))
     }
 }
 
