@@ -215,6 +215,11 @@ public struct RotationEngine: Sendable {
         adapter(for: account.provider).keychainService(forConfigDir: account.home)
     }
 
+    /// O item de chaveiro de um perfil qualquer, pelo adapter do provedor.
+    public func keychainService(for dir: ConfigDir, provider: Provider) -> String {
+        adapter(for: provider).keychainService(forConfigDir: dir)
+    }
+
     /// Por qual perfil sondar esta conta — e **nunca** pela casa de uma conta
     /// ativa.
     ///

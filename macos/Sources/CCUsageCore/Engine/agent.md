@@ -24,7 +24,6 @@ O motor do Falcão Router: contas, grupos, troca de credencial, medição passiv
 - `now: Date = Date()` como parâmetro onde o tempo decide, para teste.
 
 ## Decisões recentes
-- 2026-10-04: a função `claude()` perdeu o `exec` — o `router` tomava o lugar do shell interativo, e sair de `claude <grupo>` fechava a aba — e passou a guardar e desfazer um `alias claude` do usuário, encadeando-o no `claude` sem grupo. Com o alias, o zsh expandia até a definição da função (erro de sintaxe) e `claude <grupo>` abria o `claude` puro na conta errada. Testado num zsh de verdade, com `router` e `claude` de mentira (`ShellFunctionRunTests`).
 - 2026-08-26: reativar a conta já ativa NUNCA copia casa→grupo (o item do grupo é a cópia viva; refresh token gira). O movimento é o inverso, e o espelhamento periódico roda no `rotateAll`.
 - 2026-08-26: conta sem amostra é presumida fresca e é escolhível (o contrário criava deadlock: só mede quem serve).
 - 2026-08-26: perfil dedicado nasce com `hasCompletedOnboarding: true`, senão o Claude Code abre o assistente de login ignorando o chaveiro.
@@ -53,6 +52,7 @@ O motor do Falcão Router: contas, grupos, troca de credencial, medição passiv
 - 2026-10-04: a rotação só escolhe quem `canServe` (credencial na casa, viva em nenhum outro perfil) — antes insistia na mesma recusa a cada volta e nunca tentava a seguinte. Ativa sem amostra conta como fresca (o "Usar" manual numa conta não medida era desfeito). Perfil com login que não é conta do router não é trocado pela rotação, só por escolha explícita.
 - 2026-10-04: `activate` grava segredo e identidade juntos (identidade que falha devolve o item do grupo ao que era) e não troca se o espelho da conta que sai falhar.
 - 2026-10-04: a sonda decide o perfil de cada conta na hora de medi-la, relendo do disco quem está ativa; durante a medição o app não roda a rotação nem aceita "Usar".
+- 2026-10-04: nenhuma credencial fica para trás. `discardPendingHome` apaga a casa de um login que não virou conta (cancelado, falho, duplicado — o `claude auth login` grava a credencial antes de se saber de quem é), e `discardOrphanHomes` varre na subida do app as casas que nenhuma conta cita, só com o `config.json` lido inteiro. `removeGroup` espelha a ativa e leva o item de chaveiro e a pasta do perfil dedicado (sem sessão viva; o `~/.claude` nunca). Um `config.json` ilegível vai para o lado com data (`config.unreadable-*.json`), com aviso, em vez de virar registro vazio gravado por cima.
 
 ## Pendências conhecidas
 - `removeAccount`/`removeGroup` não apagam o item de chaveiro nem a pasta `accounts/<uuid>`: a credencial da conta removida continua viva no chaveiro do usuário. Deliberado por ora (ver comentário em `removeGroup`), mas num produto pago "remover a conta" que deixa o refresh token para trás é promessa quebrada.

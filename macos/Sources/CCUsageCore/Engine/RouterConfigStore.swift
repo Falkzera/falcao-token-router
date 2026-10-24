@@ -51,6 +51,14 @@ public final class RouterConfigStore {
     /// status line apontam. Setado pelo app ao iniciar; `nil` fora do app.
     @ObservationIgnored public var routerPath: String?
 
+    /// `true` só quando o `config.json` existia e foi lido inteiro. É a trava
+    /// das limpezas que apagam o que o registro não cita: com o registro vazio
+    /// por falha de leitura, tudo pareceria órfão.
+    @ObservationIgnored private var configLoadedFromDisk = false
+    /// Um `config.json` que não pôde ser lido NEM guardado de lado nunca é
+    /// sobrescrito — ver `init`.
+    @ObservationIgnored private var refuseToSave = false
+
     @ObservationIgnored private let paths: RouterPaths
     @ObservationIgnored private let engine: RotationEngine
     @ObservationIgnored private let keychain: any KeychainStore
@@ -65,7 +73,32 @@ public final class RouterConfigStore {
         self.engine = RotationEngine(keychain: keychain, adapters: adapters)
         self.login = AccountLoginService(adapter: adapters.first ?? AnthropicAdapter(), paths: paths)
         self.usage = GroupUsageReader(usageDir: paths.usageDir)
-        self.config = Self.load(from: paths.configFile) ?? RouterConfig()
+        // Um `config.json` que existe e não decodifica (edição à mão, uma versão
+        // mais nova que gravou um campo que esta não conhece) virava registro
+        // vazio, sem aviso, e o primeiro `save` gravava por cima: grupos e
+        // contas sumiam do registro, com casas e itens de chaveiro órfãos.
+        // Agora ele vai para o lado com data, e a tela diz onde está.
+        var loaded = RouterConfig()
+        var problem: String?
+        switch Self.load(from: paths.configFile) {
+        case .missing:
+            break
+        case .loaded(let config):
+            loaded = config
+            self.configLoadedFromDisk = true
+        case .unreadable:
+            let stamp = ISO8601DateFormatter().string(from: Date())
+                .replacingOccurrences(of: ":", with: "-")
+            let aside = paths.base.appending(path: "config.unreadable-\(stamp).json")
+            if (try? FileManager.default.moveItem(at: paths.configFile, to: aside)) != nil {
+                problem = "o config.json não pôde ser lido e foi guardado como \(aside.lastPathComponent) — os grupos começam vazios"
+            } else {
+                self.refuseToSave = true
+                problem = "o config.json não pôde ser lido; nada será gravado por cima dele"
+            }
+        }
+        self.config = loaded
+        self.lastError = problem
         self.integrationInstalled = shellIntegrationInstalled
         self.statusLineChoice = StatusLineChoice.load(from: StatusLineChoice.fileURL(base: paths.base))
         // Publica o quadro completo aqui, e não só no primeiro laço.
@@ -82,12 +115,18 @@ public final class RouterConfigStore {
 
     // MARK: - Persistência
 
-    private static func load(from url: URL) -> RouterConfig? {
-        guard let data = try? Data(contentsOf: url) else { return nil }
-        return try? JSONDecoder().decode(RouterConfig.self, from: data)
+    private enum Loaded { case missing, loaded(RouterConfig), unreadable }
+
+    private static func load(from url: URL) -> Loaded {
+        guard FileManager.default.fileExists(atPath: url.path) else { return .missing }
+        guard let data = try? Data(contentsOf: url),
+              let config = try? JSONDecoder().decode(RouterConfig.self, from: data)
+        else { return .unreadable }
+        return .loaded(config)
     }
 
     private func save() {
+        guard !refuseToSave else { return }
         do {
             try FileManager.default.createDirectory(
                 at: paths.base, withIntermediateDirectories: true)
@@ -150,15 +189,29 @@ public final class RouterConfigStore {
     }
 
     public func removeGroup(_ id: UUID) {
+        guard let group = config.groups.first(where: { $0.id == id }) else { return }
+        // A casa da ativa recebe o token vivo ANTES de o grupo sumir — uma conta
+        // que outro grupo mantém continua com a cadeia em dia.
+        engine.mirrorActive(in: group, config: config)
         // Leva junto as contas que só existiam neste grupo: órfãs não aparecem
         // em tela nenhuma e ficariam ocupando a config para sempre. A credencial
         // de cada uma sai junto — ver `removeAccount`.
-        let exclusive = Set(config.groups.first { $0.id == id }?.accountIDs ?? [])
+        let exclusive = Set(group.accountIDs)
             .subtracting(config.groups.filter { $0.id != id }.flatMap(\.accountIDs))
         config.groups.removeAll { $0.id == id }
         // Pelo mesmo caminho da remoção avulsa, para a credencial sair junto.
         for accountID in exclusive { removeAccount(accountID) }
         save()
+        // O item do grupo e a pasta do perfil dedicado saem também: sem o
+        // grupo, ninguém mais os sobrescreve, e o item guardava um refresh
+        // token vivo para sempre. Com sessão viva lá, ficam — derrubar o
+        // trabalho de alguém não é consequência aceitável de arrumar a lista.
+        // O `~/.claude` nunca (o login dele é do `claude` puro).
+        if !group.configDir.isDefault,
+           SessionRegistry.liveSessions(in: group.configDir).isEmpty {
+            engine.resetProfile(group.configDir, provider: group.provider)
+            try? FileManager.default.removeItem(at: group.configDir.url)
+        }
     }
 
     /// Tira o status de padrão de todos os grupos: nenhum passa a usar o
@@ -219,6 +272,45 @@ public final class RouterConfigStore {
         let home = paths.accountHome(id)
         try? FileManager.default.createDirectory(at: home.url, withIntermediateDirectories: true)
         return (home, id)
+    }
+
+    /// Desfaz a casa reservada de um login que não virou conta — cancelado,
+    /// fechado, falho, ou que trouxe uma conta que já está no grupo.
+    ///
+    /// O `claude auth login` grava a credencial na casa ANTES de alguém saber de
+    /// quem ela é. Até 10/2026 nada a apagava: cada "Tentar de novo" depois de
+    /// uma duplicada deixava mais um refresh token vivo no chaveiro, que o app
+    /// não mostrava nem sabia remover.
+    ///
+    /// Só apaga o que é seguro: casa de uma conta que NÃO está no registro, e
+    /// dentro de `<base>/accounts/`. Relogin reusa a casa de uma conta que
+    /// existe, e por isso nunca passa daqui.
+    public func discardPendingHome(_ home: ConfigDir, accountID: UUID) {
+        guard config.account(accountID) == nil,
+              home.url.standardizedFileURL.path == paths.accountHome(accountID).url
+                .standardizedFileURL.path
+        else { return }
+        keychain.delete(service: engine.keychainService(for: home, provider: .anthropic))
+        try? FileManager.default.removeItem(at: home.url)
+    }
+
+    /// Apaga as casas que nenhuma conta do registro cita — sobras de logins
+    /// interrompidos (o app fechado no meio, ou anteriores à limpeza do
+    /// `discardPendingHome`). Roda na subida do app, quando nenhum login está
+    /// em andamento, e só com o `config.json` lido inteiro: com o registro vazio
+    /// por falha de leitura, tudo pareceria órfão.
+    public func discardOrphanHomes() {
+        guard configLoadedFromDisk else { return }
+        let accountsDir = paths.base.appending(path: "accounts")
+        guard let entries = try? FileManager.default.contentsOfDirectory(
+            at: accountsDir, includingPropertiesForKeys: nil) else { return }
+        let referenced = Set(config.accounts.map { $0.home.url.standardizedFileURL.path })
+        for entry in entries {
+            guard let id = UUID(uuidString: entry.lastPathComponent),
+                  !referenced.contains(entry.standardizedFileURL.path)
+            else { continue }
+            discardPendingHome(paths.accountHome(id), accountID: id)
+        }
     }
 
     /// Caminho do perfil onde uma conta deve logar — para o app apontar o
