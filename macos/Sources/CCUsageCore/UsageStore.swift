@@ -21,9 +21,10 @@ public final class UsageStore {
         didSet { rebuild() }
     }
 
-    /// Como buscar os números ao vivo. Injetável para os testes exercitarem
-    /// sucesso, 401 e falha de rede sem tocar keychain nem rede.
-    public typealias LiveFetch = @Sendable (Date) async throws -> UsageReport
+    /// Como ler o número ao vivo — a amostra recente do sensor. `nil` quando não
+    /// há amostra recente, que não é erro (ver `UsageSourcePolicy`). Injetável
+    /// para os testes.
+    public typealias LiveFetch = @Sendable (Date) async -> UsageReport?
 
     /// Liga a busca ao vivo. Ligar dispara uma busca imediata.
     ///
@@ -47,8 +48,9 @@ public final class UsageStore {
     private let cacheURL: URL
     private let cachedUsageURL: URL
     private let lookback: TimeInterval
+    private let refreshInterval: Duration
     private let fetchLive: LiveFetch
-    private var lastLive: Result<UsageReport, LiveUsageError>?
+    private var lastLive: UsageReport?
     private var lastLiveAttempt: Date?
     private var liveTicker: Task<Void, Never>?
     private var isFetchingLive = false
@@ -56,7 +58,6 @@ public final class UsageStore {
     private var events: [UsageEvent] = []
     private var seenKeys = Set<String>()
     private var cache = ParseCache()
-    private var watcher: FSWatcher?
     private var ticker: Task<Void, Never>?
 
     /// A fonte "ao vivo" é o **sensor**, não uma chamada de API própria.
@@ -76,10 +77,9 @@ public final class UsageStore {
         guard let email = AnthropicAdapter().identity(inConfigDir: dir)?.email,
               let sample = GroupUsageStore.read(
                 forEmail: email, in: RouterPaths().usageDir),
-              now.timeIntervalSince(sample.sampledAt) < liveFreshness,
-              let report = sample.asUsageReport()
-        else { throw LiveUsageError.noToken }
-        return report
+              now.timeIntervalSince(sample.sampledAt) < liveFreshness
+        else { return nil }
+        return sample.asUsageReport()
     }
 
     public init(
@@ -87,6 +87,7 @@ public final class UsageStore {
         cacheURL: URL = ParseCache.defaultURL,
         cachedUsageURL: URL = CachedUsageReader.defaultURL,
         lookback: TimeInterval = 90 * 24 * 60 * 60,
+        refreshInterval: Duration = .seconds(30),
         liveUsageEnabled: Bool = false,
         fetchLive: @escaping LiveFetch = UsageStore.defaultLiveFetch
     ) {
@@ -94,6 +95,7 @@ public final class UsageStore {
         self.cacheURL = cacheURL
         self.cachedUsageURL = cachedUsageURL
         self.lookback = lookback
+        self.refreshInterval = refreshInterval
         self.liveUsageEnabled = liveUsageEnabled
         self.fetchLive = fetchLive
         self.snapshot = .empty(at: Date())
@@ -101,6 +103,10 @@ public final class UsageStore {
 
     /// Lê o delta do disco, funde com o que já está em memória e reconstrói o snapshot.
     public func refresh() async {
+        // Uma por vez: a primeira leitura numa máquina com histórico grande
+        // pode levar mais que o intervalo do ticker, e duas leituras do mesmo
+        // delta só dobrariam o trabalho.
+        guard !isLoading else { return }
         isLoading = true
         defer { isLoading = false }
 
@@ -114,13 +120,17 @@ public final class UsageStore {
                 try scanner.ingest(since: since, cache: cache)
             }.value
         } catch {
-            // Disco indisponível ou permissão negada: mantém o último snapshot bom.
+            // Disco indisponível ou permissão negada: mantém os eventos que já
+            // tem, e só deixa o relógio andar (o tempo até o reset continua).
+            rebuild()
             return
         }
 
         self.cache = result.cache
+        var changed = false
         for event in result.events where seenKeys.insert(event.dedupeKey).inserted {
             events.append(event)
+            changed = true
         }
 
         // Descarta o que já saiu da janela de interesse, senão o arquivo de
@@ -129,42 +139,42 @@ public final class UsageStore {
         if events.contains(where: { $0.timestamp < horizon }) {
             events.removeAll { $0.timestamp < horizon }
             seenKeys = Set(events.map(\.dedupeKey))
+            changed = true
         }
 
-        self.cache.events = events
-        try? self.cache.save(to: cacheURL)
+        // Só regrava com evento novo ou poda: o arquivo leva o histórico inteiro
+        // (dezenas de MB em 90 dias de uso), e a releitura roda a cada 30 s.
+        // Offset que andou sem evento novo não precisa sobreviver a um
+        // reinício — os mesmos bytes, relidos, não geram evento.
+        // ponytail: regrava o histórico inteiro a cada lote novo; vira log
+        // incremental se o arquivo passar a pesar no disco.
+        if changed {
+            self.cache.events = events
+            try? self.cache.save(to: cacheURL)
+        }
         rebuild()
     }
 
-    /// Busca os números ao vivo. Guarda o resultado — inclusive o erro — porque
-    /// a política precisa distinguir "ainda não busquei" de "busquei e falhou".
+    /// Lê o número ao vivo.
     ///
-    /// Uma por vez. O `await` abaixo suspende, e sem esta guarda duas invocações
-    /// se atropelam: a mais lenta termina por último e sobrescreve a mais nova.
-    /// Um `.failure` velho apagando um `.success` fresco deixaria o painel
-    /// dizendo "sem conexão" sobre um cache de horas até o tick seguinte — que
-    /// é exatamente o tipo de mentira que esta mudança existe para eliminar.
+    /// Uma leitura por vez. O `await` abaixo suspende, e sem esta guarda duas
+    /// invocações se atropelam: a mais lenta termina por último e uma leitura
+    /// velha sobrescreve a mais nova.
     public func refreshLive() async {
         guard liveUsageEnabled, !isFetchingLive else { return }
         isFetchingLive = true
         defer { isFetchingLive = false }
         let now = Date()
         lastLiveAttempt = now
-        do {
-            lastLive = .success(try await fetchLive(now))
-        } catch let error as LiveUsageError {
-            lastLive = .failure(error)
-        } catch {
-            lastLive = .failure(.transport)
-        }
+        lastLive = await fetchLive(now)
         rebuild()
     }
 
-    /// O painel abriu. Vale uma busca fora de hora: custa uma requisição e paga
-    /// com um número que não está cinco minutos velho.
+    /// O painel abriu. Vale uma leitura fora de hora: o número na tela não
+    /// precisa esperar o próximo tique de cinco minutos.
     ///
-    /// Represado em 30s porque abrir e fechar o menu é gesto barato, e uma
-    /// rajada de requisições por isso não é.
+    /// Represado em 30s porque abrir e fechar o menu é gesto barato e repetido,
+    /// e reler o disco a cada um não traz número novo.
     public func panelDidOpen() {
         if let lastLiveAttempt, Date().timeIntervalSince(lastLiveAttempt) < 30 { return }
         Task { await refreshLive() }
@@ -180,17 +190,20 @@ public final class UsageStore {
 
         Task { await refresh() }
 
-        watcher = FSWatcher(url: scanner.root) { [weak self] in
-            Task { @MainActor in await self?.refresh() }
-        }
-        watcher?.start()
-
-        // O bloco de 5h continua correndo mesmo sem escrita nova no disco:
-        // o tempo até o reset precisa avançar sozinho.
+        // A cada 30 s: relê o que entrou no disco e reconstrói — o que também
+        // faz o tempo até o reset do bloco de 5h andar sem escrita nova. Reler é
+        // barato: uma varredura de mtime (~50 ms com 5 mil transcrições, medido
+        // em 10/2026) e só os bytes novos de cada arquivo.
+        //
+        // Por varredura, e não por observador. O `FSWatcher` (kqueue) que havia
+        // aqui vigiava a pasta `~/.claude/projects`, e o kqueue não desce em
+        // subpasta: o Claude Code escreve em `<projeto>/<sessão>.jsonl`, e nada
+        // disparava. O medidor ficava congelado desde a abertura do app.
+        let interval = refreshInterval
         ticker = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(30))
-                await MainActor.run { self?.rebuild() }
+                try? await Task.sleep(for: interval)
+                await self?.refresh()
             }
         }
 
@@ -206,8 +219,6 @@ public final class UsageStore {
     }
 
     public func stop() {
-        watcher?.stop()
-        watcher = nil
         ticker?.cancel()
         ticker = nil
         liveTicker?.cancel()
