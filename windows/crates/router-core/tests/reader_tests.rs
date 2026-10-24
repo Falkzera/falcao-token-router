@@ -40,8 +40,8 @@ fn setup(
     seven_r: Option<i64>,
 ) -> (tempfile::TempDir, GroupUsageReader, RouterConfig, Account) {
     let tmp = tempfile::tempdir().unwrap();
-    let a = account("a@k.com", "C:/Users/exemplo/.claude-a");
-    write_sample(tmp.path(), "a@k.com", five, five_r, seven, seven_r);
+    let a = account("a@exemplo.com", "C:/Users/exemplo/.claude-a");
+    write_sample(tmp.path(), "a@exemplo.com", five, five_r, seven, seven_r);
     let config = RouterConfig {
         accounts: vec![a.clone()],
         ..Default::default()

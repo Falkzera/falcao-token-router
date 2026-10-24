@@ -8,12 +8,12 @@ struct SessionLauncherTests {
         let kc = FakeKeychain()
         let adapter = FakeAdapter()
         let a = Account(provider: .anthropic,
-                        identity: AccountIdentity(email: "a@k.com", organizationName: "K",
-                                                  rateLimitTier: nil, raw: ["emailAddress": .string("a@k.com")]),
+                        identity: AccountIdentity(email: "a@exemplo.com", organizationName: "Acme",
+                                                  rateLimitTier: nil, raw: ["emailAddress": .string("a@exemplo.com")]),
                         home: .dedicated("/tmp/.claude-a"))
         let b = Account(provider: .anthropic,
-                        identity: AccountIdentity(email: "b@k.com", organizationName: "K",
-                                                  rateLimitTier: nil, raw: ["emailAddress": .string("b@k.com")]),
+                        identity: AccountIdentity(email: "b@exemplo.com", organizationName: "Acme",
+                                                  rateLimitTier: nil, raw: ["emailAddress": .string("b@exemplo.com")]),
                         home: .dedicated("/tmp/.claude-b"))
         try? kc.write("ca", service: adapter.keychainService(forConfigDir: a.home))
         try? kc.write("cb", service: adapter.keychainService(forConfigDir: b.home))
@@ -76,7 +76,7 @@ struct SessionLauncherTests {
     func dedicatedExportsEnv() throws {
         let kc = FakeKeychain(); let adapter = FakeAdapter()
         let a = Account(provider: .anthropic,
-                        identity: AccountIdentity(email: "a@k.com", organizationName: nil,
+                        identity: AccountIdentity(email: "a@exemplo.com", organizationName: nil,
                                                   rateLimitTier: nil, raw: [:]),
                         home: .dedicated("/tmp/.claude-a"))
         try? kc.write("ca", service: adapter.keychainService(forConfigDir: a.home))

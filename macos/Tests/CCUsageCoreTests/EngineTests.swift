@@ -244,9 +244,9 @@ struct RotationDecisionTests {
         let kc = FakeKeychain()
         let adapter = FakeAdapter()
         let engine = RotationEngine(keychain: kc, adapters: [adapter])
-        let a = Account(provider: .anthropic, identity: ident("a@k.com"),
+        let a = Account(provider: .anthropic, identity: ident("a@exemplo.com"),
                         home: .dedicated("/Users/exemplo/.claude-a"))
-        let b = Account(provider: .anthropic, identity: ident("b@k.com"),
+        let b = Account(provider: .anthropic, identity: ident("b@exemplo.com"),
                         home: .dedicated("/Users/exemplo/.claude-b"))
         try? kc.write("ca", service: adapter.keychainService(forConfigDir: a.home))
         try? kc.write("cb", service: adapter.keychainService(forConfigDir: b.home))
@@ -313,7 +313,7 @@ struct RotationDecisionTests {
 struct RouterConfigTests {
     @Test("sobrevive a um ciclo de codificação")
     func roundTrips() throws {
-        let a = Account(provider: .anthropic, identity: ident("a@k.com"),
+        let a = Account(provider: .anthropic, identity: ident("a@exemplo.com"),
                         home: .dedicated("/Users/exemplo/.claude-a"), nickname: "principal")
         let group = AccountGroup(name: "trabalho", accountIDs: [a.id],
                                  configDir: .standard(home: "/Users/exemplo"))
@@ -330,11 +330,11 @@ struct RouterConfigTests {
     @Test("preserva campos desconhecidos do oauthAccount")
     func preservesOpaqueIdentity() throws {
         let raw: [String: JSONValue] = [
-            "emailAddress": .string("a@k.com"),
+            "emailAddress": .string("a@exemplo.com"),
             "organizationUuid": .string("abc-123"),
             "campoNovoQueNaoConhecemos": .bool(true),
         ]
-        let identity = AccountIdentity(email: "a@k.com", organizationName: "K",
+        let identity = AccountIdentity(email: "a@exemplo.com", organizationName: "Acme",
                                        rateLimitTier: nil, raw: raw)
         let data = try JSONEncoder().encode(identity)
         let back = try JSONDecoder().decode(AccountIdentity.self, from: data)
@@ -354,13 +354,13 @@ struct AnthropicAdapterFileTests {
         let dir = ConfigDir.dedicated(tmp.path)   // não existe ainda
         let adapter = AnthropicAdapter()
         let identity = AccountIdentity(
-            email: "z@k.com", organizationName: "K", rateLimitTier: nil,
-            raw: ["emailAddress": .string("z@k.com"), "organizationName": .string("K")])
+            email: "z@exemplo.com", organizationName: "Acme", rateLimitTier: nil,
+            raw: ["emailAddress": .string("z@exemplo.com"), "organizationName": .string("Acme")])
 
         try adapter.writeIdentity(identity, toConfigDir: dir)
 
         let back = adapter.identity(inConfigDir: dir)
-        #expect(back?.email == "z@k.com")
+        #expect(back?.email == "z@exemplo.com")
         try? FileManager.default.removeItem(at: tmp)
     }
 
@@ -373,20 +373,20 @@ struct AnthropicAdapterFileTests {
         try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
         let dir = ConfigDir.dedicated(tmp.path)
         let json = try JSONSerialization.data(withJSONObject: [
-            "oauthAccount": ["emailAddress": "old@k.com"],
+            "oauthAccount": ["emailAddress": "old@exemplo.com"],
             "cachedUsageUtilization": ["fetchedAtMs": 1],
             "projects": ["/x": ["hasTrustDialogAccepted": true]],
         ])
         try json.write(to: dir.globalConfigURL)
 
         try AnthropicAdapter().writeIdentity(
-            AccountIdentity(email: "new@k.com", organizationName: nil, rateLimitTier: nil,
-                            raw: ["emailAddress": .string("new@k.com")]),
+            AccountIdentity(email: "new@exemplo.com", organizationName: nil, rateLimitTier: nil,
+                            raw: ["emailAddress": .string("new@exemplo.com")]),
             toConfigDir: dir)
 
         let root = try JSONSerialization.jsonObject(
             with: Data(contentsOf: dir.globalConfigURL)) as! [String: Any]
-        #expect((root["oauthAccount"] as? [String: Any])?["emailAddress"] as? String == "new@k.com")
+        #expect((root["oauthAccount"] as? [String: Any])?["emailAddress"] as? String == "new@exemplo.com")
         #expect(root["cachedUsageUtilization"] == nil)          // limpo
         #expect(root["projects"] != nil)                        // preservado
         #expect(root["hasCompletedOnboarding"] as? Bool == true) // sem isto, tela de login
@@ -452,14 +452,14 @@ struct GroupUsageReaderDecayTests {
         let tmp = URL(fileURLWithPath: NSTemporaryDirectory())
             .appending(path: "usage-\(UUID().uuidString)")
         try? FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
-        let a = Account(provider: .anthropic, identity: ident("a@k.com"),
+        let a = Account(provider: .anthropic, identity: ident("a@exemplo.com"),
                         home: .dedicated("/Users/exemplo/.claude-a"))
         let sample = GroupUsageSample(
-            configDirRaw: "/x", email: "a@k.com",
+            configDirRaw: "/x", email: "a@exemplo.com",
             fiveHourPercent: five, fiveHourResetsAt: fiveResets,
             sevenDayPercent: seven, sevenDayResetsAt: sevenResets,
             sampledAt: Date(timeIntervalSince1970: 1000))
-        try? GroupUsageStore.write(sample, forEmail: "a@k.com", in: tmp)
+        try? GroupUsageStore.write(sample, forEmail: "a@exemplo.com", in: tmp)
         let config = RouterConfig(accounts: [a], groups: [])
         return (GroupUsageReader(usageDir: tmp), config, a, tmp)
     }
