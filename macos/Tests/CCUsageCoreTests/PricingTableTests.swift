@@ -26,16 +26,40 @@ private func event(
     #expect(r.cacheRead == Decimal(string: "0.5"))
 }
 
-@Test func sonnet5UsesIntroPricingBeforeSeptember() {
-    let r = PricingTable.rates(for: .sonnet5, at: date("2026-08-20T00:00:00Z"), isFast: false)!
-    #expect(r.input == 2)
-    #expect(r.output == 10)
+/// A tabela previa o Sonnet 5 voltando a $3/$15 em 01/09/2026; a oficial de
+/// 25/09 o lista a $2/$10. Desde setembro o total saía 50% acima, sem marca.
+@Test("Sonnet 5 custa $2/$10, antes e depois de setembro")
+func sonnet5StaysAtTwoAndTen() {
+    for day in ["2026-08-20T00:00:00Z", "2026-09-25T00:00:00Z"] {
+        let r = PricingTable.rates(for: .sonnet5, at: date(day), isFast: false)!
+        #expect(r.input == 2)
+        #expect(r.output == 10)
+    }
 }
 
-@Test func sonnet5RevertsToStandardPricingInSeptember() {
-    let r = PricingTable.rates(for: .sonnet5, at: date("2026-09-05T00:00:00Z"), isFast: false)!
-    #expect(r.input == 3)
-    #expect(r.output == 15)
+@Test("a geração atual tem preço: Opus 5.5, Sonnet 5.5, Fable 5.1")
+func currentGenerationIsPriced() {
+    let d = date("2026-10-01T00:00:00Z")
+    let opus = PricingTable.rates(for: .opus55, at: d, isFast: false)!
+    #expect(opus.input == 4 && opus.output == 20)
+    #expect(opus.cacheRead == Decimal(string: "0.2"))
+    let opusFast = PricingTable.rates(for: .opus55, at: d, isFast: true)!
+    #expect(opusFast.input == 8 && opusFast.output == 40)
+    let sonnet = PricingTable.rates(for: .sonnet55, at: d, isFast: false)!
+    #expect(sonnet.input == 2 && sonnet.output == 10)
+    #expect(sonnet.cacheRead == Decimal(string: "0.2"))
+    let fable = PricingTable.rates(for: .fable51, at: d, isFast: false)!
+    #expect(fable.input == 10 && fable.output == 50)
+    #expect(fable.cacheRead == Decimal(string: "0.25"))
+}
+
+/// O cache do medidor guarda o evento já resolvido; um modelo que esta tabela
+/// passou a conhecer continuava `.unknown` no histórico, sem preço.
+@Test("evento guardado como desconhecido ganha preço quando o modelo entra na tabela")
+func aCachedUnknownModelIsResolvedAgain() {
+    let e = event(model: .unknown("claude-opus-5-5"), at: date("2026-10-01T00:00:00Z"),
+                  input: 1_000_000)
+    #expect(PricingTable.cost(of: e) == 4)
 }
 
 @Test func fastModeDoublesOpus5() {
