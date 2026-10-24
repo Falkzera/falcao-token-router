@@ -1,7 +1,7 @@
 name: Release
 
 # Uma tag `macos-v*` produz a release: build universal, DMG, zip, e a página no
-# GitHub com as notas geradas. Roda na nuvem porque o build universal
+# GitHub com a seção da versão no CHANGELOG.md. Roda na nuvem porque o build universal
 # (arm64 + x86_64) precisa do xcbuild, que só vem com o Xcode completo — e a
 # máquina do mantenedor tem só o Command Line Tools. O runner tem o Xcode.
 #
@@ -84,10 +84,30 @@ jobs:
           cp "$DMG" dist/FalcaoTokenRouter.dmg
           ls -la dist/*.dmg dist/*.zip
 
-      # `--generate-notes` monta as notas dos commits desde a tag anterior. Um
-      # rascunho, não uma publicação: a página existe mas não aparece na lista
-      # nem dispara notificação até o mantenedor ler as notas e clicar em
-      # "Publish". É a pausa entre "o build passou" e "está no ar".
+      # As notas são a seção desta versão no CHANGELOG.md — escrita para quem
+      # instala. O `--generate-notes` que estava aqui listava títulos de PR (em
+      # português) desde a tag ANTERIOR DE QUALQUER PLATAFORMA: a do Windows
+      # saiu comparando com a `v1.0.0` do macOS, e a próxima do macOS compararia
+      # com a do Windows. O `release.sh` já recusa versão sem seção; isto confere
+      # de novo do lado de cá.
+      - name: Notas da release
+        run: |
+          awk -v v="$VERSION" '
+            $0 ~ "^## \\[" v "\\]" { f = 1; next }
+            f && /^## \[/ { exit }
+            f && /^\[[^]]+\]: / { exit }
+            f { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "::error::CHANGELOG.md não tem a seção [$VERSION]"
+            exit 1
+          fi
+
+      # Um rascunho, não uma publicação: a página existe mas não aparece na
+      # lista nem dispara notificação até o mantenedor ler as notas e clicar em
+      # "Publish". É a pausa entre "o build passou" e "está no ar". O título diz
+      # o sistema — "macOS X.Y.Z", par do "Windows X.Y.Z" —, porque a página de
+      # releases mistura as duas plataformas.
       - name: Release no GitHub (rascunho)
         env:
           GH_TOKEN: ${{ github.token }}
@@ -96,7 +116,7 @@ jobs:
             "dist/FalcaoTokenRouter-$VERSION.dmg" \
             "dist/FalcaoTokenRouter.dmg" \
             "dist/FalcaoTokenRouter-$VERSION-universal.zip" \
-            --title "$GITHUB_REF_NAME" \
-            --generate-notes \
+            --title "macOS $VERSION" \
+            --notes-file release-notes.md \
             --draft
           echo "::notice::Rascunho criado — revise e publique em releases/tag/$GITHUB_REF_NAME"
