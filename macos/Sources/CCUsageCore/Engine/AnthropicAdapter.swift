@@ -73,6 +73,21 @@ public struct AnthropicAdapter: ProviderAdapter {
         try writeFile(data, url)
     }
 
+    public func clearIdentity(inConfigDir dir: ConfigDir) throws {
+        let url = dir.globalConfigURL
+        // Arquivo ausente ou ilegível fica como está: nada a tirar, e um
+        // arquivo que não se lê não se regrava.
+        guard let data = readFile(url),
+              var root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              root["oauthAccount"] != nil
+        else { return }
+        root.removeValue(forKey: "oauthAccount")
+        root.removeValue(forKey: "cachedUsageUtilization")
+        let out = try JSONSerialization.data(withJSONObject: root,
+                                             options: [.prettyPrinted, .sortedKeys])
+        try writeFile(out, url)
+    }
+
     public func launchCommand() -> (executable: String, arguments: [String]) {
         ("claude", [])
     }

@@ -12,13 +12,6 @@ public enum Provider: String, Sendable, Codable, CaseIterable, Identifiable {
     case anthropic
 
     public var id: String { rawValue }
-
-    /// Nome que aparece na UI. Não traduzível: é marca.
-    public var displayName: String {
-        switch self {
-        case .anthropic: "Claude"
-        }
-    }
 }
 
 /// O que o motor precisa saber de um provedor para rotacionar suas contas, sem
@@ -47,6 +40,12 @@ public protocol ProviderAdapter: Sendable {
     /// ativada — para a tela do provedor mostrar a conta certa e o uso não vir
     /// carimbado da conta anterior.
     func writeIdentity(_ identity: AccountIdentity, toConfigDir dir: ConfigDir) throws
+
+    /// Tira a identidade de um perfil, preservando o resto do arquivo. Usado
+    /// quando um perfil dedicado sai de um grupo ou volta a ele: identidade
+    /// velha ali faria o espelho gravar uma credencial morta na casa de quem
+    /// ela nomeia.
+    func clearIdentity(inConfigDir dir: ConfigDir) throws
 
     /// O comando e os argumentos para iniciar uma sessão num grupo. O ambiente
     /// (incluindo o `CLAUDE_CONFIG_DIR`, quando o grupo não é o padrão) é
