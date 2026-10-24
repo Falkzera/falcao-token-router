@@ -17,9 +17,10 @@ this design follows from taking that seriously:
 - **The app makes no network calls.** Not one.
 - **The app never authenticates.** Sign-in runs the official `claude auth login`
   binary; the app never sees a password or a token.
-- **The app never refreshes OAuth.** It copies a keychain *blob* between items.
-  It never decodes it to use a token, and `ClaudeCredentials` has no field for a
-  refresh token — the guarantee is structural.
+- **The app never refreshes OAuth.** It copies the credential between items as
+  an opaque blob and never decodes it to use a token: no type in the engine has
+  a field for one, so the guarantee is structural. Even the plan the meter needs
+  is read from `.claude.json`, not from the keychain.
 
 The consequence is that usage has to come from somewhere the official client
 already put it. There are two such places, and they are the two measurement
@@ -94,9 +95,14 @@ Two rules make it safe, and both exist because their absence killed accounts:
   the group item back to the leaving account's home. The home is the truth only
   when the account is idle; `rotateAll` also mirrors periodically so it never
   falls too far behind.
-- **One account, one place.** The same account active in two groups would be two
-  copies of a rotating refresh token, and the second renewal invalidates the
-  first — silently. The engine refuses.
+- **One account, one place.** The same account live in two profiles would be
+  two copies of a rotating refresh token, and the second renewal invalidates the
+  first — silently. The engine refuses, and the rotation skips such an account
+  instead of insisting on it. "Two profiles" includes `~/.claude` when no group
+  uses it: after the default group moves out, the account left there keeps
+  serving plain `claude`. A group that changes profile mirrors its active
+  account first and empties the dedicated profile it leaves (and the one it
+  enters), so nothing live is left behind and nothing stale comes back.
 
 Corollary: re-activating the account that is *already* active must never copy
 home → group. That would overwrite the rotated token with a stale one ("Login
@@ -185,10 +191,11 @@ never `idle`.
 ## The terminal integration
 
 `claude <group>` is a shell function (`shell.sh`, sourced from `~/.zshrc`) that
-asks `router is-group` and, if yes, `exec`s `router launch <group>`, which
+asks `router is-group` and, if yes, runs `router launch <group>`, which
 activates the right account and `execvp`s the real `claude` with
 `CLAUDE_CONFIG_DIR` set (or unset, for the default group). Anything else falls
-through to the binary.
+through to the binary — or to the user's own `alias claude`, which the script
+saves and chains, since an alias would otherwise win over the function.
 
 The failure mode is silent: in a terminal opened before the integration was
 installed, `claude trabalho` is just an argument, and the session opens in
