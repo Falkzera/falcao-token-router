@@ -75,7 +75,7 @@ struct RouterConfigStoreTests {
         let (store, kc, adapter, _) = makeStore()
         let group = store.addGroup(name: "temporario")
         let begun = store.newAccountHome()
-        seedLogin("so-aqui@k.com", home: begun.home, kc: kc, adapter: adapter)
+        seedLogin("so-aqui@exemplo.com", home: begun.home, kc: kc, adapter: adapter)
         guard case .added(let account) = store.finishPendingLogin(
             home: begun.home, accountID: begun.accountID, into: group.id) else {
             Issue.record("login não entrou"); return
@@ -143,11 +143,11 @@ struct RouterConfigStoreTests {
         let personal = store.addGroup(name: "pessoal")
 
         let workAcc = store.newAccountHome()
-        seedLogin("gov@k.com", home: workAcc.home, kc: kc, adapter: adapter)
+        seedLogin("trabalho@exemplo.com", home: workAcc.home, kc: kc, adapter: adapter)
         _ = store.finishPendingLogin(home: workAcc.home, accountID: workAcc.accountID,
                                      into: work.id)
         let personalAcc = store.newAccountHome()
-        seedLogin("eu@k.com", home: personalAcc.home, kc: kc, adapter: adapter)
+        seedLogin("eu@exemplo.com", home: personalAcc.home, kc: kc, adapter: adapter)
         _ = store.finishPendingLogin(home: personalAcc.home, accountID: personalAcc.accountID,
                                      into: personal.id)
 
@@ -225,7 +225,7 @@ struct RouterConfigStoreTests {
         let (store, kc, adapter, paths) = makeStore()
         let group = store.addGroup(name: "g")
         var ids: [UUID] = []
-        for email in ["a@k.com", "b@k.com", "c@k.com"] {
+        for email in ["a@exemplo.com", "b@exemplo.com", "c@exemplo.com"] {
             let id = UUID(); let home = paths.accountHome(id)
             seedLogin(email, home: home, kc: kc, adapter: adapter)
             store.finishPendingLogin(home: home, accountID: id, into: group.id)
@@ -262,7 +262,7 @@ struct RouterConfigStoreTests {
         let (store, kc, adapter, paths) = makeStore()
         let group = store.addGroup(name: "g")
         let id = UUID(); let home = paths.accountHome(id)
-        seedLogin("x@k.com", home: home, kc: kc, adapter: adapter)
+        seedLogin("x@exemplo.com", home: home, kc: kc, adapter: adapter)
         store.finishPendingLogin(home: home, accountID: id, into: group.id)
 
         store.removeAccount(id)
@@ -292,16 +292,16 @@ struct RouterConfigStoreTests {
         let (store, kc, adapter, paths) = makeStore()
         let group = store.addGroup(name: "g")
         let id = UUID(); let home = paths.accountHome(id)
-        seedLogin("m@k.com", home: home, kc: kc, adapter: adapter)
+        seedLogin("m@exemplo.com", home: home, kc: kc, adapter: adapter)
         store.finishPendingLogin(home: home, accountID: id, into: group.id)
 
         // O sensor gravou uma amostra dessa conta.
         try FileManager.default.createDirectory(at: paths.usageDir, withIntermediateDirectories: true)
         let sample = GroupUsageSample(
-            configDirRaw: group.configDir.raw, email: "m@k.com",
+            configDirRaw: group.configDir.raw, email: "m@exemplo.com",
             fiveHourPercent: 0.4, fiveHourResetsAt: nil,
             sevenDayPercent: 0.72, sevenDayResetsAt: nil, sampledAt: Date())
-        try GroupUsageStore.write(sample, forEmail: "m@k.com", in: paths.usageDir)
+        try GroupUsageStore.write(sample, forEmail: "m@exemplo.com", in: paths.usageDir)
 
         store.refreshUsage()
         // Liga no maior dos dois: 72% > 40%.
