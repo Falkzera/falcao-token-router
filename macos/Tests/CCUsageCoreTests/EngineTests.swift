@@ -15,8 +15,12 @@ final class FakeKeychain: KeychainStore, @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         return items[service]
     }
+    /// Itens cuja escrita falha — para exercitar o espelho que não grava.
+    var failWritesTo: Set<String> = []
+
     func write(_ secret: String, service: String) throws {
         lock.lock(); defer { lock.unlock() }
+        if failWritesTo.contains(service) { throw CocoaError(.fileWriteNoPermission) }
         items[service] = secret
         writes.append((service, secret))
     }
@@ -46,9 +50,17 @@ final class FakeAdapter: ProviderAdapter, @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         return identities[dir.raw]
     }
+    /// Liga a falha na gravação da identidade (o `.claude.json` que não grava).
+    var failIdentityWrites = false
+
     func writeIdentity(_ identity: AccountIdentity, toConfigDir dir: ConfigDir) throws {
         lock.lock(); defer { lock.unlock() }
+        if failIdentityWrites { throw CocoaError(.fileWriteNoPermission) }
         identities[dir.raw] = identity
+    }
+    func clearIdentity(inConfigDir dir: ConfigDir) throws {
+        lock.lock(); defer { lock.unlock() }
+        identities[dir.raw] = nil
     }
     func launchCommand() -> (executable: String, arguments: [String]) { ("claude", []) }
 }
@@ -584,5 +596,141 @@ struct UsagePercentTests {
         #expect(UsagePercent.text(0) == "0%")
         #expect(UsagePercent.text(1) == "100%")
         #expect(UsagePercent.text(0.005) == "1%")
+    }
+}
+
+
+// MARK: - Uma conta, um lugar (10/2026)
+
+@Suite("Uma conta, um lugar")
+struct OneAccountOnePlaceTests {
+    /// O `~/.claude` destes testes; o grupo roda num perfil dedicado.
+    private let home = ConfigDir.standard(home: "/Users/exemplo")
+
+    private func setup() -> (RotationEngine, FakeKeychain, FakeAdapter, RouterConfig,
+                             Account, Account, AccountGroup) {
+        let kc = FakeKeychain()
+        let adapter = FakeAdapter()
+        let engine = RotationEngine(keychain: kc, adapters: [adapter], defaultProfile: home)
+        let a = Account(provider: .anthropic, identity: ident("conta-a@exemplo.com"),
+                        home: .dedicated("/Users/exemplo/casas/a"))
+        let b = Account(provider: .anthropic, identity: ident("conta-b@exemplo.com"),
+                        home: .dedicated("/Users/exemplo/casas/b"))
+        try? kc.write("cred-a", service: adapter.keychainService(forConfigDir: a.home))
+        try? kc.write("cred-b", service: adapter.keychainService(forConfigDir: b.home))
+        let group = AccountGroup(name: "trabalho", accountIDs: [a.id, b.id],
+                                 configDir: .dedicated("/Users/exemplo/grupos/t"))
+        return (engine, kc, adapter, RouterConfig(accounts: [a, b], groups: [group]),
+                a, b, group)
+    }
+
+    /// Depois de "deixar o ~/.claude livre", a conta que estava lá continua
+    /// servindo o `claude` puro. Ativá-la no perfil dedicado, a partir da casa,
+    /// deixava a cadeia em dois itens — e a primeira renovação matava a outra.
+    @Test("a conta do ~/.claude, sem grupo nele, não é ativada em outro perfil")
+    func accountLiveInTheDefaultProfileIsBusy() throws {
+        let (engine, _, adapter, config, a, b, group) = setup()
+        try adapter.writeIdentity(a.identity, toConfigDir: home)
+
+        #expect(throws: RotationEngine.RotationError.accountLiveInDefaultProfile(accountID: a.id)) {
+            try engine.activate(a, in: group, config: config)
+        }
+        #expect(engine.nextAccount(for: group, config: config, usage: [:])?.id == b.id)
+    }
+
+    @Test("a rotação pula a conta sem credencial na casa e tenta a seguinte")
+    func accountWithoutCredentialIsSkipped() {
+        let (engine, kc, adapter, config, a, b, group) = setup()
+        kc.delete(service: adapter.keychainService(forConfigDir: a.home))
+        #expect(engine.nextAccount(for: group, config: config, usage: [:])?.id == b.id)
+    }
+
+    /// Até 10/2026 a conta ativa noutro grupo continuava sendo a escolhida: a
+    /// troca recusava, a volta seguinte escolhia a mesma, e o grupo ficava
+    /// preso na conta estourada — calado.
+    @Test("a rotação pula a conta ativa em outro grupo e tenta a seguinte")
+    func accountActiveElsewhereIsSkipped() throws {
+        let (engine, _, adapter, config, a, b, group) = setup()
+        let other = AccountGroup(name: "pessoal", accountIDs: [a.id],
+                                 configDir: .dedicated("/Users/exemplo/grupos/p"))
+        let both = RouterConfig(accounts: config.accounts, groups: [group, other])
+        try adapter.writeIdentity(a.identity, toConfigDir: other.configDir)
+
+        #expect(engine.nextAccount(for: group, config: both, usage: [:])?.id == b.id)
+    }
+
+    /// Ativa sem amostra é tão fresca quanto qualquer candidata sem amostra. A
+    /// regra antiga a tratava como estourada, e um "Usar" manual numa conta
+    /// ainda não medida era desfeito três minutos depois.
+    @Test("a ativa sem amostra fica onde está")
+    func activeWithoutSampleStays() throws {
+        let (engine, _, _, config, _, b, group) = setup()
+        try engine.activate(b, in: group, config: config)
+        #expect(engine.rotationTarget(for: group, config: config, usage: [:]) == nil)
+    }
+
+    /// O `~/.claude` de quem já usava o `claude` antes do app tem um login que
+    /// não é conta do router. A rotação não o troca sozinha: apagaria esse
+    /// login sem cópia. Ativar ali continua possível como escolha explícita.
+    @Test("perfil com login de fora: a rotação não troca sozinha, o \"Usar\" troca")
+    func foreignLoginIsNotRotatedAway() throws {
+        let (engine, _, adapter, config, a, _, group) = setup()
+        let foreign = AccountIdentity(email: "fora@exemplo.com", organizationName: nil,
+                                      rateLimitTier: nil, raw: [:])
+        try adapter.writeIdentity(foreign, toConfigDir: group.configDir)
+
+        #expect(engine.rotationTarget(for: group, config: config, usage: [:]) == nil)
+        try engine.activate(a, in: group, config: config)
+        #expect(engine.activeAccount(in: group, config: config)?.id == a.id)
+    }
+
+    /// Com o segredo novo e a identidade velha, o espelho seguinte gravaria a
+    /// credencial da conta nova na casa da que saiu.
+    @Test("identidade que não grava devolve o item do grupo ao que era")
+    func failedIdentityWriteRollsTheSecretBack() throws {
+        let (engine, kc, adapter, config, a, b, group) = setup()
+        try engine.activate(a, in: group, config: config)
+        let groupService = adapter.keychainService(forConfigDir: group.configDir)
+
+        adapter.failIdentityWrites = true
+        #expect(throws: RotationEngine.RotationError.self) {
+            try engine.activate(b, in: group, config: config)
+        }
+        #expect(kc.read(service: groupService) == "cred-a")
+        #expect(engine.activeAccount(in: group, config: config)?.id == a.id)
+    }
+
+    /// O espelho é o que guarda o token vivo da conta que sai. Se ele não grava,
+    /// sobrescrever o item do grupo perderia esse token.
+    @Test("espelho que falha aborta a troca")
+    func failedMirrorAbortsTheSwitch() throws {
+        let (engine, kc, adapter, config, a, b, group) = setup()
+        try engine.activate(a, in: group, config: config)
+        let groupService = adapter.keychainService(forConfigDir: group.configDir)
+        try kc.write("cred-a-RENOVADO", service: groupService)
+
+        kc.failWritesTo = [adapter.keychainService(forConfigDir: a.home)]
+        #expect(throws: RotationEngine.RotationError.self) {
+            try engine.activate(b, in: group, config: config)
+        }
+        #expect(kc.read(service: groupService) == "cred-a-RENOVADO")
+        #expect(engine.activeAccount(in: group, config: config)?.id == a.id)
+    }
+
+    @Test("esvaziar um perfil dedicado tira item e identidade; o ~/.claude nunca")
+    func resetProfileNeverTouchesTheDefault() throws {
+        let (engine, kc, adapter, _, a, _, group) = setup()
+        try kc.write("viva", service: adapter.keychainService(forConfigDir: group.configDir))
+        try adapter.writeIdentity(a.identity, toConfigDir: group.configDir)
+        try kc.write("do-claude-puro", service: adapter.keychainService(forConfigDir: home))
+        try adapter.writeIdentity(a.identity, toConfigDir: home)
+
+        engine.resetProfile(group.configDir, provider: .anthropic)
+        engine.resetProfile(home, provider: .anthropic)
+
+        #expect(!kc.exists(service: adapter.keychainService(forConfigDir: group.configDir)))
+        #expect(adapter.identity(inConfigDir: group.configDir) == nil)
+        #expect(kc.read(service: adapter.keychainService(forConfigDir: home)) == "do-claude-puro")
+        #expect(adapter.identity(inConfigDir: home)?.email == a.identity.email)
     }
 }

@@ -29,6 +29,67 @@ struct RouterConfigStoreTests {
         try? kc.write("cred-\(email)", service: adapter.keychainService(forConfigDir: home))
     }
 
+    /// Adiciona uma conta ao grupo pelo caminho do login.
+    private func addAccount(_ email: String, to group: AccountGroup, store: RouterConfigStore,
+                            kc: FakeKeychain, adapter: FakeAdapter) throws -> Account {
+        let begun = store.newAccountHome()
+        seedLogin(email, home: begun.home, kc: kc, adapter: adapter)
+        guard case .added(let account) = store.finishPendingLogin(
+            home: begun.home, accountID: begun.accountID, into: group.id) else {
+            throw CocoaError(.featureUnsupported)
+        }
+        return account
+    }
+
+    /// "Deixar o ~/.claude livre" só mudava o caminho do grupo. A conta que
+    /// servia o `~/.claude` continuava lá, servindo o `claude` puro — e a volta
+    /// seguinte da rotação a ativava também no perfil dedicado novo, a partir
+    /// da casa: duas cópias de um refresh token que gira.
+    @Test("deixar o ~/.claude livre: a conta de lá fica só lá, e o grupo segue com outra")
+    func clearDefaultKeepsTheLiveAccountInOnePlace() throws {
+        let (store, kc, adapter, _) = makeStore()
+        let group = store.addGroup(name: "trabalho")  // padrão: o ~/.claude
+        let a = try addAccount("conta1@exemplo.com", to: group, store: store, kc: kc, adapter: adapter)
+        let b = try addAccount("conta2@exemplo.com", to: group, store: store, kc: kc, adapter: adapter)
+        store.activate(a, in: store.config.groups[0])
+        // O claude puro renova o token no item do ~/.claude.
+        try kc.write("cred-a-RENOVADO",
+                     service: adapter.keychainService(forConfigDir: group.configDir))
+
+        store.clearDefault()
+        let moved = store.config.groups[0]
+        #expect(!moved.configDir.isDefault)
+        // A casa da conta que ficou no ~/.claude recebeu o token vivo antes da troca.
+        #expect(kc.read(service: adapter.keychainService(forConfigDir: a.home)) == "cred-a-RENOVADO")
+
+        store.rotateAll()
+        #expect(adapter.identity(inConfigDir: moved.configDir)?.email == b.identity.email)
+        #expect(kc.read(service: adapter.keychainService(forConfigDir: moved.configDir))
+                == "cred-\(b.identity.email)")
+    }
+
+    /// O perfil dedicado de um grupo é sempre o mesmo caminho. Saindo dele e
+    /// voltando, a identidade velha que ficava lá fazia o espelho gravar uma
+    /// cadeia morta na casa da conta.
+    @Test("o perfil dedicado que fica para trás é esvaziado")
+    func theDedicatedProfileLeftBehindIsEmptied() throws {
+        let (store, kc, adapter, _) = makeStore()
+        _ = store.addGroup(name: "pessoal")            // padrão
+        let work = store.addGroup(name: "trabalho")    // dedicado
+        let c = try addAccount("conta3@exemplo.com", to: work, store: store, kc: kc, adapter: adapter)
+        store.activate(c, in: store.config.groups[1])
+        let dedicated = work.configDir
+        #expect(adapter.identity(inConfigDir: dedicated)?.email == c.identity.email)
+
+        store.makeDefault(work.id)
+
+        #expect(adapter.identity(inConfigDir: dedicated) == nil)
+        #expect(!kc.exists(service: adapter.keychainService(forConfigDir: dedicated)))
+        // A casa ficou com o token que estava no grupo.
+        #expect(kc.read(service: adapter.keychainService(forConfigDir: c.home))
+                == "cred-\(c.identity.email)")
+    }
+
     @Test("o primeiro grupo é o padrão; o segundo é dedicado")
     func firstGroupIsDefault() {
         let (store, _, _, _) = makeStore()

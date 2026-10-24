@@ -8,6 +8,9 @@ struct AccountRow: View {
     /// legenda é lido como o das 5 horas, e quase sempre é o semanal.
     let usage: AccountUsage?
     let sampledAt: Date?
+    /// Durante "Medir contas" trocar de conta espera: a sonda decide, conta a
+    /// conta, por qual perfil medir (ver `RouterConfigStore.measureAccounts`).
+    let isMeasuring: Bool
     let onSwitch: () -> Void
     let onRelogin: () -> Void
     let onRemove: () -> Void
@@ -74,6 +77,7 @@ struct AccountRow: View {
             if !isActive {
                 Button("groups.account.use", action: onSwitch)
                     .controlSize(.small).buttonStyle(.bordered)
+                    .disabled(isMeasuring)
             }
             // Ações raras ficam atrás do menu; "usar" fica exposto porque é a
             // ação frequente.

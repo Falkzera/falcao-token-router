@@ -48,6 +48,12 @@ public protocol ProviderAdapter: Sendable {
     /// carimbado da conta anterior.
     func writeIdentity(_ identity: AccountIdentity, toConfigDir dir: ConfigDir) throws
 
+    /// Tira a identidade de um perfil, preservando o resto do arquivo. Usado
+    /// quando um perfil dedicado sai de um grupo ou volta a ele: identidade
+    /// velha ali faria o espelho gravar uma credencial morta na casa de quem
+    /// ela nomeia.
+    func clearIdentity(inConfigDir dir: ConfigDir) throws
+
     /// O comando e os argumentos para iniciar uma sessão num grupo. O ambiente
     /// (incluindo o `CLAUDE_CONFIG_DIR`, quando o grupo não é o padrão) é
     /// montado por quem chama.
