@@ -8,7 +8,7 @@ Tudo que constrói, confere e publica — sem Xcode e sem Homebrew. Cada script 
 - `check-strings.sh` — chaves usadas no código × catálogos `en`/`pt-BR`, e literal solto em view. `PREFIXES` é o registro de namespaces: superfície nova pede prefixo novo.
 - `bundle.sh` — monta `dist/FalcaoTokenRouter.app` a partir do SwiftPM e assina ad-hoc. Universal por padrão (precisa do xcbuild do Xcode); `--native` monta só para esta máquina e **não é publicável**. `--install` copia para `/Applications`.
 - `dmg.sh` — o DMG, com diagramação de janela pelo Finder quando há tela; sem tela avisa e sai sem diagramação.
-- `icon.sh` + `icon.swift` — o ícone e a arte, compilados junto com `GaugeGeometry.swift` para o ícone e a barra serem o MESMO desenho.
+- `icon.sh` + `icon.swift` — o ícone e a arte, compilados junto com `GaugeGeometry.swift` para o ícone e a barra serem o MESMO desenho. Chamado à mão, copia o banner e o card social para `docs/art/`; chamado pelo `bundle.sh` (`ICON_SKIP_REPO_ART=1`), gera só o `.icns`.
 - `release.sh` — confere (main limpa e sincronizada, tag inexistente, CHANGELOG com a seção, testes) e empurra a tag. O build é da nuvem: `.github/workflows/release.yml`.
 
 ## Padrões
@@ -16,6 +16,7 @@ Tudo que constrói, confere e publica — sem Xcode e sem Homebrew. Cada script 
 - Nada aqui depende de ferramenta fora do macOS + Command Line Tools.
 
 ## Decisões recentes
+- 2026-10-04: o `bundle.sh` deixou de regravar `docs/art/`. O texto da arte é rasterizado pelo sistema e muda de pixel entre versões do macOS: todo build sujava a árvore, e o `release.sh` recusa árvore suja. As notas da release passaram a ser a seção do CHANGELOG (o `--generate-notes` comparava com a tag anterior de qualquer plataforma).
 - 2026-09-22: a release passou a ser construída na nuvem. O binário universal exige o xcbuild, que só vem com o Xcode completo — a máquina do mantenedor tem só o CLT. O `release.sh` ficou com a parte que precisa de julgamento local (está na main? está limpo? a tag existe?); a release nasce como **rascunho** para as notas serem revisadas antes de aparecer.
 
 ## Pendências conhecidas
