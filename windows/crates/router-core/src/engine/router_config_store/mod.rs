@@ -195,7 +195,8 @@ impl RouterConfigStore {
             unreadable_on_disk,
             router_path: None,
             usage: GroupUsageReader::new(paths.usage_dir()),
-            engine: RotationEngine::new(credentials.clone(), adapters),
+            engine: RotationEngine::new(credentials.clone(), adapters)
+                .with_default_profile(ConfigDir::standard(&home)),
             login: AccountLoginService::new(adapter, credentials.clone()),
             credentials,
             paths,

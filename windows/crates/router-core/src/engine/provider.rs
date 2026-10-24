@@ -72,6 +72,12 @@ pub trait ProviderAdapter: Send + Sync {
         dir: &ConfigDir,
     ) -> Result<(), IdentityError>;
 
+    /// Tira a identidade de um perfil, preservando o resto do arquivo. Usado
+    /// quando um perfil dedicado sai de um grupo ou volta a ele: identidade
+    /// velha ali faria o espelho gravar uma credencial morta na casa de quem ela
+    /// nomeia. Arquivo ausente: nada a fazer; ilegível: não é regravado.
+    fn clear_identity(&self, dir: &ConfigDir) -> Result<(), IdentityError>;
+
     /// O comando e os argumentos para iniciar uma sessão num grupo. O ambiente
     /// (incluindo o `CLAUDE_CONFIG_DIR`, quando o grupo não é o padrão) é montado
     /// por quem chama.

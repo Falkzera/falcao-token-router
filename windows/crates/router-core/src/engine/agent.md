@@ -111,3 +111,16 @@ Modelos, formato da amostra, leitor de uso, credencial, rotação e o store. Sem
   na casa desta, e "Usar" serviria a outra conta com o nome desta (o macOS deixava). A credencial
   estranha sai (a conta fica sem login, o estado honesto); só age quando a casa tem mesmo outra
   identidade.
+- 04/10/2026: "uma conta, um lugar" passou a contar o `~\.claude` (≙ macOS #23). Depois de
+  "deixar o ~\.claude livre", a conta de lá continua servindo o `claude` puro, e a rotação a
+  ativava também no dedicado novo. `where_else_live` olha os outros grupos E o perfil padrão
+  quando nenhum grupo o usa (o motor recebe o perfil com `with_default_profile`; o store e a CLI
+  sempre o passam). `clear_default`/`make_default` espelham a ativa e esvaziam o dedicado de
+  destino e o que fica para trás (`reset_profile`; nunca o `~\.claude`).
+- 04/10/2026: a rotação só escolhe quem `can_serve` (login na casa, viva em nenhum outro perfil);
+  ativa sem amostra conta como fresca; login de fora num perfil não é trocado sozinho. O
+  `activate` devolve o grupo ao que era se a identidade não grava (`NotPersisted` incluído) e não
+  troca se o espelho da conta que sai falhar. O lançamento sem ativa sobe na primeira que pode
+  servir.
+- 04/10/2026: o comando da status line só vai cru com letra, dígito e `-_./:~`. Olhar só o
+  espaço deixava `'`, `&`, `(` passarem — um usuário `D'Angelo` ficava sem sensor.

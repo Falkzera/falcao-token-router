@@ -79,6 +79,7 @@ export type ErrorView =
   | { code: "saveFailed"; detail: string }
   | { code: "activateNoCredential" }
   | { code: "activateBusyElsewhere"; group: string }
+  | { code: "activateLiveInDefaultProfile" }
   | { code: "activateWriteFailed"; detail: string }
   | { code: "routerPathUnknown" }
   | { code: "integrationFailed"; detail: string }
