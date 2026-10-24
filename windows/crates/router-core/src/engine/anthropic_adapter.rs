@@ -122,8 +122,4 @@ impl ProviderAdapter for AnthropicAdapter {
             JsonFileError::Io { path, source } => IdentityError::Io { path, source },
         })
     }
-
-    fn launch_command(&self) -> (String, Vec<String>) {
-        ("claude".to_string(), Vec::new())
-    }
 }

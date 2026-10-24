@@ -161,8 +161,4 @@ impl ProviderAdapter for FakeAdapter {
         self.identities.lock().unwrap().remove(&dir.raw);
         Ok(())
     }
-
-    fn launch_command(&self) -> (String, Vec<String>) {
-        ("claude".to_string(), Vec::new())
-    }
 }

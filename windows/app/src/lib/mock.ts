@@ -17,6 +17,7 @@
 // Dados só de exemplo (@exemplo.com, Acme, C:\Users\exemplo).
 
 import type {
+  AccountView,
   AppInfo,
   GroupView,
   HomeTab,
@@ -90,7 +91,6 @@ function usage(
   const [fraction, bound] = candidates.reduce((a, b) => (b[0] >= a[0] ? b : a));
   return {
     fraction,
-    text: pct(fraction),
     bound,
     // Como a Anthropic: a janela de 5h sem uso não começou e vem sem reset.
     fiveHour:
@@ -131,10 +131,10 @@ function work(): GroupView {
     activeAccountId: "A2",
     sessions: { count: 2, engaged: 1 },
     accounts: [
-      { id: "A1", label: "equipe-1", email: "equipe-1@exemplo.com", organization: "Acme", usage: usage(0.12, 0.4, "probe", 125) },
-      { id: "A2", label: "equipe-2", email: "equipe-2@exemplo.com", organization: "Acme", usage: usage(0.34, 0.81, "sensor", 3) },
-      { id: "A3", label: "equipe-3", email: "equipe-3@exemplo.com", organization: "Acme", usage: null },
-      { id: "A6", label: "equipe-4", email: "equipe-4@exemplo.com", organization: "Acme", usage: usage(0, 0.02, "probe", 1) },
+      { id: "A1", label: "equipe-1", organization: "Acme", usage: usage(0.12, 0.4, "probe", 125) },
+      { id: "A2", label: "equipe-2", organization: "Acme", usage: usage(0.34, 0.81, "sensor", 3) },
+      { id: "A3", label: "equipe-3", organization: "Acme", usage: null },
+      { id: "A6", label: "equipe-4", organization: "Acme", usage: usage(0, 0.02, "probe", 1) },
     ],
   });
 }
@@ -149,11 +149,10 @@ function personal(): GroupView {
       {
         id: "A4",
         label: "conta1",
-        email: "conta1@exemplo.com",
         organization: null,
         usage: usage(0.2, 0.45, "sensor", 8, { name: "Fable", fraction: 0.95, ageMinutes: 75 }),
       },
-      { id: "A5", label: "conta2", email: "conta2@exemplo.com", organization: null, usage: usage(null, 0.3, "sensor", 14 * 60) },
+      { id: "A5", label: "conta2", organization: null, usage: usage(null, 0.3, "sensor", 14 * 60) },
     ],
   });
 }
@@ -166,7 +165,7 @@ const scenarios: Record<string, () => GroupView[]> = {
       id: "G1",
       name: "Trabalho",
       activeAccountId: "A1",
-      accounts: [{ id: "A1", label: "equipe-1", email: "equipe-1@exemplo.com", organization: "Acme", usage: null }],
+      accounts: [{ id: "A1", label: "equipe-1", organization: "Acme", usage: null }],
     }),
   ],
   critico: () => [
@@ -176,8 +175,8 @@ const scenarios: Record<string, () => GroupView[]> = {
       activeAccountId: "A2",
       sessions: { count: 1, engaged: 0 },
       accounts: [
-        { id: "A1", label: "equipe-1", email: "equipe-1@exemplo.com", organization: "Acme", usage: usage(0.97, 0.7, "sensor", 1) },
-        { id: "A2", label: "equipe-2", email: "equipe-2@exemplo.com", organization: "Acme", usage: usage(0.96, 0.88, "sensor", 2) },
+        { id: "A1", label: "equipe-1", organization: "Acme", usage: usage(0.97, 0.7, "sensor", 1) },
+        { id: "A2", label: "equipe-2", organization: "Acme", usage: usage(0.96, 0.88, "sensor", 2) },
       ],
     }),
   ],
@@ -219,7 +218,6 @@ function terminalView(scripts: ScriptsState, shells: ShellView[], routerFound = 
       routerFound &&
       scripts === "current" &&
       shells.every((s) => s.loadsIntegration && !s.policyBlocks && s.bashLogin !== "ignores"),
-    blockedByPolicy: shells.some((s) => s.policyBlocks),
     needsInstall: scripts !== "current" || shells.some((s) => !s.loadsIntegration),
   };
 }
@@ -335,7 +333,7 @@ function mockPreview(choice: StatusLineChoice): Span[] {
   const portuguese = mockLocale() === "pt-BR";
   const first = state.groups[0];
   const email =
-    first?.accounts.find((a) => a.id === first.activeAccountId)?.email ??
+    emailOf(first?.accounts.find((a) => a.id === first.activeAccountId)) ??
     (portuguese ? "voce@exemplo.com" : "you@example.com");
   const now = Date.now();
   const five = new Date(now + (2 * 60 + 13) * 60_000);
@@ -485,6 +483,12 @@ function findAccount(id: string | undefined) {
   return state.groups.flatMap((g) => g.accounts).find((a) => a.id === id);
 }
 
+/** A conta da UI não carrega e-mail (a tela não o mostra); onde o mock imita o
+ *  núcleo — a status line, o relogin com a conta errada —, deriva do rótulo. */
+function emailOf(account: AccountView | undefined): string | undefined {
+  return account && `${account.label}@exemplo.com`;
+}
+
 /** Um login do começo: iniciando → link → (o cenário). */
 function runLogin(): LoginView | null {
   loginTimers.forEach(clearTimeout);
@@ -522,7 +526,7 @@ function settleLogin(scenario: string): void {
     const account = findAccount(target.accountId);
     setPhase(
       scenario === "errada"
-        ? { phase: "wrongAccount", expected: account?.email ?? "", got: "intrusa@exemplo.com" }
+        ? { phase: "wrongAccount", expected: emailOf(account) ?? "", got: "intrusa@exemplo.com" }
         : { phase: "renewed", label: account?.label ?? "" },
     );
   } else if (scenario === "duplicada") {
@@ -532,7 +536,6 @@ function settleLogin(scenario: string): void {
     findGroup(target.groupId)?.accounts.push({
       id: `A${n}`,
       label: `conta${n}`,
-      email: `conta${n}@exemplo.com`,
       organization: null,
       usage: null,
     });
@@ -580,7 +583,7 @@ const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
     publishLogin();
     return changed();
   },
-  app_info: (): AppInfo => ({ version: "0.1.0-mock", locale: mockLocale(), initialTab: mockTab() }),
+  app_info: (): AppInfo => ({ locale: mockLocale(), initialTab: mockTab() }),
   get_snapshot: () => structuredClone(state),
   fit_flyout: () => undefined,
   open_home: (args) => console.info("mock: abrir a janela na aba", args.tab),
