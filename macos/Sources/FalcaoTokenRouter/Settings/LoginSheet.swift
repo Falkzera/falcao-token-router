@@ -38,6 +38,7 @@ struct LoginSheet: View {
         }
         .padding(24).frame(width: 380)
         .onAppear {
+            if pending.isRelogin { store.beginRelogin(pending.accountID) }
             let s = LoginSession(home: pending.home, accountID: pending.accountID,
                                  groupID: pending.groupID)
             session = s
@@ -47,7 +48,10 @@ struct LoginSheet: View {
             if phase == .success { Task { await finish() } }
         }
         // Fechar a folha por qualquer caminho (Esc, o X) também descarta.
-        .onDisappear { discardUnfinishedHome() }
+        .onDisappear {
+            discardUnfinishedHome()
+            if pending.isRelogin { store.endRelogin(pending.accountID) }
+        }
     }
 
     /// A casa que este login reservou e que não virou conta: o `claude auth
