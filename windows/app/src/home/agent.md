@@ -78,6 +78,8 @@
   usuário — sempre visível, em coluna) e o menu ⋯ (mover, relogar, remover). O que o resumo mostra é escolha do
   usuário (`hidden`, de Ajustes → Resumo dos grupos; de fábrica, tudo); o tooltip segue com
   tudo. (23/09/2026: os resets na linha nasceram como teste e ficaram, com a escolha.)
+  Conta sem login (`signedOut`): o selo amarelo "sem login" ao lado do nome, que é um botão
+  para o Relogar (23/10/2026 — o aviso da medição dizia quantas, não qual).
 - `NewGroupDialog.svelte` — nome e a escolha "usar como grupo padrão", DESMARCADA quando o
   `~\.claude` tem um login que o router não conhece — e, se marcada, o aviso de qual.
 - `ConfirmDialog.svelte` — confirmação destrutiva genérica; o texto diz o que de fato acontece.

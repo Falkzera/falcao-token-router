@@ -25,7 +25,7 @@
   const stale = $derived(age > STALE_SECONDS);
   /** Meio dia: marca explícita — o risco é acreditar num número otimista. */
   const veryStale = $derived(age > VERY_STALE_SECONDS);
-  const help = $derived(accountHelp(usage, clock.now));
+  const help = $derived(accountHelp(usage, clock.now, account.signedOut));
 
   /** Só a janela que decide ganha peso e cor; com as duas coloridas, nada
    *  diria qual dispara a troca. Velha, perde a cor que sugere frescor. */
@@ -48,6 +48,9 @@
       aria-hidden="true"
     ></span>
     <span class="label">{account.label}</span>
+    {#if account.signedOut}
+      <span class="signed-out" title={t("panel.accounts.signedOut.help")}>{t("panel.accounts.signedOut")}</span>
+    {/if}
     {#if usage?.bound === "model" && usage.model}
       <ModelBadge model={usage.model} />
     {/if}
@@ -69,8 +72,9 @@
     {/each}
   {:else}
     <!-- Sem amostra a conta está PRONTA (entra no rodízio sozinha): um traço
-         leria como "quebrada". Ocupa a largura das três colunas. -->
-    <span class="ready">{t("panel.accounts.ready")}</span>
+         leria como "quebrada" — a menos que ela ESTEJA sem login, e aí o
+         traço é a verdade. Ocupa a largura das três colunas. -->
+    <span class="ready">{account.signedOut ? t("panel.accounts.window.absent") : t("panel.accounts.ready")}</span>
   {/if}
 </button>
 
@@ -140,6 +144,17 @@
   .clock {
     display: inline-flex;
     color: var(--text-tertiary);
+  }
+  /* Sem login: o âmbar do `warning`, no formato do selo do modelo. */
+  .signed-out {
+    flex: none;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--warning) 22%, transparent);
+    color: var(--warning-text);
+    font-size: var(--font-small);
+    line-height: 16px;
+    white-space: nowrap;
   }
   .num {
     text-align: right;

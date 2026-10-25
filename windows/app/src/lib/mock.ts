@@ -136,10 +136,10 @@ function work(): GroupView {
     activeAccountId: "A2",
     sessions: { count: 2, engaged: 1 },
     accounts: [
-      { id: "A1", label: "equipe-1", organization: "Acme", usage: usage(0.12, 0.4, "probe", 125) },
-      { id: "A2", label: "equipe-2", organization: "Acme", usage: usage(0.34, 0.81, "sensor", 3) },
-      { id: "A3", label: "equipe-3", organization: "Acme", usage: null },
-      { id: "A6", label: "equipe-4", organization: "Acme", usage: usage(0, 0.02, "probe", 1) },
+      { id: "A1", label: "equipe-1", organization: "Acme", usage: usage(0.12, 0.4, "probe", 125), signedOut: false },
+      { id: "A2", label: "equipe-2", organization: "Acme", usage: usage(0.34, 0.81, "sensor", 3), signedOut: false },
+      { id: "A3", label: "equipe-3", organization: "Acme", usage: null, signedOut: false },
+      { id: "A6", label: "equipe-4", organization: "Acme", usage: usage(0, 0.02, "probe", 1), signedOut: false },
     ],
   });
 }
@@ -156,8 +156,9 @@ function personal(): GroupView {
         label: "conta1",
         organization: null,
         usage: usage(0.2, 0.45, "sensor", 8, { name: "Fable", fraction: 0.95, ageMinutes: 75 }),
+        signedOut: false,
       },
-      { id: "A5", label: "conta2", organization: null, usage: usage(null, 0.3, "sensor", 14 * 60) },
+      { id: "A5", label: "conta2", organization: null, usage: usage(null, 0.3, "sensor", 14 * 60), signedOut: false },
     ],
   });
 }
@@ -170,7 +171,7 @@ const scenarios: Record<string, () => GroupView[]> = {
       id: "G1",
       name: "Trabalho",
       activeAccountId: "A1",
-      accounts: [{ id: "A1", label: "equipe-1", organization: "Acme", usage: null }],
+      accounts: [{ id: "A1", label: "equipe-1", organization: "Acme", usage: null, signedOut: false }],
     }),
   ],
   critico: () => [
@@ -180,13 +181,19 @@ const scenarios: Record<string, () => GroupView[]> = {
       activeAccountId: "A2",
       sessions: { count: 1, engaged: 0 },
       accounts: [
-        { id: "A1", label: "equipe-1", organization: "Acme", usage: usage(0.97, 0.7, "sensor", 1) },
-        { id: "A2", label: "equipe-2", organization: "Acme", usage: usage(0.96, 0.88, "sensor", 2) },
+        { id: "A1", label: "equipe-1", organization: "Acme", usage: usage(0.97, 0.7, "sensor", 1), signedOut: false },
+        { id: "A2", label: "equipe-2", organization: "Acme", usage: usage(0.96, 0.88, "sensor", 2), signedOut: false },
       ],
     }),
   ],
-  erro: () => [work(), personal()],
+  // A medição falhou em duas: as duas sem login, marcadas.
+  erro: () => signedOut([work(), personal()], ["A3", "A5"]),
 };
+
+function signedOut(groups: GroupView[], ids: string[]): GroupView[] {
+  for (const account of groups.flatMap((g) => g.accounts)) account.signedOut = ids.includes(account.id);
+  return groups;
+}
 
 // MARK: - Integração de terminal
 
@@ -533,6 +540,11 @@ function settleLogin(scenario: string): void {
     setPhase({ phase: "timeout" });
   } else if (target.relogin) {
     const account = findAccount(target.accountId);
+    if (scenario !== "errada") {
+      // Relogin renovado tira o selo "sem login" na hora, em todo grupo.
+      for (const a of state.groups.flatMap((g) => g.accounts)) if (a.id === target.accountId) a.signedOut = false;
+      changed();
+    }
     setPhase(
       scenario === "errada"
         ? { phase: "wrongAccount", expected: emailOf(account) ?? "", got: "intrusa@exemplo.com" }
@@ -547,6 +559,7 @@ function settleLogin(scenario: string): void {
       label: `conta${n}`,
       organization: null,
       usage: null,
+      signedOut: false,
     });
     changed();
     setPhase({ phase: "added", label: `conta${n}` });

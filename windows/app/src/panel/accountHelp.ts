@@ -27,10 +27,15 @@ function resets(usage: UsageView, now: number): string {
   return lines.join("\n");
 }
 
-export function accountHelp(usage: UsageView | null, now: number): string {
-  if (!usage) return t("panel.accounts.ready.help.probe");
+/** `signedOut`: a conta se mostrou sem login — isso vem primeiro, e sem
+ *  amostra ela NÃO está "pronta" (o texto de pronta mandaria medir, e medir
+ *  dá no mesmo "sem login"). */
+export function accountHelp(usage: UsageView | null, now: number, signedOut = false): string {
+  const signedOutLine = signedOut ? t("panel.accounts.signedOut.help") : "";
+  if (!usage) return signedOutLine || t("panel.accounts.ready.help.probe");
   const absent = t("panel.accounts.window.absent");
   const lines = [
+    signedOutLine,
     t(
       "panel.accounts.usage.help.format",
       usage.fiveHour?.text ?? absent,

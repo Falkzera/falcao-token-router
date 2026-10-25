@@ -2,8 +2,6 @@
 //!
 //! Parte do `impl RouterConfigStore` — ver o `mod.rs` ao lado.
 
-use chrono::DateTime;
-
 use super::*;
 use crate::engine::measure_schedule::MeasureSchedule;
 use crate::engine::usage_history::UsageHistory;
@@ -28,7 +26,15 @@ impl RouterConfigStore {
                 self.last_error = None;
                 self.refresh_usage();
             }
-            Err(e) => self.last_error = Some(StoreError::ActivateFailed(e)),
+            Err(e) => {
+                // Sem credencial na casa a conta está sem login neste
+                // computador — a mesma marca que a sonda poria. Achar a
+                // credencial não tira a marca: ela pode estar vencida.
+                if let RotationError::NoCredential { account_id } = &e {
+                    self.signed_out.insert(*account_id, Utc::now());
+                }
+                self.last_error = Some(StoreError::ActivateFailed(e));
+            }
         }
     }
 
@@ -66,7 +72,7 @@ impl RouterConfigStore {
             return MeasureSummary::default();
         };
         let summary = self.measure_plan(group).run(probe);
-        self.finish_measure(summary);
+        self.finish_measure(summary.clone());
         summary
     }
 
@@ -134,11 +140,26 @@ impl RouterConfigStore {
         UsageHistory::clear(&self.paths.history_dir())
     }
 
-    /// Publica o saldo de uma medição: o erro (contas que não responderam) e o
-    /// quadro relido com as amostras novas.
+    /// Publica o saldo de uma medição: o erro (contas que não responderam), QUAIS
+    /// estão sem login, e o quadro relido com as amostras novas. A conta que
+    /// falhou por outro motivo (prazo, formato novo) fica como estava: a falha
+    /// não diz nada sobre o login dela.
     pub fn finish_measure(&mut self, summary: MeasureSummary) {
         self.last_error = (summary.failed > 0).then_some(StoreError::ProbeFailures(summary.failed));
+        self.note_login_state(&summary);
         self.refresh_usage();
+    }
+
+    /// O que uma medição disse sobre o login de cada conta: quem respondeu
+    /// perde a marca, quem a sonda achou sem login ganha. A medição de 5 em 5
+    /// horas passa só por aqui — o aviso vermelho é da última ação do usuário.
+    pub fn note_login_state(&mut self, summary: &MeasureSummary) {
+        for id in &summary.measured {
+            self.signed_out.remove(id);
+        }
+        let now = Utc::now();
+        self.signed_out
+            .extend(summary.signed_out.iter().map(|id| (*id, now)));
     }
 
     /// Sem `claude` instalado não há sonda — um erro com nome, para a UI.
@@ -152,6 +173,23 @@ impl RouterConfigStore {
         let detail = self.usage.detail_by_account(&self.config, Utc::now());
         self.usage_snapshot = detail.iter().map(|(id, u)| (*id, u.fraction)).collect();
         self.usage_detail = detail;
+        // Amostra mais nova que a marca: a conta serviu uma sessão DEPOIS de se
+        // mostrar sem login (um `/login` no próprio terminal, sem o app) — o
+        // login voltou. A data da amostra vai ao disco sem fração de segundo,
+        // então uma do mesmo segundo da marca não conta: fica para a próxima.
+        // As datas só são lidas com alguma marca posta: reler a pasta `usage\`
+        // inteira a cada refresh, para ninguém usar, foi o que tirou o campo
+        // `usage_sampled_at` daqui.
+        if !self.signed_out.is_empty() {
+            let sampled_at: HashMap<Id, DateTime<Utc>> = self
+                .usage
+                .samples_by_account(&self.config)
+                .into_iter()
+                .map(|(id, s)| (id, s.sampled_at))
+                .collect();
+            self.signed_out
+                .retain(|id, marked| sampled_at.get(id).is_none_or(|at| at <= marked));
+        }
         self.active_by_group = self
             .config
             .groups

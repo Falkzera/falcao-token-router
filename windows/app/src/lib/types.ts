@@ -60,6 +60,9 @@ export interface AccountView {
   organization: string | null;
   /** `null` = sem amostra: "pronta". */
   usage: UsageView | null;
+  /** Se mostrou sem login (a sonda, ou "Usar" sem credencial) e ainda não
+   *  provou o contrário — o selo amarelo "sem login". */
+  signedOut: boolean;
 }
 
 export interface SessionsView {
