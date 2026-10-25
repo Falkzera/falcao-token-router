@@ -37,6 +37,16 @@ a fix on one platform never waits for the other's calendar.
   going on it. If it was the group's only account, the group's profile is left
   alone, so a live session isn't cut off.
 
+### Fixed
+
+- **A signed-out account is now named, not just counted.** "Measure accounts"
+  used to say only how many accounts didn't answer. The account the probe finds
+  signed out (or that "Use" finds with no login on this computer) now carries a
+  yellow "signed out" tag in the Groups window, the flyout and the account
+  card; in the Groups window the tag opens "Log in again". It clears when the
+  account answers a measurement, a login is renewed, or a session it serves
+  reports usage again.
+
 ## [1.0.0] — 2026-09-24
 
 First Windows release. The port reads and writes the same files as the macOS

@@ -165,3 +165,14 @@ Modelos, formato da amostra, leitor de uso, credencial, rotação e o store. Sem
     deslogada seria sondada a cada volta do laço. As tentativas moram no app (memória).
   - `scheduled_measure_plans`: um plano por grupo, só as contas vencidas, cada conta uma vez (a
     que está em dois grupos vai no primeiro), a ativa pelo perfil do grupo (`probe_targets`).
+- 23/10/2026: a conta SEM LOGIN fica marcada (`is_signed_out`). O aviso da medição dizia só
+  "N conta(s) não responderam" e não deixava saber qual relogar. `MeasureSummary` passou a ser
+  conta por conta (`measured: Vec<Id>`, `failed`, `signed_out: Vec<Id>` — só o `NotSignedIn`
+  da sonda; prazo/formato novo falham sem veredito sobre o login). Marca também "Usar" sem
+  credencial na casa (`NoCredential`). Sai quando a conta prova o contrário: responde à sonda,
+  relogin renovado, ou amostra do sensor MAIS NOVA que a marca (um `/login` no terminal, sem o
+  app; a data da amostra não tem fração, então a do mesmo segundo não conta). Só em memória —
+  o formato em disco é o contrato com o macOS.
+- 25/10/2026: a medição de 5 em 5 horas também marca e desmarca (`note_login_state`), sem o
+  aviso vermelho, que é da última ação do usuário. Sem o campo `usage_sampled_at` (saiu em
+  04/10), o `refresh_usage` lê a data das amostras só quando há alguma conta marcada.

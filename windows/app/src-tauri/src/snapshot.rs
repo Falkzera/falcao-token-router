@@ -125,6 +125,9 @@ pub struct AccountView {
     pub label: String,
     pub organization: Option<String>,
     pub usage: Option<UsageView>,
+    /// Se mostrou sem login (a sonda, ou "Usar" sem credencial) e ainda não
+    /// provou o contrário — a marca amarela da linha.
+    pub signed_out: bool,
 }
 
 /// Quantas sessões vivas o grupo tem, e quantas trabalham ou esperam o usuário
@@ -292,6 +295,7 @@ fn group_view(store: &RouterConfigStore, group: &AccountGroup, locale: Locale) -
                     .usage_detail()
                     .get(&account.id)
                     .map(|usage| UsageView::of(usage, locale)),
+                signed_out: store.is_signed_out(account.id),
             })
             .collect(),
     }
@@ -552,13 +556,55 @@ mod tests {
         assert_eq!(json["lastError"], json!({"code": "probeUnavailable"}));
 
         store.finish_measure(router_core::engine::router_config_store::MeasureSummary {
-            measured: 1,
             failed: 2,
+            ..Default::default()
         });
         let json = serde_json::to_value(build_with(&store, None, false, Locale::PtBr)).unwrap();
         assert_eq!(
             json["lastError"],
             json!({"code": "probeFailures", "count": 2})
+        );
+    }
+
+    /// O aviso diz quantas; a CONTA diz se é ela — em todo grupo em que está.
+    #[test]
+    fn the_signed_out_account_is_marked_in_every_group() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut store = sandbox(tmp.path());
+        let equipe1 = Id::parse("AAAAAAAA-0000-4000-8000-000000000001").unwrap();
+        store.finish_measure(router_core::engine::router_config_store::MeasureSummary {
+            failed: 1,
+            signed_out: vec![equipe1],
+            ..Default::default()
+        });
+        let json = serde_json::to_value(build_with(&store, None, false, Locale::PtBr)).unwrap();
+
+        let marks = |group: usize| -> Vec<(String, bool)> {
+            json["groups"][group]["accounts"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|a| {
+                    (
+                        a["label"].as_str().unwrap().to_string(),
+                        a["signedOut"].as_bool().unwrap(),
+                    )
+                })
+                .collect()
+        };
+        assert_eq!(
+            marks(0),
+            [
+                ("equipe-1".to_string(), true),
+                ("equipe-2".to_string(), false)
+            ]
+        );
+        assert_eq!(
+            marks(1),
+            [
+                ("conta1".to_string(), false),
+                ("equipe-1".to_string(), true)
+            ]
         );
     }
 }

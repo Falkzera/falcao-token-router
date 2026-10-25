@@ -66,8 +66,10 @@ pub fn check(app: &AppHandle) {
                 // botão não começa outra medição entre dois grupos.
                 state.set_measuring(Some(*group));
                 publish(&worker);
-                plan.run(&probe);
-                state.store().refresh_usage();
+                let summary = plan.run(&probe);
+                let mut store = state.store();
+                store.note_login_state(&summary);
+                store.refresh_usage();
             }
             state.set_measuring(None);
             publish(&worker);

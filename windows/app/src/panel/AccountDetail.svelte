@@ -30,6 +30,9 @@
     </button>
   </div>
 
+  {#if account.signedOut}
+    <p class="signed-out"><Icon name="warning" size={12} /><span>{t("panel.accounts.signedOut.help")}</span></p>
+  {/if}
   {#if usage}
     <Gauge title={t("panel.gauge.current")} reading={usage.fiveHour} session />
     <Gauge title={t("panel.gauge.weekly")} reading={usage.sevenDay} />
@@ -49,7 +52,7 @@
         {t("panel.account.probed.format", duration(ageSeconds(usage.model.sampledAt, clock.now)))}
       </span>
     {/if}
-  {:else}
+  {:else if !account.signedOut}
     <p class="ready">{t("panel.accounts.ready.help.probe")}</p>
   {/if}
   <button class="history" onclick={() => onHistory(account.id)}>
@@ -117,6 +120,18 @@
   .ready {
     font-size: var(--font-caption);
     color: var(--text-secondary);
+  }
+  .signed-out {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    margin: 0;
+    font-size: var(--font-caption);
+    color: var(--warning-text);
+  }
+  .signed-out :global(svg) {
+    flex: none;
+    margin-top: 2px;
   }
   .history {
     display: inline-flex;
