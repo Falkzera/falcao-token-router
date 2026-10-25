@@ -30,3 +30,6 @@
 - 21/10/2026: a sonda deixou de ser "nunca laço" no Windows — o app a roda de 5 em 5 horas por
   conta (para o histórico, pedido do usuário), com uma chave nos Ajustes. Nunca no laço de 3
   minutos. Toda medição, de onde vier, deixa um ponto no histórico.
+- 25/10/2026: código de saída diferente de zero só é "sem login" quando o stdout fala de login
+  (a regra do macOS desde 04/10); o resto é `Failed`. Com o selo de sem login, uma medição sem
+  rede marcava todas as contas. Código zero sem linha `Current` continua sendo "sem login".

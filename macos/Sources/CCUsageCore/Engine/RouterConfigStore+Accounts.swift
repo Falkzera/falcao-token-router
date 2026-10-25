@@ -190,7 +190,10 @@ extension RouterConfigStore {
 
     /// Passa o grupo cuja conta ativa acabou de ser removida para a primeira
     /// de `RotationEngine.successors` que aceitar a ativação — quem não pode
-    /// (sem credencial na casa, ativa noutro grupo) é pulada. Com a conta já
+    /// (sem credencial na casa, ativa noutro grupo) é pulada. A marcada sem
+    /// login também: a credencial da casa dela a sonda já viu morta, e passar o
+    /// grupo para ela derrubaria as sessões abertas que a removida ainda
+    /// atende. Sem ninguém, o item do grupo fica como está. Com a conta já
     /// fora do registro, o `activate` não espelha a que sai: a casa dela vai
     /// ser apagada. Se outra conta do registro já está no grupo (a CLI rodou a
     /// rotação no meio), fica a escolha dela.
@@ -198,7 +201,8 @@ extension RouterConfigStore {
         guard let group = config.groups.first(where: { $0.id == groupID }),
               engine.activeAccount(in: group, config: config) == nil
         else { return }
-        for candidate in engine.successors(for: group, config: config, usage: usageSnapshot) {
+        for candidate in engine.successors(for: group, config: config, usage: usageSnapshot)
+        where signedOut[candidate.id] == nil {
             if (try? engine.activate(candidate, in: group, config: config)) != nil { return }
         }
     }

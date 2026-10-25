@@ -49,7 +49,7 @@ impl RouterPaths {
     }
 
     /// O histórico das medições da sonda: `<base>\history` (ver
-    /// `usage_history` — só do Windows, fora do contrato com o macOS).
+    /// `usage_history` — o mesmo arquivo que o app macOS grava).
     pub fn history_dir(&self) -> PathBuf {
         UsageHistory::directory(&self.base)
     }

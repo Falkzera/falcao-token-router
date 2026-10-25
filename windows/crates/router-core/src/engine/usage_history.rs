@@ -1,6 +1,6 @@
 //! O histórico de uso de cada conta: um ponto por medição da SONDA, para a aba
-//! Histórico do app desenhar a janela de 5h e a semanal ao longo do tempo (só
-//! do Windows, 21/10/2026).
+//! Histórico do app desenhar a janela de 5h e a semanal ao longo do tempo
+//! (21/10/2026; o app macOS grava o mesmo arquivo desde o #36).
 //!
 //! Mora fora do `usage\` de propósito. Aquele arquivo é a ÚLTIMA amostra — o
 //! número que decide a rotação, regravado pelo sensor a cada render da status

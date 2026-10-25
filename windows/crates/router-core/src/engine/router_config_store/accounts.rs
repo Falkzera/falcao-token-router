@@ -189,7 +189,10 @@ impl RouterConfigStore {
 
     /// Passa o grupo cuja conta ativa acabou de ser removida para a primeira
     /// de `RotationEngine::successors` que aceitar a ativação — quem não pode
-    /// (sem credencial na casa, ativa noutro grupo) é pulada. Com a conta já
+    /// (sem credencial na casa, ativa noutro grupo) é pulada. A marcada sem
+    /// login também: a credencial da casa dela a sonda já viu morta, e passar o
+    /// grupo para ela derrubaria as sessões abertas que a removida ainda
+    /// atende. Sem ninguém, a cópia do grupo fica como está. Com a conta já
     /// fora do registro, o `activate` não espelha a que sai: a casa dela vai
     /// ser apagada. Se outro processo já pôs uma conta do registro no grupo
     /// (a rotação da CLI), fica a escolha dele.
@@ -208,6 +211,9 @@ impl RouterConfigStore {
             .engine
             .successors(&group, &self.config, &self.usage_snapshot)
         {
+            if self.signed_out.contains_key(&candidate.id) {
+                continue;
+            }
             if self
                 .engine
                 .activate(candidate, &group, &self.config)

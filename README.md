@@ -106,10 +106,11 @@ $ router measure trabalho
 
 It asks the official binary (`claude --print /usage`) — the same thing that
 happens when you type `/usage` yourself. Still no network call of our own, still
-no token read. It costs a Node cold start per account, so on macOS it is a button
-and a command, never a loop. The Windows app also runs it every 5 hours while it's
-open (a setting, on by default) and keeps each reading for its History tab. The
-passive sensor, which runs on every status-line update, remains the everyday source.
+no token read. It costs a Node cold start per account, so it never rides the
+rotation loop: besides the button and the command, the app runs it once per account
+every 5 hours while it's open (a setting, on by default) and keeps each reading for
+its History tab — on macOS and on Windows alike. The passive sensor, which runs on
+every status-line update, remains the everyday source.
 
 `router` is the command-line tool inside the app:
 `/Applications/FalcaoTokenRouter.app/Contents/MacOS/router` on macOS and
