@@ -295,4 +295,23 @@ public struct RotationEngine: Sendable {
         }
         return target.id == active?.id ? nil : target
     }
+
+    /// Quem pode assumir um grupo cuja conta ativa acabou de ser removida, na
+    /// ordem de tentar: primeiro as que a rotação escolheria (com folga, ou sem
+    /// medição — a regra do `nextAccount`), depois as demais, cada parte na
+    /// ordem de preferência.
+    ///
+    /// Diferente da rotação, "ninguém com folga" não é motivo para ficar: ficar
+    /// é o grupo seguir servido pela conta que o usuário acabou de remover —
+    /// fora da lista, sem casa e sem espelho. Uma conta acima do limiar ainda é
+    /// melhor que essa.
+    public func successors(for group: AccountGroup, config: RouterConfig,
+                           usage: [UUID: Double]) -> [Account] {
+        let threshold = group.thresholdPercent / 100
+        let accounts = config.accounts(in: group)
+        let hasRoom: (Account) -> Bool = { account in
+            usage[account.id].map { $0 < threshold } ?? true
+        }
+        return accounts.filter(hasRoom) + accounts.filter { !hasRoom($0) }
+    }
 }

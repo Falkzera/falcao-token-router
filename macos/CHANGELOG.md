@@ -41,6 +41,14 @@ All notable changes to this project are documented here. The format follows
   branch is read from `.git/HEAD`, without starting a process on every render.
   Found by the Windows port on its first real test, and ported from it, in
   [#16](https://github.com/Falkzera/falcao-token-router/pull/16).
+- **Removing the account in use hands the group to the next one.** Before, the
+  group kept being served by the removed account — off the list, its login gone
+  from the keychain but still alive in the group's item — and the window showed
+  the group with no account in use. Now the next account takes over right away
+  (the first in the preference order with room under the threshold, the same
+  rule as rotation), through the usual hot swap, so open sessions keep going on
+  it. If it was the group's only account, the group's item is left alone, so a
+  live session isn't cut off.
 
 ### Added
 

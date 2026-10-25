@@ -317,6 +317,26 @@ struct RotationDecisionTests {
                                            usage: [a.id: 0.99, b.id: 0.0])
         #expect(target == nil)
     }
+
+    /// Quem assume o grupo de uma conta removida: as com folga (ou sem medição)
+    /// primeiro, depois as estouradas — que ainda ganham da conta removida —,
+    /// cada parte na ordem de preferência.
+    @Test("sucessoras: com folga primeiro, depois as demais, na ordem")
+    func successorsOrder() {
+        let (engine, _, _, a, b) = fixture()
+        let c = Account(provider: .anthropic, identity: ident("c@k.com"),
+                        home: .dedicated("/Users/exemplo/.claude-c"))
+        let d = Account(provider: .anthropic, identity: ident("d@k.com"),
+                        home: .dedicated("/Users/exemplo/.claude-d"))
+        let group = AccountGroup(name: "g", accountIDs: [a.id, b.id, c.id, d.id],
+                                 configDir: .standard(home: "/Users/exemplo"),
+                                 thresholdPercent: 90)
+        let config = RouterConfig(accounts: [a, b, c, d], groups: [group])
+
+        let order = engine.successors(for: group, config: config,
+                                      usage: [a.id: 0.95, b.id: 0.10, c.id: 0.99])
+        #expect(order.map(\.id) == [b.id, d.id, a.id, c.id])
+    }
 }
 
 // MARK: - Configuração persistível
