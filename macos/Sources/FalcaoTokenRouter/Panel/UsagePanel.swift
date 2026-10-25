@@ -122,6 +122,18 @@ struct UsagePanel: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
+
+            // O atalho para o Histórico desta conta (21/10/2026): abre a janela
+            // na aba, já no cartão dela.
+            Button {
+                navigation.showHistory(of: account.id)
+                openWindow(id: HomeWindowID.value)
+                NSApp.activate()
+            } label: {
+                Label("panel.account.history", systemImage: "chart.xyaxis.line")
+                    .font(.caption2)
+            }
+            .buttonStyle(.link)
         }
         .padding(12)
         .glassEffect(.regular, in: .rect(cornerRadius: 16))

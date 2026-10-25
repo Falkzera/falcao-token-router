@@ -16,17 +16,25 @@ public enum StatusLineFormat {
     public static func resetWhen(_ date: Date, withDay: Bool,
                                  portuguese: Bool = Locale.current.language.languageCode?.identifier == "pt",
                                  calendar: Calendar = .current) -> String {
-        let parts = calendar.dateComponents([.weekday, .day, .hour, .minute], from: date)
+        let parts = calendar.dateComponents([.day, .hour, .minute], from: date)
         let hour = parts.hour ?? 0, minute = parts.minute ?? 0
         guard withDay else { return String(format: "%02d:%02d", hour, minute) }
 
         // Hora sem zero à esquerda no formato semanal, de propósito — é o que o
         // porte Windows imprime, e as duas plataformas escrevem igual.
+        let day = weekdayName(date, portuguese: portuguese, calendar: calendar)
+        return "\(day) (\(parts.day ?? 0)) \(hour):\(String(format: "%02d", minute))"
+    }
+
+    /// O dia da semana abreviado como a linha o escreve ("seg" / "Mon").
+    /// Público: as marcas de dia dos gráficos do Histórico (21/10/2026) usam os
+    /// mesmos nomes, e a tela não discorda da sessão.
+    public static func weekdayName(_ date: Date, portuguese: Bool,
+                                   calendar: Calendar = .current) -> String {
         let pt = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"]
         let en = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-        let names = portuguese ? pt : en
-        let weekday = (parts.weekday ?? 1) - 1          // Calendar: 1 = domingo
-        return "\(names[weekday % 7]) (\(parts.day ?? 0)) \(hour):\(String(format: "%02d", minute))"
+        let weekday = calendar.component(.weekday, from: date) - 1  // Calendar: 1 = domingo
+        return (portuguese ? pt : en)[weekday % 7]
     }
 
     /// "Opus 5 (1M context)" → "Opus 5": a janela já aparece no medidor de

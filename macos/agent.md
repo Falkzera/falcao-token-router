@@ -24,7 +24,7 @@ Esta pasta é autocontida: `Package.swift`, `VERSION`, `CHANGELOG.md` e
 - **`swift test` puro não funciona** sob Command Line Tools. Use `./Scripts/test.sh`, que injeta o plugin de macro e o `Testing.framework`. Está no `CONTRIBUTING.md`.
 - **Nunca escrever `@State`** — do SDK do macOS 26 em diante é macro do SwiftUI e o plugin só vem no Xcode. Use `@ViewState` (`Sources/FalcaoTokenRouter/ViewState.swift`).
 - **O `icon.sh` escreve fora desta pasta.** O banner e o card social são do produto, não da plataforma, e vão para `../docs/art` — ele usa `$REPO`, não `$ROOT`.
-- **O que esta pasta compartilha com `windows/` não é código, é o formato em disco:** `config.json`, as casas por conta e `usage/<email>.json`. Mudar esse formato é mudar as duas plataformas.
+- **O que esta pasta compartilha com `windows/` não é código, é o formato em disco:** `config.json`, as casas por conta, `usage/<email>.json` e — desde 21/10/2026 — `history/<email>.jsonl`. Mudar esse formato é mudar as duas plataformas.
 
 ## Decisões com data
 - **24/09/2026** — a pasta nasce. Antes, este projeto era a raiz do repositório e o `windows/` era hóspede; a estrutura contradizia a documentação, que trata portes como cidadãos de primeira classe. `CHANGELOG.md` e `VERSION` vieram junto, porque o Windows já tinha os dele.

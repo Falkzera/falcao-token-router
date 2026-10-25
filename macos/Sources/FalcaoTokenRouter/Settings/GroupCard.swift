@@ -6,6 +6,8 @@ struct GroupCard: View {
     let group: AccountGroup
     let onAddAccount: () -> Void
     let onRelogin: (Account) -> Void
+    /// O atalho de cada conta para o Histórico, já neste grupo (21/10/2026).
+    let onHistory: (Account) -> Void
 
     @ViewState private var editingName = false
     @ViewState private var draftName = ""
@@ -169,6 +171,7 @@ struct GroupCard: View {
                            sampledAt: store.usageSampledAt[account.id],
                            isMeasuring: store.measuringGroup != nil,
                            onSwitch: { store.activate(account, in: group) },
+                           onHistory: { onHistory(account) },
                            onRelogin: { onRelogin(account) },
                            onRemove: { pendingDelete = account })
             }

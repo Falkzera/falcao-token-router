@@ -38,6 +38,11 @@ struct LoginSheet: View {
         }
         .padding(24).frame(width: 380)
         .onAppear {
+            // Com um login aberto a agenda de 5 em 5 horas espera: a sonda
+            // poderia mexer na casa que está sendo relogada (21/10/2026). Na
+            // folha, e não em `GroupsView`: ela some também quando a janela
+            // fecha no meio do login, e a agenda não fica presa.
+            store.signingIn = true
             if pending.isRelogin { store.beginRelogin(pending.accountID) }
             let s = LoginSession(home: pending.home, accountID: pending.accountID,
                                  groupID: pending.groupID)
@@ -49,6 +54,7 @@ struct LoginSheet: View {
         }
         // Fechar a folha por qualquer caminho (Esc, o X) também descarta.
         .onDisappear {
+            store.signingIn = false
             discardUnfinishedHome()
             if pending.isRelogin { store.endRelogin(pending.accountID) }
         }

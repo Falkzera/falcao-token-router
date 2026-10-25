@@ -9,7 +9,7 @@ A CLI embutida no .app (`Contents/MacOS/router`) que o shell e a status line cha
   - `launch <grupo> -- <args>` — escolhe/ativa a conta (`SessionLauncher`), garante status line + ProfileSharing no perfil, e `execvp` o claude com `CLAUDE_CONFIG_DIR` (ou sem, no grupo padrão).
   - `is-group <nome>` — a função de shell pergunta antes de rotear.
   - `rotate` — uma volta de espelhamento + rotação (para agente periódico externo; o app tem laço próprio).
-  - `measure [grupo]` — a SONDA: mede as contas pelo binário oficial, inclusive o limite por modelo e o número das contas OCIOSAS (que o sensor nunca vê). Respeita `probeConfigDir`: conta ativa vai pelo perfil do grupo, nunca pela casa.
+  - `measure [grupo]` — a SONDA: mede as contas pelo binário oficial, inclusive o limite por modelo e o número das contas OCIOSAS (que o sensor nunca vê). Respeita `probeConfigDir`: conta ativa vai pelo perfil do grupo, nunca pela casa. Grava pelo `ProbeRecord`: a amostra e o ponto do histórico.
   - `doctor` — diagnóstico: config, `shell.sh` apontando para ESTE binário, `source` no `~/.zshrc`, sensor por perfil, conta ativa e idade da amostra, **as sessões vivas de cada grupo com o que cada uma está fazendo**, e conta ativa em dois grupos. Sai 1 se algo está torto.
 
 ## Padrões
@@ -25,6 +25,7 @@ A CLI embutida no .app (`Contents/MacOS/router`) que o shell e a status line cha
 - 2026-09-18: entra o `measure`. O sensor passivo só mede quem está servindo, e só 5h/7d; a sonda cobre as duas lacunas. É comando e não laço porque cada conta custa um processo Node subindo do zero (~3s) e uma requisição de verdade.
 
 - 2026-09-24: a linha do `statusline` virou a completa (#16) e passou a respeitar a escolha do usuário (#17), relida de `statusline.json` a cada render — o mesmo arquivo e formato do porte Windows. O desenho mora em `CCUsageCore/StatusLine`.
+- 2026-10-21: o `measure` passou a gravar pelo `ProbeRecord` (antes montava a amostra à mão, uma cópia da do store) — e por isso cada medição daqui também vira um ponto do histórico. Continua comando: a medição de 5 em 5 horas é do app.
 
 ## Pendências conhecidas
 - Nenhuma.

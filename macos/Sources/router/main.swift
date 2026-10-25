@@ -358,7 +358,8 @@ enum Doctor {
 /// que é o que estoura primeiro.
 ///
 /// Custa um processo Node por conta e uma requisição de verdade em cada uma,
-/// então é comando, não laço.
+/// então aqui é comando, não laço; a medição de 5 em 5 horas é do app
+/// (21/10/2026). Toda medição deixa um ponto no histórico, a desta CLI também.
 enum Measure {
     static func run(_ argv: [String]) -> Bool {
         guard let config = Launcher.loadConfig() else {
@@ -387,7 +388,7 @@ enum Measure {
             return true
         }
 
-        let dir = RouterPaths().usageDir
+        let paths = RouterPaths()
         var falhas = 0
         for conta in contas {
             // A regra que não pode ser quebrada: conta ativa é sondada pelo
@@ -395,15 +396,8 @@ enum Measure {
             let perfil = engine.probeConfigDir(for: conta, config: config)
             do {
                 let leitura = try probe.read(configDir: perfil)
-                let agora = Date()
-                let amostra = GroupUsageSample(
-                    configDirRaw: perfil.raw, email: conta.identity.email,
-                    fiveHourPercent: leitura.session, fiveHourResetsAt: leitura.sessionResetsAt,
-                    sevenDayPercent: leitura.weeklyAll, sevenDayResetsAt: leitura.weeklyAllResetsAt,
-                    sampledAt: agora,
-                    models: ModelUsage(windows: leitura.models, sampledAt: agora),
-                    origin: .probe)
-                try GroupUsageStore.write(amostra, forEmail: conta.identity.email, in: dir)
+                try ProbeRecord.write(leitura, email: conta.identity.email, configDir: perfil,
+                                      usageDir: paths.usageDir, historyDir: paths.historyDir)
                 print("  \(conta.label): \(descreve(leitura))")
             } catch ClaudeUsageProbe.ProbeError.notSignedIn {
                 print("  \(conta.label): sem login neste perfil — use Relogar no app")

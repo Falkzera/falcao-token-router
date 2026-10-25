@@ -20,8 +20,11 @@ import Foundation
 ///
 /// **Custo.** Cada sonda é um processo Node subindo do zero, alguns segundos, e
 /// uma requisição de verdade na conta. Por isso ela **não** entra no laço de
-/// rotação de 3 minutos: é sob demanda (`router measure`) ou em cadência baixa.
-/// O sensor passivo continua sendo a fonte de todo minuto.
+/// rotação de 3 minutos: é sob demanda (`router measure`, "Medir contas") ou em
+/// cadência baixa — desde 21/10/2026, de 5 em 5 horas por conta pela agenda do
+/// app (`MeasureSchedule`). Toda medição deixa um ponto no histórico
+/// (`ProbeRecord`, `UsageHistory`). O sensor passivo continua sendo a fonte de
+/// todo minuto.
 public struct ClaudeUsageProbe: Sendable {
     /// Uma janela por modelo, como o `/usage` a nomeia.
     public struct ModelWindow: Sendable, Equatable, Codable {

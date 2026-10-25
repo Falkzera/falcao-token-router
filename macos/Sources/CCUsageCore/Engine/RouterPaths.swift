@@ -56,4 +56,9 @@ public struct RouterPaths: Sendable {
         GroupUsageStore.directory(bundleID: RouterPaths.bundleID,
                                   base: base.deletingLastPathComponent())
     }
+
+    /// O histórico das medições da sonda (21/10/2026): `<base>/history`, um
+    /// `<e-mail>.jsonl` por conta. Mesmo formato do porte Windows — ver
+    /// `UsageHistory`.
+    public var historyDir: URL { UsageHistory.directory(base: base) }
 }

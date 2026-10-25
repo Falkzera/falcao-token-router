@@ -4,10 +4,10 @@
 O painel do menu bar: a tabela de contas por grupo, o detalhamento da conta selecionada (ou da sessão medida), o valor equivalente em API e o rodapé.
 
 ## Arquivos
-- `UsagePanel.swift` — a composição. `selectedAccount` mora aqui e desce como `Binding`: com seleção o cartão de baixo fala da CONTA, sem seleção fala da sessão do perfil medido.
+- `UsagePanel.swift` — a composição. `selectedAccount` mora aqui e desce como `Binding`: com seleção o cartão de baixo fala da CONTA, sem seleção fala da sessão do perfil medido. O cartão da conta termina em "Ver histórico", que abre a janela no Histórico dela (21/10/2026).
 - `AccountsSection.swift` — a tabela de contas. Define também `AccountHelp` (o tooltip da linha, compartilhado com Grupos), `ModelBadge`, `SessionsBadge` e `UsageAge` (limiares de 1h e 12h).
 - `WindowReading.swift` — uma janela do `rate_limits` numa linha: rótulo e valor. As DUAS aparecem sempre; a que manda se distingue por peso e cor, não por ser a única visível.
-- `UsageColor.swift` — o semáforo de consumo, definido uma vez. Painel e barra leem os mesmos limiares daqui: com limiares separados, um diria "tranquilo" enquanto o outro já alertava.
+- `UsageColor.swift` — o semáforo de consumo, definido uma vez. Painel e barra leem os mesmos limiares daqui: com limiares separados, um diria "tranquilo" enquanto o outro já alertava. Também a cor da linha dos gráficos do Histórico (`chartLine`, um tom por aparência).
 - `Formatters.swift` — formatação de duração, percentual e valor.
 
 ## Padrões

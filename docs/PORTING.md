@@ -111,8 +111,8 @@ every platform. The sessions registry is the detector.
 `%LOCALAPPDATA%\com.synqo.falcao-router` on Windows — a fixed name, deliberately
 not the app's bundle id (see the warning below). On Linux it would be
 `$XDG_DATA_HOME/com.synqo.falcao-router` (or `~/.local/share/…`). Everything
-under it — `config.json`, `accounts/`, `groups/`, `usage/`, `statusline.json`,
-`shell.sh` — is relative.
+under it — `config.json`, `accounts/`, `groups/`, `usage/`, `history/`,
+`statusline.json`, `shell.sh` — is relative.
 
 **Warning:** on macOS the keychain service name is a hash of the profile path,
 so moving the data directory orphans every credential. If your credential store
@@ -137,6 +137,11 @@ source and its age.** That's an invariant, not a style.
   credentials don't sync — but the format allows it).
 - `GroupUsageSample`, `GroupUsageStore`, `GroupUsageReader` — the sample
   format and the decision.
+- `UsageHistory`, `MeasureSchedule`, `UsageHistoryChart` — the history file
+  (`history/<email>.jsonl`, one line per probe measurement, kept 90 days), the
+  rule for when the app measures an account again (5 hours after the newest of
+  its last measurement and its last attempt), and what the History charts draw.
+  The macOS and Windows apps write the same file and read each other's.
 - `StatusLineChoice` — `statusline.json`, the items the user keeps on the line.
 - `RotationEngine` — the rules. Every line of it exists because its absence
   killed an account.
@@ -144,9 +149,10 @@ source and its age.** That's an invariant, not a style.
   time formats (Windows adds the comma) and the nearest-year rule.
 - `SessionRegistry.session(from:)` — the registry record decoder.
 - `ProviderEnv` — the environment scrub.
-- The tests. `EngineTests`, `StoreTests`, `ProbeTests`, `SessionRegistryTests`
-  run against in-memory fakes and don't touch the platform; `router-core`'s
-  suite does the same in Rust.
+- The tests. `EngineTests`, `StoreTests`, `ProbeTests`, `SessionRegistryTests`,
+  `UsageHistoryTests`, `MeasureScheduleTests` and `UsageHistoryChartTests` run
+  against in-memory fakes and temporary folders and don't touch the platform;
+  `router-core`'s suite does the same in Rust.
 
 ## What "done" looks like
 
