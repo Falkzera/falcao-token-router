@@ -1,4 +1,4 @@
-//! A medição automática de 5 em 5 horas (só do Windows, 21/10/2026): QUANDO
+//! A medição automática de 5 em 5 horas (21/10/2026; a mesma regra do macOS): QUANDO
 //! cada conta deve ser medida de novo. Puro — o relógio entra por parâmetro.
 //!
 //! A sonda era "botão e comando, nunca laço": cada medição sobe um `claude` e

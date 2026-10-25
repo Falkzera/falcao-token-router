@@ -246,7 +246,7 @@ threshold.
 | The app and `router.exe` | `%LOCALAPPDATA%\FalcaoTokenRouter` |
 | Groups, accounts, their profiles, the samples | `%LOCALAPPDATA%\com.synqo.falcao-router` — the same layout as the macOS app's `Application Support` folder |
 | The status line choice | `statusline.json` in that same folder — the macOS app reads the same items; running your own command is Windows-only for now |
-| The measurement history | `history\` in that same folder: one `<e-mail>.jsonl` per account, kept 90 days (Windows only); **Settings → History → Delete history…** empties it |
+| The measurement history | `history\` in that same folder: one `<e-mail>.jsonl` per account, kept 90 days (the same file the macOS app writes); **Settings → History → Delete history…** empties it |
 | The app's own settings, and its window's cache | `%APPDATA%\com.synqo.falcao-token-router`, and the same name under `%LOCALAPPDATA%` |
 | The terminal integration | one line in each `$PROFILE` and in `~/.bashrc`, pointing at `shell.ps1` / `shell.sh` in the router's folder |
 

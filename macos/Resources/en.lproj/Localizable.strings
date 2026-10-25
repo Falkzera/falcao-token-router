@@ -224,6 +224,9 @@
 "home.history.chart.threshold.format" = "switch at %@";
 "home.history.chart.empty" = "No points in this period.";
 "home.history.chart.label.format" = "%1$@ — latest %2$@";
+"home.history.chart.axis.when" = "when";
+"home.history.chart.axis.usage" = "usage";
+"home.history.chart.axis.segment" = "segment";
 "groups.account.history" = "This account's usage history";
 "panel.account.history" = "View history";
 "settings.section.history" = "History";

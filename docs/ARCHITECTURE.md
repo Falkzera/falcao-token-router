@@ -153,16 +153,17 @@ without it every poll launches whatever the user has configured. Telemetry is
 deliberately left on: the per-model line is behind a feature gate that
 `DISABLE_TELEMETRY` closes.
 
-It costs a Node cold start and a real request per account, so on macOS it's a
-button and a command (`router measure`), never a loop. The Windows app adds one
-schedule — each account again 5 hours after its last measurement, while the app
-runs, on by default — and keeps every reading in `history/<email>.jsonl` for a
-History tab; that file is Windows-only, outside the shared contract.
+It costs a Node cold start and a real request per account, so it never rides the
+rotation loop. Besides the button and `router measure`, both apps add one schedule
+— each account again 5 hours after its last measurement, while the app runs, on by
+default — and keep every reading in `history/<email>.jsonl` for a History tab. That
+file is part of the shared contract: both apps write the same lines and read each
+other's.
 
 **An active account is probed through its group profile, never its home**
 (`probeConfigDir`): probing the home would renew with the stale refresh token and
-rotate the chain out from under the live session. The Windows schedule follows the
-same rule.
+rotate the chain out from under the live session. The schedule follows the same
+rule, and decides each account's profile right before probing it.
 
 ### Provenance
 

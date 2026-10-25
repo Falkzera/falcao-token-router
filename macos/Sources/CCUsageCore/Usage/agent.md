@@ -32,6 +32,7 @@ Nenhuma das duas fala com `api.anthropic.com`. Quem faz requisição é o client
 - 2026-09-18: o ano do reset não é impresso e é **escolhido**: o candidato mais próximo de `now` entre ano passado, este e o que vem. Qualquer outra regra erra a virada do ano numa das direções.
 
 - 2026-10-21: a sonda deixou de ser só "botão e comando": com o app aberto ela roda **de 5 em 5 horas por conta** (`Engine/MeasureSchedule.swift`), para a aba Histórico — umas 5 medições por conta por dia, com uma chave nos Ajustes que a desliga. Nunca no laço de 3 minutos. A montagem da amostra, que o store e a CLI faziam cada um à mão, foi para o `ProbeRecord`.
+- 2026-10-25: saída de código zero sem nenhuma linha `Current` é "sem login" (`ClaudeUsageProbe.interpret`), a regra do Windows. O `claude` deslogado sai com 0 e só o resumo do `--print`; antes isso caía em `unrecognized`, e a conta nunca ganhava o selo de sem login. Formato novo é só quando há linha `Current` e ela não se lê.
 
 ## Pendências conhecidas
 - A sonda mede uma conta por vez, em série. Cinco contas levam ~15s. Paralelizar é possível, mas cada uma sobe um Node — vale medir a pressão antes.

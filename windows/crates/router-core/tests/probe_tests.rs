@@ -168,17 +168,31 @@ fn a_logged_out_profile_is_not_signed_in_even_with_exit_code_zero() {
     );
 }
 
-/// Código diferente de zero continua sendo "sem login" (o do macOS).
+/// Código diferente de zero que fala de login é "sem login".
 #[test]
-fn a_nonzero_exit_code_is_not_signed_in() {
+fn a_nonzero_exit_code_that_speaks_of_login_is_not_signed_in() {
     let out = ProbeOutput {
         exit_code: Some(1),
-        stdout: String::new(),
+        stdout: "Invalid API key \u{b7} Please run /login\r\n".to_string(),
     };
     assert_eq!(
         ClaudeUsageProbe::interpret(&out, agora()),
         Err(ProbeError::NotSignedIn)
     );
+}
+
+/// Sem falar de login é falha, não "sem login": uma medição sem rede marcava
+/// todas as contas como deslogadas (a regra do macOS desde 10/2026).
+#[test]
+fn a_nonzero_exit_code_without_login_text_is_a_failure() {
+    let out = ProbeOutput {
+        exit_code: Some(1),
+        stdout: "API Error: Connection error.\r\n".to_string(),
+    };
+    assert!(matches!(
+        ClaudeUsageProbe::interpret(&out, agora()),
+        Err(ProbeError::Failed(_))
+    ));
 }
 
 /// Há linha `Current`, mas ela não se lê: aí sim é formato novo — o sinal de

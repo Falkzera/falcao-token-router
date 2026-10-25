@@ -329,6 +329,25 @@ struct ProbeOutcomeTests {
         }
     }
 
+    /// Deslogado, o `claude` sai com 0 e só o resumo do `--print` — o que o
+    /// porte Windows gravou do 2.1.280, e o JavaScript é o mesmo. Sem esta
+    /// regra a saída caía em "formato novo", e a conta nunca ganhava o selo.
+    @Test("saída sem nenhuma linha Current é \"sem login\"")
+    func noCurrentLineIsNotSignedIn() {
+        let deslogado = "Total cost:            $0.0000\nTotal duration (API):  0s\n"
+            + "Total duration (wall): 0s\nTotal code changes:    0 lines added, 0 lines removed\n"
+        #expect(throws: ClaudeUsageProbe.ProbeError.notSignedIn) {
+            _ = try ClaudeUsageProbe.interpret(deslogado, now: Date())
+        }
+    }
+
+    @Test("linha Current que não se lê continua sendo formato novo")
+    func unreadableCurrentLineIsUnrecognized() {
+        #expect(throws: ClaudeUsageProbe.ProbeError.unrecognized) {
+            _ = try ClaudeUsageProbe.interpret("Current session: muito usado\n", now: Date())
+        }
+    }
+
     @Test("TERM é o prazo; outro sinal é crash")
     func signals() {
         #expect(throws: ClaudeUsageProbe.ProbeError.timedOut) {

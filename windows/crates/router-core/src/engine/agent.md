@@ -15,7 +15,7 @@ Modelos, formato da amostra, leitor de uso, credencial, rotação e o store. Sem
   limpeza do e-mail no nome do arquivo (o histórico usa a mesma).
 - `group_usage_reader.rs` — `GroupUsageReader`/`AccountUsage`: maior janela válida, empate
   vai para a de horizonte mais longo (`max_by` = último dos empatados, igual `max(by:<=)`).
-- `usage_history.rs` — `UsageHistoryPoint`/`UsageHistory` (21/10/2026, só do Windows): um ponto
+- `usage_history.rs` — `UsageHistoryPoint`/`UsageHistory` (21/10/2026; o mesmo arquivo do macOS): um ponto
   por medição da SONDA em `<base>\history\<email>.jsonl` — o vocabulário da amostra, janela
   ausente fica ausente (nunca zero), as por modelo vão junto. `append` relê (linha ilegível é
   pulada), poda o que passou de 90 dias, ordena e regrava atômico; `read`/`last_sampled_at`;
@@ -176,3 +176,6 @@ Modelos, formato da amostra, leitor de uso, credencial, rotação e o store. Sem
 - 25/10/2026: a medição de 5 em 5 horas também marca e desmarca (`note_login_state`), sem o
   aviso vermelho, que é da última ação do usuário. Sem o campo `usage_sampled_at` (saiu em
   04/10), o `refresh_usage` lê a data das amostras só quando há alguma conta marcada.
+- 25/10/2026: o `hand_over` pula a conta marcada sem login. A credencial da casa dela a sonda
+  já viu morta, e sem amostra ela vinha primeiro na fila: passar o grupo para ela derrubava as
+  sessões que a conta removida ainda atendia.
