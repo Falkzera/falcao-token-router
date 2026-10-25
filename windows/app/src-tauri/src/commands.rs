@@ -111,6 +111,10 @@ pub fn clear_default(app: AppHandle) -> Snapshot {
 
 /// "Usar": troca manual da conta que serve o grupo. Falha vira o erro do
 /// quadro (com o motivo como fato).
+///
+/// Durante "Medir contas" não troca: a medição decide por qual perfil sondar
+/// cada conta, e ativar uma delas no meio a faria sondar a casa de uma conta
+/// ativa. O quadro volta como está; a medição leva segundos.
 #[tauri::command]
 pub fn activate_account(
     app: AppHandle,
@@ -118,6 +122,9 @@ pub fn activate_account(
     group_id: String,
 ) -> Result<Snapshot, String> {
     let (account, group) = (id(&account_id)?, id(&group_id)?);
+    if app.state::<AppState>().measuring().is_some() {
+        return Ok(publish(&app));
+    }
     Ok(mutate(&app, |store| {
         let found = (
             store.config().account(account).cloned(),
@@ -156,7 +163,8 @@ pub fn foreign_default_login(state: State<'_, AppState>) -> Option<String> {
 
 /// "Medir contas": a sonda roda numa thread, fora da trava do store (segundos
 /// por conta), e o quadro é republicado ao começar (spinner) e ao terminar.
-/// Uma medição por vez.
+/// Uma medição por vez — a agenda de 5 em 5 horas usa a mesma marca
+/// (`try_start_measuring`), e um clique durante ela só devolve o quadro.
 #[tauri::command]
 pub fn measure_group(app: AppHandle, group_id: String) -> Result<Snapshot, String> {
     let group = id(&group_id)?;
@@ -174,7 +182,9 @@ pub fn measure_group(app: AppHandle, group_id: String) -> Result<Snapshot, Strin
     let Some(claude) = ClaudeBinary::locate() else {
         return Ok(mutate(&app, RouterConfigStore::measure_unavailable));
     };
-    state.set_measuring(Some(group));
+    if !state.try_start_measuring(group) {
+        return Ok(publish(&app));
+    }
     let started = publish(&app);
     let worker = app.clone();
     thread::spawn(move || {

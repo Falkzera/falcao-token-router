@@ -81,15 +81,38 @@ struct StatusLineViewTests {
         #expect(opus.render(.init(trueColor: false, portuguese: false, phase: 0)).contains("\u{1b}[94m"))
     }
 
-    @Test("a cor da janela segue a severidade: <70 verde, <90 amarelo, senão vermelho")
+    /// A mesma régua do painel e da bandeja (`UsageColor`): até 10/2026 a linha
+    /// usava 0,70, e uma conta a 68% saía amarela no painel e verde no terminal.
+    @Test("a cor da janela segue a régua do painel: <66 verde, <90 amarelo, senão vermelho")
     func severidade() {
         func cor(_ f: Double) -> String {
             StatusLineView(fiveHour: .init(fraction: f, resetsAt: nil))
                 .render(.init(trueColor: false, portuguese: false, phase: 0))
         }
-        #expect(cor(0.69).contains("\u{1b}[32m"))
-        #expect(cor(0.70).contains("\u{1b}[33m"))
+        #expect(cor(0.65).contains("\u{1b}[32m"))
+        #expect(cor(0.66).contains("\u{1b}[33m"))
+        #expect(cor(0.68).contains("\u{1b}[33m"))
         #expect(cor(0.90).contains("\u{1b}[31m"))
+    }
+
+    /// O git grava o `gitdir:` do worktree com caminho absoluto; concatenado ao
+    /// do worktree, o HEAD não era achado e a linha mostrava o branch do
+    /// repositório principal.
+    @Test("num worktree, o branch é o do worktree, não o do repositório principal")
+    func worktreeBranch() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "wt-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let fm = FileManager.default
+        let mainGit = root.appending(path: "repo/.git")
+        let worktreeGit = mainGit.appending(path: "worktrees/x")
+        let worktree = root.appending(path: "repo/.claude/worktrees/x")
+        try fm.createDirectory(at: worktreeGit, withIntermediateDirectories: true)
+        try fm.createDirectory(at: worktree, withIntermediateDirectories: true)
+        try Data("ref: refs/heads/main\n".utf8).write(to: mainGit.appending(path: "HEAD"))
+        try Data("ref: refs/heads/feat/x\n".utf8).write(to: worktreeGit.appending(path: "HEAD"))
+        try Data("gitdir: \(worktreeGit.path)\n".utf8).write(to: worktree.appending(path: ".git"))
+
+        #expect(StatusLineSource.gitBranch(at: worktree.path) == "feat/x")
     }
 
     @Test("a cor do grupo vem da posição na lista, e dá a volta")

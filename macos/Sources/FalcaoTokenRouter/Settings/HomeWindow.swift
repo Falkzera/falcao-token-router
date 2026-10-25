@@ -3,10 +3,20 @@ import Observation
 import SwiftUI
 import CCUsageCore
 
-/// As duas metades do app fora do painel: o rodízio (o produto) e o medidor.
+/// O app fora do painel: o rodízio (o produto), o histórico de uso de cada
+/// conta (21/10/2026) e o medidor.
 enum HomeTab: Hashable {
     case groups
+    case history
     case meter
+}
+
+/// O atalho de uma conta: qual mostrar no Histórico — no grupo do clique, se
+/// veio de um. `seq` muda a cada clique, para o mesmo atalho rolar de novo.
+struct HistoryFocus: Equatable {
+    let accountID: UUID
+    let groupID: UUID?
+    let seq: Int
 }
 
 /// Qual aba a janela mostra.
@@ -18,6 +28,16 @@ enum HomeTab: Hashable {
 @Observable
 final class HomeNavigation {
     var tab: HomeTab = .groups
+    /// A conta que o Histórico deve mostrar ao abrir; a aba a consome.
+    var historyFocus: HistoryFocus?
+
+    /// Abre o Histórico já numa conta: o atalho da linha da conta (Grupos) e
+    /// do cartão da conta no painel.
+    func showHistory(of accountID: UUID, in groupID: UUID? = nil) {
+        historyFocus = HistoryFocus(accountID: accountID, groupID: groupID,
+                                    seq: (historyFocus?.seq ?? 0) + 1)
+        tab = .history
+    }
 }
 
 /// A janela única do app: rodízio e ajustes do medidor em abas.
@@ -44,9 +64,13 @@ struct HomeWindow: View {
 
     var body: some View {
         TabView(selection: $navigation.tab) {
-            GroupsView(store: router)
+            GroupsView(store: router, navigation: navigation)
                 .tabItem { Label("home.tab.groups", systemImage: "rectangle.stack") }
                 .tag(HomeTab.groups)
+
+            HistoryView(store: router, settings: settings, navigation: navigation)
+                .tabItem { Label("home.tab.history", systemImage: "chart.xyaxis.line") }
+                .tag(HomeTab.history)
 
             SettingsView(settings: settings, router: router, form: form, loginItem: loginItem,
                          alerts: alerts, calibratedCeiling: calibratedCeiling)

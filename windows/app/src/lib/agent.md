@@ -4,10 +4,12 @@
 - `api.ts` — as chamadas ao backend (`app_info`, `get_snapshot`, `fit_flyout`, `open_home`,
   `quit_app`, as ações de grupos e contas, a integração de terminal — `terminal_report`,
   `install_integration`, `allow_profiles_for` — e os ajustes — `get_settings`, `set_autostart`,
-  `set_show_in_taskbar`, `set_hidden_summary`, `open_url` —, a status line — `get_status_line`, `set_status_line`,
+  `set_show_in_taskbar`, `set_hidden_summary`, `open_url` —, o histórico — `get_history`,
+  `set_scheduled_measure`, `clear_history` —, a status line — `get_status_line`, `set_status_line`,
   `test_status_line` —, o login — `start_login`, `start_relogin`,
   `current_login`, `login_submit_code`, `login_retry`, `login_recheck`, `login_close`) e os
-  eventos (`navigate`, `snapshot-changed`, `login-changed`). Dentro do
+  eventos (`navigate` — `{tab, account}`: a conta é a do atalho do Histórico —,
+  `snapshot-changed`, `login-changed`). `openHome(aba, conta?)`. Dentro do
   Tauri, `invoke`/`listen`; no navegador, o backend simulado. `currentView()` pelo rótulo da
   janela (ou `?view=`); `initialSelection()` abre o cartão de uma conta só no navegador
   (`?select=`).
@@ -22,7 +24,23 @@
   navegador, e a escolha gravada volta normalizada como no Rust) e o login
   (`&login=ok|codigo|duplicada|errada|recusado|encerrado|timeout|semclaude`, com as fases no
   tempo e a revisão crescente). Dados só de exemplo (`@exemplo.com`, Acme, `C:\Users\exemplo`).
-- `types.ts` — espelho dos `#[derive(Serialize)]` do Rust (camelCase), inclusive o `Snapshot`.
+  A aba pela URL inclui `&tab=history`, e `&conta=<id>` abre o Histórico já nessa conta (como o
+  atalho do painel); o histórico vem do `mock-history.ts`. "Apagar o histórico…" deixa o
+  histórico simulado vazio daí em diante (`&apagar=falha` faz a gravação falhar).
+- `mock-history.ts` — o `get_history` do backend simulado (21/10/2026): 4 semanas de pontos de 5
+  em 5 horas para cada conta do quadro, estáveis por conta e por bloco de 5 h (nada sorteado:
+  a releitura não muda o gráfico); a 5h alta no horário de trabalho e sem janela de madrugada,
+  a semanal subindo até o reset de segunda 9:00. Séries montadas como no Rust (recorte, buracos
+  de mais de 7h30, marcas). Cenários `&historico=cheio|vazio|lacuna|desligado`.
+- `LineChart.svelte` — o gráfico de linha do Histórico (21/10/2026), SVG à mão: eixo vertical
+  FIXO de 0 a 100%, marcas de tempo vindas do backend, o limiar tracejado com rótulo, linha de
+  2 px na cor `--chart-line` (validada contra as duas superfícies), bolinha só no último ponto,
+  no ponto isolado e no escolhido; a dica segue o ponteiro até o ponto mais perto no tempo (lado
+  com mais espaço) e o teclado (foco: o último; ←/→, Home/End, Esc); `aria-live` e uma tabela
+  escondida com todos os pontos para leitor de tela. Grupo focável com `svelte-ignore` (vírgula
+  entre os códigos — o Svelte 5 ignora o resto depois de um espaço).
+- `types.ts` — espelho dos `#[derive(Serialize)]` do Rust (camelCase), inclusive o `Snapshot` e o
+  `HistoryView`.
 - `i18n.ts` — `t(chave, …args)`, `format` (`%@`, `%d`, `%1$@`, `%%`, como no macOS),
   `setLocale` (uma vez, na subida).
 - `format.ts` — duração ("1h 12m"), quanto falta com dias (`untilText`: "4d 13h" a partir de um
@@ -33,7 +51,7 @@
   relógio).
 - `clock.svelte.ts` — o relógio da tela, andando a cada 30 s (idades não congelam na tela aberta).
 - `Icon.svelte` — os ícones do app em SVG (grupos, ajustes, fechar, relógio, sensor, sonda,
-  terminal, copiar, ✓, lápis, +, aviso, informação).
+  terminal, copiar, ✓, lápis, +, aviso, informação, gráfico — o atalho do Histórico).
 - `Modal.svelte` — o `<dialog>` nativo (`showModal`): foco preso, Esc fecha, clicar fora NÃO fecha
   (confirmação destrutiva não pode sumir por clique errado).
 - `Menu.svelte` — o menu ⋯ (fecha ao escolher, ao clicar fora e no Esc; itens destrutivos em

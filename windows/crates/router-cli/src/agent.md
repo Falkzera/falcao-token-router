@@ -20,7 +20,9 @@ desconhecido sai com 2.
 - `launch.rs` — `launch` (aceita `<g> -- args` e `<g> args`; ativa sob a trava; planta o sensor;
   liga o compartilhamento; ambiente direto; sobe o `claude` como FILHO ignorando Ctrl+C no router
   e repassa o código de saída), `is-group` (mudo, só o código) e `rotate` (mudo).
-- `measure.rs` — a sonda por conta (ativa pelo perfil do grupo), saída igual à do macOS.
+- `measure.rs` — a sonda por conta (ativa pelo perfil do grupo), saída igual à do macOS. Desde
+  21/10/2026 cada medição também deixa um ponto no histórico (pelo `measure_into` do núcleo); a
+  medição de 5 em 5 horas é do app, não da CLI.
 - `doctor/` — as checagens do macOS + as do Windows, uma família por arquivo: `mod.rs` (o
   `Report` e a ordem em que tudo corre, único lugar que decide o código de saída),
   `terminal.rs` (scripts, os dois `$PROFILE`, `.bashrc`, política de execução),

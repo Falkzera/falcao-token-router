@@ -23,6 +23,7 @@
     onSnapshot,
     onAddAccount,
     onRelogin,
+    onHistory,
   }: {
     group: GroupView;
     /** O comando só funciona com a integração de pé — o aviso leva até ela. */
@@ -33,6 +34,8 @@
     onSnapshot: (snapshot: Snapshot) => void;
     onAddAccount: () => void;
     onRelogin: (account: AccountView) => void;
+    /** O atalho de cada conta: a aba Histórico já nela. */
+    onHistory: (account: AccountView) => void;
   } = $props();
 
   // MARK: renomear
@@ -132,6 +135,10 @@
     | { kind: "deleteGroup" }
     | { kind: "makeDefault"; foreign: string | null };
   let pending = $state<Pending | null>(null);
+  // Em uso e com outra no grupo: ao sair, o grupo passa para a próxima (o motor
+  // escolhe qual) — a confirmação diz isso, e não "continuam até o token vencer".
+  const handsOver = (account: AccountView) =>
+    account.id === group.activeAccountId && group.accounts.length > 1;
 
   async function askMakeDefault() {
     pending = { kind: "makeDefault", foreign: await api.foreignDefaultLogin() };
@@ -250,6 +257,7 @@
           first={index === 0}
           last={index === ordered.length - 1}
           onUse={async () => onSnapshot(await api.activateAccount(account.id, group.id))}
+          onHistory={() => onHistory(account)}
           onRelogin={() => onRelogin(account)}
           onRemove={() => (pending = { kind: "removeAccount", account })}
           onMove={(delta) => move(account.id, delta)}
@@ -284,7 +292,9 @@
 {#if pending?.kind === "removeAccount"}
   <ConfirmDialog
     title={t("groups.account.delete.title")}
-    message={t("groups.account.delete.message.format", pending.account.label)}
+    message={handsOver(pending.account)
+      ? t("groups.account.delete.messageActive.format", pending.account.label)
+      : t("groups.account.delete.message.format", pending.account.label)}
     confirm={t("groups.account.delete.confirm")}
     onConfirm={confirmPending}
     onCancel={() => (pending = null)}

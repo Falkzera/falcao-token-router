@@ -42,9 +42,27 @@ public final class RouterConfigStore {
     public private(set) var signedOut: [UUID: Date] = [:]
     /// Última falha de uma ação, para a UI mostrar. `nil` quando tudo correu bem.
     public private(set) var lastError: String?
+    /// Contas com relogin em andamento. A rotação não espelha a ativa delas
+    /// enquanto isso: o relogin grava a credencial NOVA na casa, e o espelho
+    /// (grupo → casa) escreveria por cima a MORTA que motivou o relogin — que o
+    /// fim do relogin empurraria de volta para o grupo (issue #12).
+    @ObservationIgnored private var reloginInFlight: Set<UUID> = []
     /// O grupo que está sendo sondado agora, ou `nil`. Observável porque a
     /// sondagem leva segundos — sem indicação, o clique parece não fazer nada.
-    public private(set) var measuringGroup: UUID?
+    /// A agenda de 5 em 5 horas (`RouterConfigStore+History.swift`) usa a mesma
+    /// marca, e por isso o `set` é do módulo, não do arquivo.
+    public internal(set) var measuringGroup: UUID?
+    /// O histórico de cada conta (conta → pontos), o que a aba Histórico
+    /// desenha (21/10/2026). Observável e em memória, relido no `refreshUsage`:
+    /// uma computada que lesse o disco não re-renderizaria a tela.
+    public internal(set) var historyByAccount: [UUID: [UsageHistoryPoint]] = [:]
+    /// A última tentativa da medição automática em cada conta, nesta execução
+    /// do app — o que segura uma conta deslogada (ver `MeasureSchedule`).
+    @ObservationIgnored public internal(set) var measureAttempts: [UUID: Date] = [:]
+    /// Um login (ou relogin) está aberto na tela: a agenda espera. A sonda
+    /// poderia mexer na casa que está sendo relogada. Quem liga e desliga é a
+    /// `LoginSheet`, do aparecer ao sumir.
+    @ObservationIgnored public var signingIn = false
     /// Espelho OBSERVÁVEL de `shellIntegrationInstalled`: aquele é computado
     /// lendo o disco, e computado não dispara re-render — o clique em "Ativar"
     /// funcionava e a tela ficava parada, parecendo botão morto.
@@ -58,8 +76,18 @@ public final class RouterConfigStore {
     /// status line apontam. Setado pelo app ao iniciar; `nil` fora do app.
     @ObservationIgnored public var routerPath: String?
 
-    @ObservationIgnored private let paths: RouterPaths
-    @ObservationIgnored private let engine: RotationEngine
+    /// `true` só quando o `config.json` existia e foi lido inteiro. É a trava
+    /// das limpezas que apagam o que o registro não cita: com o registro vazio
+    /// por falha de leitura, tudo pareceria órfão.
+    @ObservationIgnored private var configLoadedFromDisk = false
+    /// Um `config.json` que não pôde ser lido NEM guardado de lado nunca é
+    /// sobrescrito — ver `init`.
+    @ObservationIgnored private var refuseToSave = false
+
+    // Do módulo, e não do arquivo: o histórico e a agenda moram numa extensão
+    // em outro arquivo (`RouterConfigStore+History.swift`, régua das 600 linhas).
+    @ObservationIgnored let paths: RouterPaths
+    @ObservationIgnored let engine: RotationEngine
     @ObservationIgnored private let keychain: any KeychainStore
     @ObservationIgnored private let login: AccountLoginService
     @ObservationIgnored private let usage: GroupUsageReader
@@ -72,7 +100,32 @@ public final class RouterConfigStore {
         self.engine = RotationEngine(keychain: keychain, adapters: adapters)
         self.login = AccountLoginService(adapter: adapters.first ?? AnthropicAdapter(), paths: paths)
         self.usage = GroupUsageReader(usageDir: paths.usageDir)
-        self.config = Self.load(from: paths.configFile) ?? RouterConfig()
+        // Um `config.json` que existe e não decodifica (edição à mão, uma versão
+        // mais nova que gravou um campo que esta não conhece) virava registro
+        // vazio, sem aviso, e o primeiro `save` gravava por cima: grupos e
+        // contas sumiam do registro, com casas e itens de chaveiro órfãos.
+        // Agora ele vai para o lado com data, e a tela diz onde está.
+        var loaded = RouterConfig()
+        var problem: String?
+        switch Self.load(from: paths.configFile) {
+        case .missing:
+            break
+        case .loaded(let config):
+            loaded = config
+            self.configLoadedFromDisk = true
+        case .unreadable:
+            let stamp = ISO8601DateFormatter().string(from: Date())
+                .replacingOccurrences(of: ":", with: "-")
+            let aside = paths.base.appending(path: "config.unreadable-\(stamp).json")
+            if (try? FileManager.default.moveItem(at: paths.configFile, to: aside)) != nil {
+                problem = "o config.json não pôde ser lido e foi guardado como \(aside.lastPathComponent) — os grupos começam vazios"
+            } else {
+                self.refuseToSave = true
+                problem = "o config.json não pôde ser lido; nada será gravado por cima dele"
+            }
+        }
+        self.config = loaded
+        self.lastError = problem
         self.integrationInstalled = shellIntegrationInstalled
         self.statusLineChoice = StatusLineChoice.load(from: StatusLineChoice.fileURL(base: paths.base))
         // Publica o quadro completo aqui, e não só no primeiro laço.
@@ -89,12 +142,18 @@ public final class RouterConfigStore {
 
     // MARK: - Persistência
 
-    private static func load(from url: URL) -> RouterConfig? {
-        guard let data = try? Data(contentsOf: url) else { return nil }
-        return try? JSONDecoder().decode(RouterConfig.self, from: data)
+    private enum Loaded { case missing, loaded(RouterConfig), unreadable }
+
+    private static func load(from url: URL) -> Loaded {
+        guard FileManager.default.fileExists(atPath: url.path) else { return .missing }
+        guard let data = try? Data(contentsOf: url),
+              let config = try? JSONDecoder().decode(RouterConfig.self, from: data)
+        else { return .unreadable }
+        return .loaded(config)
     }
 
     private func save() {
+        guard !refuseToSave else { return }
         do {
             try FileManager.default.createDirectory(
                 at: paths.base, withIntermediateDirectories: true)
@@ -157,24 +216,39 @@ public final class RouterConfigStore {
     }
 
     public func removeGroup(_ id: UUID) {
+        guard let group = config.groups.first(where: { $0.id == id }) else { return }
+        // A casa da ativa recebe o token vivo ANTES de o grupo sumir — uma conta
+        // que outro grupo mantém continua com a cadeia em dia.
+        engine.mirrorActive(in: group, config: config)
         // Leva junto as contas que só existiam neste grupo: órfãs não aparecem
         // em tela nenhuma e ficariam ocupando a config para sempre. A credencial
         // de cada uma sai junto — ver `removeAccount`.
-        let exclusive = Set(config.groups.first { $0.id == id }?.accountIDs ?? [])
+        let exclusive = Set(group.accountIDs)
             .subtracting(config.groups.filter { $0.id != id }.flatMap(\.accountIDs))
         config.groups.removeAll { $0.id == id }
         // Pelo mesmo caminho da remoção avulsa, para a credencial sair junto.
         for accountID in exclusive { removeAccount(accountID) }
         save()
+        // O item do grupo e a pasta do perfil dedicado saem também: sem o
+        // grupo, ninguém mais os sobrescreve, e o item guardava um refresh
+        // token vivo para sempre. Com sessão viva lá, ficam — derrubar o
+        // trabalho de alguém não é consequência aceitável de arrumar a lista.
+        // O `~/.claude` nunca (o login dele é do `claude` puro).
+        if !group.configDir.isDefault,
+           SessionRegistry.liveSessions(in: group.configDir).isEmpty {
+            engine.resetProfile(group.configDir, provider: group.provider)
+            try? FileManager.default.removeItem(at: group.configDir.url)
+        }
     }
 
     /// Tira o status de padrão de todos os grupos: nenhum passa a usar o
     /// `~/.claude`, cada um fica no seu perfil dedicado. Isto protege sessões que
-    /// já rodam no `~/.claude` (o `claude` puro) — o router deixa de tocar lá.
+    /// já rodam no `~/.claude` (o `claude` puro) — o router deixa de tocar lá, e
+    /// a conta que estava lá fica fora da rotação enquanto o `~/.claude` for
+    /// dela (ver `RotationEngine.whereElseLive`).
     public func clearDefault() {
         for i in config.groups.indices where config.groups[i].configDir.isDefault {
-            config.groups[i].configDir = paths.groupConfigDir(
-                config.groups[i].id, isDefault: false)
+            moveGroup(at: i, toDefault: false)
         }
         save()
     }
@@ -186,11 +260,33 @@ public final class RouterConfigStore {
             let wasDefault = config.groups[i].configDir.isDefault
             let shouldBeDefault = config.groups[i].id == id
             if wasDefault != shouldBeDefault {
-                config.groups[i].configDir = paths.groupConfigDir(
-                    config.groups[i].id, isDefault: shouldBeDefault)
+                moveGroup(at: i, toDefault: shouldBeDefault)
             }
         }
         save()
+    }
+
+    /// Troca o perfil de um grupo sem deixar uma conta viva em dois lugares.
+    ///
+    /// Até 10/2026 trocar o padrão só mudava o caminho, e a rotação, na volta
+    /// seguinte, ativava no perfil novo a mesma conta que continuava viva no
+    /// antigo — duas cópias de um refresh token que gira. E o perfil dedicado de
+    /// um grupo é sempre o mesmo caminho: voltando a ele, a identidade velha que
+    /// ficou lá fazia o espelho gravar uma cadeia morta na casa da conta.
+    ///
+    /// Então: espelha a conta ativa (a casa fica com o token vivo); esvazia o
+    /// perfil dedicado de destino (nada velho entra) e o dedicado que fica para
+    /// trás (nada vivo sobra). O preço, deliberado: uma sessão que ainda rode
+    /// no dedicado que ficou para trás perde a credencial na próxima
+    /// requisição — melhor que uma conta morta em silêncio. O `~/.claude` nunca
+    /// é esvaziado: o login dele é do `claude` puro.
+    private func moveGroup(at i: Int, toDefault: Bool) {
+        let group = config.groups[i]
+        engine.mirrorActive(in: group, config: config)
+        let target = paths.groupConfigDir(group.id, isDefault: toDefault)
+        engine.resetProfile(target, provider: group.provider)
+        engine.resetProfile(group.configDir, provider: group.provider)
+        config.groups[i].configDir = target
     }
 
     // MARK: - Contas
@@ -205,9 +301,44 @@ public final class RouterConfigStore {
         return (home, id)
     }
 
-    /// Caminho do perfil onde uma conta deve logar — para o app apontar o
-    /// `CLAUDE_CONFIG_DIR` do login oficial.
-    public func homePath(_ home: ConfigDir) -> String { home.raw }
+    /// Desfaz a casa reservada de um login que não virou conta — cancelado,
+    /// fechado, falho, ou que trouxe uma conta que já está no grupo.
+    ///
+    /// O `claude auth login` grava a credencial na casa ANTES de alguém saber de
+    /// quem ela é. Até 10/2026 nada a apagava: cada "Tentar de novo" depois de
+    /// uma duplicada deixava mais um refresh token vivo no chaveiro, que o app
+    /// não mostrava nem sabia remover.
+    ///
+    /// Só apaga o que é seguro: casa de uma conta que NÃO está no registro, e
+    /// dentro de `<base>/accounts/`. Relogin reusa a casa de uma conta que
+    /// existe, e por isso nunca passa daqui.
+    public func discardPendingHome(_ home: ConfigDir, accountID: UUID) {
+        guard config.account(accountID) == nil,
+              home.url.standardizedFileURL.path == paths.accountHome(accountID).url
+                .standardizedFileURL.path
+        else { return }
+        keychain.delete(service: engine.keychainService(for: home, provider: .anthropic))
+        try? FileManager.default.removeItem(at: home.url)
+    }
+
+    /// Apaga as casas que nenhuma conta do registro cita — sobras de logins
+    /// interrompidos (o app fechado no meio, ou anteriores à limpeza do
+    /// `discardPendingHome`). Roda na subida do app, quando nenhum login está
+    /// em andamento, e só com o `config.json` lido inteiro: com o registro vazio
+    /// por falha de leitura, tudo pareceria órfão.
+    public func discardOrphanHomes() {
+        guard configLoadedFromDisk else { return }
+        let accountsDir = paths.base.appending(path: "accounts")
+        guard let entries = try? FileManager.default.contentsOfDirectory(
+            at: accountsDir, includingPropertiesForKeys: nil) else { return }
+        let referenced = Set(config.accounts.map { $0.home.url.standardizedFileURL.path })
+        for entry in entries {
+            guard let id = UUID(uuidString: entry.lastPathComponent),
+                  !referenced.contains(entry.standardizedFileURL.path)
+            else { continue }
+            discardPendingHome(paths.accountHome(id), accountID: id)
+        }
+    }
 
     /// O resultado de checar um login pendente.
     public enum LoginOutcome: Sendable, Equatable {
@@ -272,8 +403,17 @@ public final class RouterConfigStore {
 
         let expected = config.accounts[i].identity.email
         guard identity.email == expected else {
+            // O `claude auth login` já gravou a credencial da OUTRA conta na casa
+            // desta. Deixada lá, ela ficava com o nome desta: "Usar" serviria a
+            // outra conta sob este nome, e o sensor carimbaria o consumo no
+            // e-mail errado (issue #12). Credencial e identidade estranhas
+            // saem; a conta volta a pedir relogin — a credencial que havia ali
+            // era a morta que motivou este.
+            engine.resetProfile(config.accounts[i].home, provider: config.accounts[i].provider)
+            reloginInFlight.remove(accountID)
             return .wrongAccount(expected: expected, got: identity.email)
         }
+        reloginInFlight.remove(accountID)
         config.accounts[i].identity = identity  // tier/organização podem ter mudado
         save()
         signedOut[accountID] = nil
@@ -288,20 +428,35 @@ public final class RouterConfigStore {
         return .renewed(config.accounts[i])
     }
 
+    /// Marca o início e o fim de um relogin, para a rotação não espelhar a conta
+    /// no meio dele (ver `reloginInFlight`). Idempotentes.
+    public func beginRelogin(_ accountID: UUID) { reloginInFlight.insert(accountID) }
+    public func endRelogin(_ accountID: UUID) { reloginInFlight.remove(accountID) }
+
     /// Remove a conta do registro **e apaga a credencial dela**.
     ///
     /// Até 18/09/2026 só o registro saía: o item de chaveiro e a pasta da casa
     /// ficavam para trás, com um refresh token vivo, para sempre. Num produto
     /// pago isso é promessa quebrada — "remover a conta" tem de remover a conta.
     ///
-    /// O item do GRUPO não é tocado de propósito, mesmo quando é esta conta que
-    /// o serve: pode haver sessão viva atendida por ele agora, e derrubar o
-    /// trabalho de alguém não é consequência aceitável de arrumar a lista. Ele é
-    /// sobrescrito na próxima ativação, e sem a conta no registro ninguém mais a
-    /// escolhe.
+    /// Se ela serve um grupo agora, o grupo passa para a próxima conta (ver
+    /// `handOver`) — a troca a quente de sempre, então a sessão viva segue, só
+    /// que atendida pela próxima. Até 22/10/2026 o item do grupo ficava
+    /// intocado: o grupo seguia servido pela conta removida, e a tela o
+    /// mostrava sem conta em uso.
+    ///
+    /// Sem próxima (era a única, ou nenhuma pode assumir), o item do GRUPO
+    /// segue intocado: pode haver sessão viva atendida por ele agora, e
+    /// derrubar o trabalho de alguém não é consequência aceitável de arrumar a
+    /// lista.
     public func removeAccount(_ accountID: UUID) {
         guard let account = config.account(accountID) else { return }
         let service = engine.homeKeychainService(for: account)
+        // Apurado ANTES de a conta sair do registro: depois, a identidade no
+        // perfil do grupo não casa com conta nenhuma.
+        let served = config.groups
+            .filter { engine.activeAccount(in: $0, config: config)?.id == accountID }
+            .map(\.id)
 
         config.accounts.removeAll { $0.id == accountID }
         for i in config.groups.indices {
@@ -310,14 +465,26 @@ public final class RouterConfigStore {
         save()
         signedOut[accountID] = nil
 
+        for groupID in served { handOver(groupID) }
+
         keychain.delete(service: service)
         try? FileManager.default.removeItem(at: account.home.url)
+        refreshUsage()
     }
 
-    public func setNickname(_ accountID: UUID, _ nickname: String?) {
-        guard let i = config.accounts.firstIndex(where: { $0.id == accountID }) else { return }
-        config.accounts[i].nickname = nickname?.isEmpty == true ? nil : nickname
-        save()
+    /// Passa o grupo cuja conta ativa acabou de ser removida para a primeira
+    /// de `RotationEngine.successors` que aceitar a ativação — quem não pode
+    /// (sem credencial na casa, ativa noutro grupo) é pulada. Com a conta já
+    /// fora do registro, o `activate` não espelha a que sai: a casa dela vai
+    /// ser apagada. Se outra conta do registro já está no grupo (a CLI rodou a
+    /// rotação no meio), fica a escolha dela.
+    private func handOver(_ groupID: UUID) {
+        guard let group = config.groups.first(where: { $0.id == groupID }),
+              engine.activeAccount(in: group, config: config) == nil
+        else { return }
+        for candidate in engine.successors(for: group, config: config, usage: usageSnapshot) {
+            if (try? engine.activate(candidate, in: group, config: config)) != nil { return }
+        }
     }
 
     // MARK: - Rotação (ações que tocam o sistema)
@@ -331,6 +498,12 @@ public final class RouterConfigStore {
     /// Relê a conta ativa em seguida, para o indicador da UI se mover na hora —
     /// senão o clique parece não fazer nada.
     public func activate(_ account: Account, in group: AccountGroup) {
+        // Durante a medição a sonda decide, conta a conta, por qual perfil
+        // medir; ativar alguém no meio a faria sondar a casa de uma conta ativa.
+        guard measuringGroup == nil else {
+            lastError = "espere a medição terminar para trocar de conta"
+            return
+        }
         do {
             try engine.activate(account, in: group, config: config)
             lastError = nil
@@ -357,8 +530,11 @@ public final class RouterConfigStore {
     /// oficial e traz o quadro inteiro, inclusive o limite POR MODELO, que não
     /// chega no `rate_limits` da status line e é o que estoura primeiro.
     ///
-    /// Sob demanda, e não no laço: cada conta custa um processo Node subindo do
-    /// zero e uma requisição de verdade. Medir cinco contas leva ~15s.
+    /// Sob demanda (este botão) — e, com o app aberto, de 5 em 5 horas pela
+    /// agenda (`runScheduledMeasure`, 21/10/2026). Nunca no laço de 3 minutos:
+    /// cada conta custa um processo Node subindo do zero e uma requisição de
+    /// verdade. Medir cinco contas leva ~15s. Toda medição deixa um ponto no
+    /// histórico (`ProbeRecord`).
     ///
     /// `probe` é injetável para teste; sem ele, a sonda sobre o binário instalado.
     public func measureAccounts(in group: AccountGroup, using probe: ClaudeUsageProbe? = nil) async {
@@ -366,14 +542,11 @@ public final class RouterConfigStore {
         measuringGroup = group.id
         defer { measuringGroup = nil }
 
-        // O perfil de cada conta é decidido AQUI, com o config na mão: conta
-        // ativa vai pelo perfil do grupo, nunca pela casa (ver `probeConfigDir`
-        // — sondar a casa de uma conta ativa derruba a sessão viva).
-        let alvos = config.accounts(in: group).map {
-            (id: $0.id, email: $0.identity.email,
-             dir: engine.probeConfigDir(for: $0, config: config))
-        }
+        let contas = config.accounts(in: group)
+        let configNoClique = config
+        let engine = self.engine
         let usageDir = paths.usageDir
+        let historyDir = paths.historyDir
         let scratchBase = paths.base
 
         // Conta por conta, e não só quantas: o aviso que dizia "N conta(s) não
@@ -383,24 +556,24 @@ public final class RouterConfigStore {
             guard let sonda = probe ?? ClaudeUsageProbe.system(scratchBase: scratchBase)
             else { return nil }
             var responderam: [UUID] = [], semLogin: [UUID] = [], falhas = 0
-            for alvo in alvos {
+            for conta in contas {
+                // O perfil é decidido AGORA, conta a conta, relendo do disco
+                // quem está ativa: conta ativa vai pelo perfil do grupo, nunca
+                // pela casa (ver `probeConfigDir` — sondar a casa de uma conta
+                // ativa derruba a sessão viva). Decidido no clique, um
+                // `claude <grupo>` aberto em outro terminal no meio da medição
+                // fazia a sonda chegar na casa de uma conta que já estava ativa.
+                // Dentro do app, a rotação e o "Usar" esperam a medição.
+                let alvo = (email: conta.identity.email,
+                            dir: engine.probeConfigDir(for: conta, config: configNoClique))
                 do {
                     let leitura = try sonda.read(configDir: alvo.dir)
-                    let agora = Date()
-                    let amostra = GroupUsageSample(
-                        configDirRaw: alvo.dir.raw, email: alvo.email,
-                        fiveHourPercent: leitura.session,
-                        fiveHourResetsAt: leitura.sessionResetsAt,
-                        sevenDayPercent: leitura.weeklyAll,
-                        sevenDayResetsAt: leitura.weeklyAllResetsAt,
-                        sampledAt: agora,
-                        models: ModelUsage(windows: leitura.models, sampledAt: agora),
-                        origin: .probe)
-                    try GroupUsageStore.write(amostra, forEmail: alvo.email, in: usageDir)
-                    responderam.append(alvo.id)
+                    try ProbeRecord.write(leitura, email: alvo.email, configDir: alvo.dir,
+                                          usageDir: usageDir, historyDir: historyDir)
+                    responderam.append(conta.id)
                 } catch ClaudeUsageProbe.ProbeError.notSignedIn {
                     falhas += 1
-                    semLogin.append(alvo.id)
+                    semLogin.append(conta.id)
                 } catch {
                     // Prazo estourado, formato novo: falha, mas não diz nada
                     // sobre o login — a marca da conta fica como estava.
@@ -425,8 +598,10 @@ public final class RouterConfigStore {
         refreshUsage()
     }
 
-    /// Relê o uso do sensor e a conta ativa de cada grupo, e publica ambos.
-    /// Chamado pelo laço do app, e ao abrir a lista de grupos.
+    /// Relê o uso do sensor e a conta ativa de cada grupo, e publica ambos —
+    /// e, desde 21/10/2026, o histórico de cada conta, para a aba Histórico
+    /// ganhar o ponto novo sem esperar. Chamado pelo laço do app, e ao abrir a
+    /// lista de grupos.
     public func refreshUsage() {
         let detail = usage.detailByAccount(config)
         usageDetail = detail
@@ -451,10 +626,8 @@ public final class RouterConfigStore {
         }
         activeByGroup = active
         liveSessions = sessions
+        refreshHistory()
     }
-
-    /// Quantas sessões vivas um grupo tem agora.
-    public func sessionCount(in groupID: UUID) -> Int { liveSessions[groupID]?.count ?? 0 }
 
     // MARK: - Integração com o terminal
 
@@ -554,7 +727,15 @@ public final class RouterConfigStore {
     /// passou do limiar e tem para onde ir, troca. Fail-safe: quem não tem
     /// destino fica onde está. Usa o `usageSnapshot` mais recente.
     public func rotateAll() {
+        // A sonda decide o perfil de cada conta na hora de medi-la; trocar a
+        // ativa no meio a faria medir pela casa uma conta que acabou de ficar
+        // ativa. A volta seguinte, três minutos depois, faz o que esta não fez.
+        guard measuringGroup == nil else { return }
         for group in config.groups {
+            // Relogin da ativa em andamento: nem espelho nem troca neste grupo
+            // até ele terminar — ver `reloginInFlight`.
+            if let active = engine.activeAccount(in: group, config: config),
+               reloginInFlight.contains(active.id) { continue }
             // O espelhamento periódico: a casa da conta ativa recebe o token
             // vivo do grupo, senão o refresh token dela morre na prateleira.
             engine.mirrorActive(in: group, config: config)

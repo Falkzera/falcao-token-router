@@ -4,16 +4,17 @@ contact_links:
     url: https://github.com/Falkzera/falcao-token-router/security/advisories/new
     about: >
       Please report privately rather than in a public issue. The app copies
-      Claude Code's keychain items between profiles, so anything touching
-      credentials goes here.
-  - name: How to install, and why macOS blocks it
+      Claude Code's credentials between profiles, so anything touching them
+      goes here. SECURITY.md says what to include.
+  - name: How to install, and why the system blocks it
     url: https://github.com/Falkzera/falcao-token-router#install
     about: >
-      The app is ad-hoc signed and not notarized, so macOS blocks it on first
-      launch. The README has the way through.
+      Neither build is signed by a paid developer account yet, so macOS
+      (quarantine) and Windows (SmartScreen) stop it once. Each platform's
+      install guide has the way through.
   - name: How it works, and how to port it
     url: https://github.com/Falkzera/falcao-token-router/tree/main/docs
-    about: docs/ARCHITECTURE.md explains the mechanism; docs/PORTING.md maps what a Linux or Windows port needs.
+    about: docs/ARCHITECTURE.md explains the mechanism; docs/PORTING.md maps what a new platform needs, with the Windows port as the worked example.
   - name: Contributing guide
     url: https://github.com/Falkzera/falcao-token-router/blob/main/CONTRIBUTING.md
-    about: Building without Xcode, the workflow, the checks that fail a PR, and the invariants.
+    about: Building each platform, the workflow, the checks that fail a PR, and the invariants.

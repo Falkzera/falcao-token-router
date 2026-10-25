@@ -3,7 +3,9 @@
 //!
 //! O sensor passivo só enxerga quem está servindo, e só as janelas de 5h e 7
 //! dias. A sonda mede conta OCIOSA e traz o limite POR MODELO. Custa um processo
-//! e uma requisição por conta, então é comando, não laço.
+//! e uma requisição por conta, então aqui é comando; a medição de 5 em 5 horas
+//! é do app (21/10/2026). Toda medição deixa um ponto no histórico
+//! (`router_core::engine::usage_history`), a desta CLI também.
 
 use chrono::Utc;
 
@@ -13,6 +15,7 @@ use router_core::engine::session_launcher::SessionLauncher;
 use router_core::usage::claude_binary::ClaudeBinary;
 use router_core::usage::claude_usage_probe::{ClaudeUsageProbe, ProbeError, ProbeTarget, Reading};
 use router_core::usage::usage_percent::UsagePercent;
+use router_core::ConfigDir;
 use router_core::{Account, AccountGroup};
 
 use crate::shared;
@@ -53,7 +56,8 @@ pub fn run(argv: &[String]) -> bool {
     }
 
     let home = shared::home();
-    let engine = RotationEngine::new(shared::credentials(&paths, &home), shared::adapters());
+    let engine = RotationEngine::new(shared::credentials(&paths, &home), shared::adapters())
+        .with_default_profile(ConfigDir::standard(&home));
     let probe = ClaudeUsageProbe::system(claude, paths.base.clone());
     let usage_dir = paths.usage_dir();
     let mut failures = 0;

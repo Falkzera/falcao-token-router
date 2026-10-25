@@ -61,6 +61,10 @@ struct FalcaoTokenRouterApp: App {
         // errada. Aqui é o único momento em que se sabe onde o binário está
         // AGORA, então é aqui que se conserta.
         Self.router.healShellIntegration()
+        // Casas de logins interrompidos (o app fechado no meio de um), com a
+        // credencial que o `claude auth login` já tinha gravado. Na subida,
+        // nenhum login está em andamento.
+        Self.router.discardOrphanHomes()
         // Duas portas de propósito. O `Task` roda assim que a fila principal
         // gira, o que já é depois de o NSApplication existir; o delegate é a
         // garantia para o caso de o SwiftUI reordenar a subida. As duas são
@@ -76,11 +80,21 @@ struct FalcaoTokenRouterApp: App {
     /// limiar. Três minutos porque o `rate_limits` só muda quando há atividade, e
     /// o endpoint de uso tem orçamento próprio — reconsultar mais rápido não traz
     /// número novo, só trabalho.
+    ///
+    /// A partir da 2ª volta (3 min depois da subida), olha também a agenda da
+    /// medição de 5 em 5 horas (21/10/2026) — na abertura do Mac ela não disputa
+    /// a máquina com tudo o mais que sobe junto. Numa `Task` à parte: medir leva
+    /// segundos por conta, e a rotação não espera por ela.
     @MainActor private static func startRotation() {
         Task {
+            var volta = 0
             while !Task.isCancelled {
                 router.refreshUsage()
                 router.rotateAll()
+                if volta > 0 && settings.scheduledMeasure {
+                    Task { await router.runScheduledMeasure() }
+                }
+                volta += 1
                 try? await Task.sleep(for: .seconds(180))
             }
         }

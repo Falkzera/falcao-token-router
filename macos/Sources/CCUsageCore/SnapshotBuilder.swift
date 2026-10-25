@@ -74,7 +74,7 @@ public enum SnapshotBuilder {
 
         var unknown = Set<String>()
         for event in events {
-            if let name = event.model.unknownName { unknown.insert(name) }
+            if let name = event.model.resolved.unknownName { unknown.insert(name) }
         }
 
         return UsageSnapshot(

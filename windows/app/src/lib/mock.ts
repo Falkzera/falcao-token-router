@@ -3,7 +3,10 @@
 // quadro e avisam a tela, como o backend de verdade. Cenário, idioma, janela,
 // aba e seleção vêm da URL:
 //   ?view=home|flyout  &state=uso|vazio|pronta|critico|erro  &lang=en|pt-BR
-//   &tab=groups|settings  &select=<conta>  &foreign=<e-mail>  &scripts=current|missing|stale
+//   &tab=groups|history|settings  &select=<conta>  &foreign=<e-mail>  &scripts=current|missing|stale
+// O histórico (aba Histórico, `mock-history.ts`):
+//   &historico=cheio|vazio|lacuna|desligado  &conta=<id> (abre já nela, como o atalho do painel)
+//   &apagar=falha (o "Apagar o histórico…" dos Ajustes falha)
 // A integração de terminal e os ajustes:
 //   &terminal=ausente|ok|bloqueado|parcial|velha|semrouter  &devmode=1
 //   &install=falha (Ativar grava só parte)  &diretiva=1 (Permitir não vence a política)
@@ -17,6 +20,7 @@
 // Dados só de exemplo (@exemplo.com, Acme, C:\Users\exemplo).
 
 import type {
+  AccountView,
   AppInfo,
   GroupView,
   HomeTab,
@@ -38,6 +42,7 @@ import type {
   TerminalView,
   UsageView,
 } from "./types";
+import { mockHistory } from "./mock-history";
 
 function param(name: string): string | null {
   return new URLSearchParams(window.location.search).get(name);
@@ -48,7 +53,8 @@ function mockLocale(): Locale {
 }
 
 function mockTab(): HomeTab {
-  return param("tab") === "settings" ? "settings" : "groups";
+  const tab = param("tab");
+  return tab === "settings" || tab === "history" ? tab : "groups";
 }
 
 const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
@@ -90,7 +96,6 @@ function usage(
   const [fraction, bound] = candidates.reduce((a, b) => (b[0] >= a[0] ? b : a));
   return {
     fraction,
-    text: pct(fraction),
     bound,
     // Como a Anthropic: a janela de 5h sem uso não começou e vem sem reset.
     fiveHour:
@@ -131,10 +136,10 @@ function work(): GroupView {
     activeAccountId: "A2",
     sessions: { count: 2, engaged: 1 },
     accounts: [
-      { id: "A1", label: "equipe-1", email: "equipe-1@exemplo.com", organization: "Acme", usage: usage(0.12, 0.4, "probe", 125) },
-      { id: "A2", label: "equipe-2", email: "equipe-2@exemplo.com", organization: "Acme", usage: usage(0.34, 0.81, "sensor", 3) },
-      { id: "A3", label: "equipe-3", email: "equipe-3@exemplo.com", organization: "Acme", usage: null },
-      { id: "A6", label: "equipe-4", email: "equipe-4@exemplo.com", organization: "Acme", usage: usage(0, 0.02, "probe", 1) },
+      { id: "A1", label: "equipe-1", organization: "Acme", usage: usage(0.12, 0.4, "probe", 125) },
+      { id: "A2", label: "equipe-2", organization: "Acme", usage: usage(0.34, 0.81, "sensor", 3) },
+      { id: "A3", label: "equipe-3", organization: "Acme", usage: null },
+      { id: "A6", label: "equipe-4", organization: "Acme", usage: usage(0, 0.02, "probe", 1) },
     ],
   });
 }
@@ -149,11 +154,10 @@ function personal(): GroupView {
       {
         id: "A4",
         label: "conta1",
-        email: "conta1@exemplo.com",
         organization: null,
         usage: usage(0.2, 0.45, "sensor", 8, { name: "Fable", fraction: 0.95, ageMinutes: 75 }),
       },
-      { id: "A5", label: "conta2", email: "conta2@exemplo.com", organization: null, usage: usage(null, 0.3, "sensor", 14 * 60) },
+      { id: "A5", label: "conta2", organization: null, usage: usage(null, 0.3, "sensor", 14 * 60) },
     ],
   });
 }
@@ -166,7 +170,7 @@ const scenarios: Record<string, () => GroupView[]> = {
       id: "G1",
       name: "Trabalho",
       activeAccountId: "A1",
-      accounts: [{ id: "A1", label: "equipe-1", email: "equipe-1@exemplo.com", organization: "Acme", usage: null }],
+      accounts: [{ id: "A1", label: "equipe-1", organization: "Acme", usage: null }],
     }),
   ],
   critico: () => [
@@ -176,8 +180,8 @@ const scenarios: Record<string, () => GroupView[]> = {
       activeAccountId: "A2",
       sessions: { count: 1, engaged: 0 },
       accounts: [
-        { id: "A1", label: "equipe-1", email: "equipe-1@exemplo.com", organization: "Acme", usage: usage(0.97, 0.7, "sensor", 1) },
-        { id: "A2", label: "equipe-2", email: "equipe-2@exemplo.com", organization: "Acme", usage: usage(0.96, 0.88, "sensor", 2) },
+        { id: "A1", label: "equipe-1", organization: "Acme", usage: usage(0.97, 0.7, "sensor", 1) },
+        { id: "A2", label: "equipe-2", organization: "Acme", usage: usage(0.96, 0.88, "sensor", 2) },
       ],
     }),
   ],
@@ -219,7 +223,6 @@ function terminalView(scripts: ScriptsState, shells: ShellView[], routerFound = 
       routerFound &&
       scripts === "current" &&
       shells.every((s) => s.loadsIntegration && !s.policyBlocks && s.bashLogin !== "ignores"),
-    blockedByPolicy: shells.some((s) => s.policyBlocks),
     needsInstall: scripts !== "current" || shells.some((s) => !s.loadsIntegration),
   };
 }
@@ -288,8 +291,12 @@ const settings: SettingsView = {
   autostartFailure: null,
   showInTaskbar: param("taskbar") === "1",
   hiddenSummary: (param("resumo")?.split(",").filter(Boolean) ?? []) as SummaryItem[],
+  scheduledMeasure: param("historico") !== "desligado",
   version: "0.1.0-mock",
 };
+
+/** "Apagar o histórico…" já foi usado: o histórico simulado fica vazio. */
+let historyCleared = false;
 
 // MARK: - Status line
 
@@ -335,7 +342,7 @@ function mockPreview(choice: StatusLineChoice): Span[] {
   const portuguese = mockLocale() === "pt-BR";
   const first = state.groups[0];
   const email =
-    first?.accounts.find((a) => a.id === first.activeAccountId)?.email ??
+    emailOf(first?.accounts.find((a) => a.id === first.activeAccountId)) ??
     (portuguese ? "voce@exemplo.com" : "you@example.com");
   const now = Date.now();
   const five = new Date(now + (2 * 60 + 13) * 60_000);
@@ -485,6 +492,12 @@ function findAccount(id: string | undefined) {
   return state.groups.flatMap((g) => g.accounts).find((a) => a.id === id);
 }
 
+/** A conta da UI não carrega e-mail (a tela não o mostra); onde o mock imita o
+ *  núcleo — a status line, o relogin com a conta errada —, deriva do rótulo. */
+function emailOf(account: AccountView | undefined): string | undefined {
+  return account && `${account.label}@exemplo.com`;
+}
+
 /** Um login do começo: iniciando → link → (o cenário). */
 function runLogin(): LoginView | null {
   loginTimers.forEach(clearTimeout);
@@ -522,7 +535,7 @@ function settleLogin(scenario: string): void {
     const account = findAccount(target.accountId);
     setPhase(
       scenario === "errada"
-        ? { phase: "wrongAccount", expected: account?.email ?? "", got: "intrusa@exemplo.com" }
+        ? { phase: "wrongAccount", expected: emailOf(account) ?? "", got: "intrusa@exemplo.com" }
         : { phase: "renewed", label: account?.label ?? "" },
     );
   } else if (scenario === "duplicada") {
@@ -532,7 +545,6 @@ function settleLogin(scenario: string): void {
     findGroup(target.groupId)?.accounts.push({
       id: `A${n}`,
       label: `conta${n}`,
-      email: `conta${n}@exemplo.com`,
       organization: null,
       usage: null,
     });
@@ -580,10 +592,15 @@ const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
     publishLogin();
     return changed();
   },
-  app_info: (): AppInfo => ({ version: "0.1.0-mock", locale: mockLocale(), initialTab: mockTab() }),
+  // `&conta=<id>`: a janela abre no Histórico já nessa conta (o atalho do painel).
+  app_info: (): AppInfo => ({
+    locale: mockLocale(),
+    initialTab: param("conta") ? "history" : mockTab(),
+    initialAccount: param("conta"),
+  }),
   get_snapshot: () => structuredClone(state),
   fit_flyout: () => undefined,
-  open_home: (args) => console.info("mock: abrir a janela na aba", args.tab),
+  open_home: (args) => console.info("mock: abrir a janela na aba", args.tab, "na conta", args.account),
   quit_app: () => console.info("mock: sair"),
   copy_text: async (args) => {
     await navigator.clipboard?.writeText(String(args.text)).catch(() => undefined);
@@ -639,10 +656,12 @@ const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
     state.lastError = null;
     return changed();
   },
+  // A conta em uso sai e o grupo passa para a próxima. Aqui é sempre a primeira
+  // que sobrou; a regra de verdade (folga antes, na ordem) é do motor.
   remove_account: (args) => {
     for (const g of state.groups) {
       g.accounts = g.accounts.filter((a) => a.id !== args.accountId);
-      if (g.activeAccountId === args.accountId) g.activeAccountId = null;
+      if (g.activeAccountId === args.accountId) g.activeAccountId = g.accounts[0]?.id ?? null;
     }
     return changed();
   },
@@ -705,6 +724,22 @@ const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
     const hidden = args.hidden as SummaryItem[];
     settings.hiddenSummary = order.filter((item) => hidden.includes(item));
     return { ...settings };
+  },
+  get_history: () =>
+    mockHistory(state.groups, mockLocale(), historyCleared ? "vazio" : param("historico"), settings.scheduledMeasure),
+  set_scheduled_measure: (args) => {
+    settings.scheduledMeasure = Boolean(args.on);
+    changed();
+    return { ...settings };
+  },
+  // Como o Rust: devolve quantos arquivos saíram (um por conta com histórico).
+  clear_history: () => {
+    if (param("apagar") === "falha") throw new Error("Acesso negado. (os error 5)");
+    const accounts = new Set(state.groups.flatMap((g) => g.accounts.map((a) => a.id)));
+    const removed = historyCleared || param("historico") === "vazio" ? 0 : accounts.size;
+    historyCleared = true;
+    changed();
+    return removed;
   },
   open_url: (args) => {
     const url = String(args.url);

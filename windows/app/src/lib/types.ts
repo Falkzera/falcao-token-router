@@ -3,16 +3,23 @@
 
 export type Locale = "en" | "pt-BR";
 
-export type HomeTab = "groups" | "settings";
+export type HomeTab = "groups" | "history" | "settings";
+
+/** Para onde a janela vai: a aba e, no atalho do Histórico, a conta. */
+export interface Navigation {
+  tab: HomeTab;
+  account: string | null;
+}
 
 /** Qual superfície uma janela mostra. */
 export type View = "home" | "flyout";
 
 export interface AppInfo {
-  version: string;
   locale: Locale;
   /** A aba com que a janela abre (a bandeja pode ter pedido Ajustes). */
   initialTab: HomeTab;
+  /** A conta que o Histórico mostra ao abrir (o atalho do painel da bandeja). */
+  initialAccount: string | null;
 }
 
 /** Uma janela do `rate_limits`: fração 0–1, o % pronto (do núcleo) e o reset. */
@@ -38,7 +45,6 @@ export type Origin = "sensor" | "probe";
 export interface UsageView {
   /** O número que a rotação compara com o limiar (o maior das janelas). */
   fraction: number;
-  text: string;
   /** Qual janela manda nesse número. */
   bound: Bound;
   fiveHour: Reading | null;
@@ -51,7 +57,6 @@ export interface UsageView {
 export interface AccountView {
   id: string;
   label: string;
-  email: string;
   organization: string | null;
   /** `null` = sem amostra: "pronta". */
   usage: UsageView | null;
@@ -79,6 +84,7 @@ export type ErrorView =
   | { code: "saveFailed"; detail: string }
   | { code: "activateNoCredential" }
   | { code: "activateBusyElsewhere"; group: string }
+  | { code: "activateLiveInDefaultProfile" }
   | { code: "activateWriteFailed"; detail: string }
   | { code: "routerPathUnknown" }
   | { code: "integrationFailed"; detail: string }
@@ -118,7 +124,6 @@ export interface TerminalView {
   shells: ShellView[];
   developerMode: boolean;
   fullyInstalled: boolean;
-  blockedByPolicy: boolean;
   /** "Ativar" resolve algo (a política e o `.bash_profile` têm correção própria). */
   needsInstall: boolean;
 }
@@ -170,6 +175,8 @@ export interface SettingsView {
   showInTaskbar: boolean;
   /** O que o resumo das contas NÃO mostra (de fábrica, nada). */
   hiddenSummary: SummaryItem[];
+  /** "Medir as contas a cada 5 horas" (de fábrica, ligada). */
+  scheduledMeasure: boolean;
   version: string;
 }
 
@@ -225,4 +232,57 @@ export interface Snapshot {
   lastError: ErrorView | null;
   /** O estado barato da integração (o quadro por shell é pedido à parte). */
   scripts: ScriptsState;
+}
+
+/** Um ponto do Histórico: a fração (o desenho), o % pronto (do núcleo) e as
+ *  horas escritas pelo Rust, no fuso do Windows e no idioma do app. */
+export interface HistoryPoint {
+  at: string;
+  fraction: number;
+  text: string;
+  /** Quando foi medido ("qua (21) 10:05"). */
+  label: string;
+  /** Quando aquela janela resetava, se a leitura disse. */
+  resetsLabel: string | null;
+}
+
+/** Uma marca do eixo do tempo (a meia-noite local). */
+export interface HistoryTick {
+  at: string;
+  label: string;
+}
+
+export interface HistorySeries {
+  from: string;
+  to: string;
+  ticks: HistoryTick[];
+  /** Trechos da linha: mais de 7h30 sem ponto quebra a linha. */
+  segments: HistoryPoint[][];
+  latest: HistoryPoint | null;
+}
+
+export interface AccountHistory {
+  id: string;
+  label: string;
+  email: string;
+  lastMeasuredAt: string | null;
+  /** Com a agenda ligada; pode já ter passado ("em instantes"). */
+  nextMeasureAt: string | null;
+  nextMeasureLabel: string | null;
+  /** A janela de 5h nos últimos 7 dias. */
+  fiveHour: HistorySeries;
+  /** A semanal nas últimas 4 semanas. */
+  sevenDay: HistorySeries;
+}
+
+export interface GroupHistory {
+  id: string;
+  name: string;
+  thresholdPercent: number;
+  accounts: AccountHistory[];
+}
+
+export interface HistoryView {
+  scheduleOn: boolean;
+  groups: GroupHistory[];
 }
