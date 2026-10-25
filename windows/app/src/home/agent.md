@@ -1,14 +1,18 @@
-# app/src/home — a janela Grupos / Ajustes (≙ Settings/HomeWindow.swift + GroupsView.swift)
+# app/src/home — a janela Grupos / Histórico / Ajustes (≙ Settings/HomeWindow.swift + GroupsView.swift)
 
 ## Arquivos
-- `Home.svelte` — as duas abas, **Grupos** (o produto) e **Ajustes** (sem medidor nesta entrega).
+- `Home.svelte` — as três abas, **Grupos** (o produto), **Histórico** (21/10/2026, só do Windows)
+  e **Ajustes** (sem medidor nesta entrega).
   O tamanho é da janela (abre no último, 520×620 na 1ª vez; redimensiona e maximiza — o Rust
   cuida, `home_window.rs`), nunca do conteúdo: as abas têm alturas naturais diferentes e a
   janela pularia a cada troca. Numa janela larga, abas, páginas e o aviso de erro seguem a mesma
   coluna (`--page-inline`: até 880 px, centrada; 16 px de margem no tamanho de sempre). A bandeja pode pedir a aba (`navigate`); a aba da abertura
   vale ANTES do 1º desenho (montar Grupos por um instante pediria o quadro do terminal à toa).
   Dona do diálogo do login ("Adicionar conta" e "Relogar…"): fica com a visão de revisão maior
-  (evento × resposta do comando) e reabre o login em andamento quando a janela volta.
+  (evento × resposta do comando) e reabre o login em andamento quando a janela volta. Dona
+  também do ATALHO de cada conta (21/10/2026): `showHistory(conta, grupo)` troca para o Histórico
+  com o foco nela — vindo da linha da conta (com o grupo do clique), do `navigate` da bandeja ou
+  do `initialAccount` da janela que abriu pelo painel; `seq` faz o mesmo atalho rolar de novo.
 - `GroupsView.svelte` — a aba do produto: cabeçalho com "Novo grupo", vazio com convite, os
   cartões, a seção da integração de terminal (depois dos grupos) e o aviso da última falha
   (`ErrorBanner`) embaixo. É dona do quadro do terminal (lento: pedido ao abrir, depois de cada
@@ -27,9 +31,24 @@
   diretiva de grupo vencer), a linha do `.bashrc` com copiar para o `.bash_profile` que o ignora,
   a função `claude` do usuário encadeada (info), o app movido (scripts velhos) e a dica do Modo
   de Desenvolvedor (→ `ms-settings:developers`). "Instalada ✓" por 2 s só com `ok`.
-- `SettingsView.svelte` — a aba Ajustes: a status line (em cima), o resumo dos grupos, "Abrir no
-  login" (do sistema, com o motivo da recusa), "Mostrar na barra de tarefas" com a explicação, a
-  dica do ícone escondido no `^` (→ `ms-settings:taskbar`) e a versão.
+- `HistoryView.svelte` — a aba Histórico (21/10/2026): o aviso de que cada ponto é uma medição
+  da sonda, os grupos na ordem da lista com as contas na ordem de rotação (a conta em dois
+  grupos aparece nos dois), vazio com convite. Relê o quadro (`get_history`) ao abrir e a cada
+  `snapshot-changed` — o laço avisa depois de cada grupo medido. Com um `focus` (o atalho), rola
+  até o cartão da conta — no grupo do clique; senão, o primeiro — e o destaca por 1,8 s; depois
+  avisa (`onFocused`) e o pedido some, para a releitura de 30 s não rolar a página de novo.
+- `HistoryCard.svelte` — uma conta no Histórico: rótulo, e-mail, a linha de estado ("medida há
+  2h · próxima às 19:05", "próxima em instantes" quando vencida ou a menos de 3 min — uma volta
+  da agenda; o relógio da tela anda de 30 em 30 s e uma conta recém-zerada dizia "próxima às" a
+  hora de agora —, "medição automática desligada", "sem medições ainda") e os dois `LineChart`
+  (5h em 7 dias, semanal em 4 semanas) com o limiar do grupo. `data-account`/`data-group` são o
+  endereço do atalho; `highlight`, o contorno que some sozinho (fixo com movimento reduzido).
+- `SettingsView.svelte` — a aba Ajustes: a status line (em cima), o resumo dos grupos, o
+  Histórico (21/10/2026) — "Medir as contas a cada 5 horas" (controlado, mostra o que o backend
+  gravou) e "Apagar o histórico…" (pedido do usuário: confirmação destrutiva, "Histórico apagado
+  ✓" por 2 s só com o backend confirmando, a falha com o motivo) —, "Abrir no login" (do
+  sistema, com o motivo da recusa), "Mostrar na barra de tarefas" com a explicação, a dica do
+  ícone escondido no `^` (→ `ms-settings:taskbar`) e a versão.
 - `SummarySection.svelte` — "Resumo dos grupos" (pedido de 23/09/2026): o que cada conta mostra
   na aba Grupos, em pares por janela (uso | reset: 5 h, 7 dias, limite do modelo); de fábrica,
   tudo. O reset fica desligado sem a janela dele (o estado é guardado e volta com ela); "Mostrar
@@ -55,7 +74,8 @@
   rotulados (só a janela que manda com peso e cor), cada janela com o reset embaixo (`↻ 22:30`,
   `↻ seg (28) 9:00`; a de 5h sem uso, "não iniciada"; terciário — na altura que nome e
   organização já ocupam, a linha não cresce), "Usar" (na ativa o botão só some — o espaço fica e
-  os números alinham) e o menu ⋯ (mover, relogar, remover). O que o resumo mostra é escolha do
+  os números alinham), o atalho do Histórico desta conta (ícone de gráfico, 21/10/2026, pedido do
+  usuário — sempre visível, em coluna) e o menu ⋯ (mover, relogar, remover). O que o resumo mostra é escolha do
   usuário (`hidden`, de Ajustes → Resumo dos grupos; de fábrica, tudo); o tooltip segue com
   tudo. (23/09/2026: os resets na linha nasceram como teste e ficaram, com a escolha.)
 - `NewGroupDialog.svelte` — nome e a escolha "usar como grupo padrão", DESMARCADA quando o
@@ -91,6 +111,11 @@
   são os reais mesmo no sandbox.
 - Login (23/09): todos os estados no navegador (`&login=…`), nos dois idiomas e temas; e o
   caminho real no app do sandbox com o `fake-claude` (ver `src-tauri/src/agent.md`).
+- Histórico (21/10/2026): Chrome headless pelo DevTools Protocol (script no scratchpad da
+  sessão) — `?tab=history` nos dois idiomas e temas, `&historico=cheio|lacuna|vazio|desligado`,
+  `&state=vazio` (sem grupos), 520 px e janela larga (a coluna de 880 px); a dica pelo ponteiro
+  dos dois lados e pelo teclado (foco + ←); a chave nos Ajustes (uma gravação, e o Histórico
+  passa a dizer "medição automática desligada").
 
 ## Pendências
 - O login com o `claude` e o navegador de verdade: teste ponta a ponta (fase 7).

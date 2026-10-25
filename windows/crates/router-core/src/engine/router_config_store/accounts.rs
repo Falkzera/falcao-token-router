@@ -215,11 +215,4 @@ impl RouterConfigStore {
             }
         }
     }
-
-    pub fn set_nickname(&mut self, account_id: Id, nickname: Option<&str>) {
-        if let Some(account) = self.config.accounts.iter_mut().find(|a| a.id == account_id) {
-            account.nickname = nickname.filter(|n| !n.is_empty()).map(String::from);
-            self.save();
-        }
-    }
 }

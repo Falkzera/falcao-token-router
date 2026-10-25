@@ -15,6 +15,16 @@ enum UsageColor {
     static let warning = Color(red: 0.88, green: 0.72, blue: 0.25)
     static let critical = Color(red: 0.85, green: 0.32, blue: 0.28)
 
+    /// A linha dos gráficos do Histórico (21/10/2026). Não é o `calm`: aquele é
+    /// dessaturado de propósito, e numa linha fina ele se lê cinza. É a mesma
+    /// cor do porte Windows, um tom por aparência, conferida contra as
+    /// superfícies clara e escura (contraste de 3:1 ou mais).
+    static func chartLine(_ scheme: ColorScheme) -> Color {
+        scheme == .dark
+            ? Color(red: 0x52 / 255, green: 0xA7 / 255, blue: 0x6D / 255)
+            : Color(red: 0x1E / 255, green: 0x75 / 255, blue: 0x46 / 255)
+    }
+
     static func bar(_ fraction: Double) -> Color {
         switch fraction {
         case ..<calmThreshold: calm

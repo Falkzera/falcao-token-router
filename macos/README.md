@@ -11,12 +11,13 @@ on a Mac.
 ## Install
 
 Grab `FalcaoTokenRouter-<version>.dmg` from the
-[latest macOS release](../../../releases?q=macos-v), open it, and drag the app
-onto *Applications*. The binary is universal — Apple Silicon and Intel.
+[current macOS release, `v1.0.0`](../../../releases/tag/v1.0.0), open it, and drag
+the app onto *Applications*. The binary is universal — Apple Silicon and Intel.
 
 > This repository tags each platform separately, so GitHub's *latest release*
-> link is ambiguous: it may point at a Windows release. Follow the tag, or read
-> the release title — it names the system.
+> link is ambiguous: it may point at a Windows release. macOS releases are tagged
+> `macos-v*` — except the first, `v1.0.0`, which predates the split — and the
+> [releases page](../../../releases) names the system in every title.
 
 The app is **ad-hoc signed, not notarized** (that needs a paid Apple Developer
 account, which is on the roadmap). macOS will refuse to open it the first time.
@@ -37,12 +38,14 @@ in Dock** makes it a regular app), create a group, add accounts, and click
 > **Open a new terminal afterwards.** The integration is a shell function that
 > shadows the binary. In a terminal opened before the install, `claude trabalho`
 > is just an argument to `claude` and your session silently opens in `~/.claude`,
-> on the wrong account. `source ~/.zshrc` fixes an already-open terminal;
-> `router doctor` tells you what's wrong.
+> on the wrong account. `source ~/.zshrc` fixes an already-open terminal, and
+> `'/Applications/FalcaoTokenRouter.app/Contents/MacOS/router' doctor` tells you
+> what's wrong. (`router` is the CLI inside the app — it isn't on your `PATH`, and
+> it prints in Portuguese.)
 
 ### From source
 
-No Xcode needed — Command Line Tools with Swift 6.4+ is enough.
+No Xcode needed — Command Line Tools with Swift 6.3+ is enough.
 
 ```bash
 git clone https://github.com/Falkzera/falcao-token-router.git
@@ -52,18 +55,49 @@ cd falcao-token-router/macos
 
 An app you assembled yourself never carries the quarantine flag.
 
+## Usage history
+
+The **History** tab draws two lines per account: the 5-hour window over the
+last 7 days and the weekly window over the last 4 weeks, with the group's
+threshold dashed on both. Each point is one measurement by the probe
+(`claude /usage`): while the app is open it measures each account every 5 hours
+(**Meter → History → Measure accounts every 5 hours**, on by default), and
+**Measure accounts** and `router measure` add their points too. More than 7½
+hours without a point breaks the line instead of guessing — the app was closed,
+or the Mac was asleep. Select a point on a chart to read its value, when it was
+measured and when that window reset.
+
+The chart button next to each account on the Groups tab, and **View history**
+on an account's card in the menu bar panel, open the tab right on that account.
+**Delete history…**, in the same section of the Meter tab, empties it for every
+account; measuring goes on.
+
 ## Where things live
 
-Everything the app writes is under
+The router's data is under
 `~/Library/Application Support/com.synqo.falcao-router/`: `config.json` (groups
 and accounts), `accounts/<uuid>/` (each account's home profile),
 `groups/<uuid>/` (the profile a group's sessions run in), `usage/<email>.json`
-(the sensor's samples) and `shell.sh` (the terminal function).
+(the sensor's samples), `history/<email>.jsonl` (one line per probe
+measurement, kept for 90 days — the same file the Windows app writes),
+`statusline.json` (what the status line shows) and
+`shell.sh` (the terminal function).
 
-The credential itself is **not** there — it is a keychain item,
+The meter keeps its parse cache in
+`~/Library/Application Support/FalcaoTokenRouter/cache.json`, and the app's
+preferences live in the usual `~/Library/Preferences`.
+
+Outside its own folders the app writes only what the integration needs: one
+`source` line in `~/.zshrc`; the `statusLine` entry in each group profile's
+`settings.json`; and the active account's identity in the group's
+`.claude.json`. For the default group those are **your** `~/.claude/settings.json`
+and `~/.claude.json`.
+
+The credential itself is **not** in any of those — it is a keychain item,
 `Claude Code-credentials` for the default profile and
-`Claude Code-credentials-<sha256(path)[:8]>` for any other, written by Claude
-Code and read through `/usr/bin/security`.
+`Claude Code-credentials-<sha256(path)[:8]>` for any other. Claude Code writes it
+at sign-in; the app copies it between items when it activates an account,
+through `/usr/bin/security`.
 
 > That hash is why the data folder is named `com.synqo.falcao-router` and not
 > after the current product name. Renaming the base directory changes every

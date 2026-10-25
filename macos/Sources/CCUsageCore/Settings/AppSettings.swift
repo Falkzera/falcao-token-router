@@ -90,6 +90,14 @@ public final class AppSettings {
         didSet { save() }
     }
 
+    /// "Medir as contas a cada 5 horas" (21/10/2026, para a aba Histórico):
+    /// ligada de fábrica — e um payload de antes dela, sem o campo, também.
+    /// Cada medição é o `claude /usage` de cada conta, a mesma consulta do
+    /// "Medir contas".
+    public var scheduledMeasure: Bool {
+        didSet { save() }
+    }
+
     /// O que notificar. Tudo desligado por padrão: notificação é interrupção, e
     /// interrupção não pode ser o estado inicial de nada. Ligar dispara o
     /// pedido de permissão do sistema — que é o momento certo para pedir,
@@ -143,6 +151,7 @@ public final class AppSettings {
         self.manualBlockCeiling = stored?.manualBlockCeiling
         self.liveUsageEnabled = stored?.liveUsageEnabled ?? true
         self.showInDock = stored?.showInDock ?? false
+        self.scheduledMeasure = stored?.scheduledMeasure ?? true
         // `alertsEnabled` é o formato anterior, de quando havia uma chave só.
         // Migra em vez de descartar: quem tinha ligado não perde a escolha.
         self.alerts = stored?.alerts
@@ -167,6 +176,9 @@ public final class AppSettings {
         /// para `false` no init — nunca para ligado.
         var liveUsageEnabled: Bool?
         var showInDock: Bool?
+        /// Ausente em payload de antes da medição automática: resolve para
+        /// ligado no init.
+        var scheduledMeasure: Bool?
         /// Formato anterior, com uma chave só. Lido para migração; não é mais
         /// gravado.
         var alertsEnabled: Bool?
@@ -177,6 +189,7 @@ public final class AppSettings {
         let payload = Payload(plan: plan, manualBlockCeiling: manualBlockCeiling,
                               liveUsageEnabled: liveUsageEnabled,
                               showInDock: showInDock,
+                              scheduledMeasure: scheduledMeasure,
                               alertsEnabled: nil, alerts: alerts)
         guard let data = try? JSONEncoder().encode(payload) else { return }
         defaults.set(data, forKey: Self.storageKey)

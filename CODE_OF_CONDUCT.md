@@ -54,10 +54,10 @@ officially representing the community in public spaces.
 ## Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported to the maintainer through GitHub's private vulnerability reporting
-(Security tab → Report a vulnerability) or by contacting the maintainer directly
-via their GitHub profile. All complaints will be reviewed and investigated
-promptly and fairly. The maintainer is obligated to respect the privacy and
+reported privately to the maintainer through the repository's private reporting
+form (Security tab → Report a vulnerability), which reaches only the
+maintainers. All complaints will be reviewed and investigated promptly and
+fairly. The maintainer is obligated to respect the privacy and
 security of the reporter of any incident.
 
 ## Attribution

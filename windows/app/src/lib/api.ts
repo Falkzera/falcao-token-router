@@ -9,9 +9,11 @@ import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { mockInvoke, mockListen, mockLoginListen } from "./mock";
 import type {
   AppInfo,
+  HistoryView,
   HomeTab,
   InstallResult,
   LoginView,
+  Navigation,
   SettingsView,
   ShellName,
   Snapshot,
@@ -64,9 +66,10 @@ export function fitFlyout(height: number): Promise<void> {
   return call<void>("fit_flyout", { height });
 }
 
-/** Uma porta do rodapé do flyout: abre a janela na aba. */
-export function openHome(tab: HomeTab): Promise<void> {
-  return call<void>("open_home", { tab });
+/** Uma porta do flyout: abre a janela na aba — e, com uma conta, o Histórico
+ *  já nela (o atalho do cartão da conta). */
+export function openHome(tab: HomeTab, account: string | null = null): Promise<void> {
+  return call<void>("open_home", { tab, account });
 }
 
 export function quitApp(): Promise<void> {
@@ -118,6 +121,15 @@ export const setHiddenSummary = (hidden: SummaryItem[]) =>
 /** Só os endereços da lista do backend (Configurações do Windows, logout, login). */
 export const openUrl = (url: string) => call<void>("open_url", { url });
 
+// MARK: - Histórico (as medições da sonda, de 5 em 5 horas e sob demanda)
+
+/** As duas séries de cada conta (5h em 7 dias, semanal em 4 semanas), prontas. */
+export const getHistory = () => call<HistoryView>("get_history");
+/** "Medir as contas a cada 5 horas". */
+export const setScheduledMeasure = (on: boolean) => call<SettingsView>("set_scheduled_measure", { on });
+/** "Apagar o histórico…": os pontos de todas as contas (devolve quantos arquivos saíram). */
+export const clearHistory = () => call<number>("clear_history");
+
 // MARK: - Status line (a escolha mora na base do router; a CLI a lê a cada render)
 
 export const getStatusLine = () => call<StatusLineView>("get_status_line");
@@ -148,9 +160,9 @@ export async function onLoginChanged(handler: (view: LoginView | null) => void):
   return on<LoginView | null>("login-changed", handler);
 }
 
-/** A bandeja pediu outra aba com a janela já aberta. */
-export function onNavigate(handler: (tab: HomeTab) => void): Promise<UnlistenFn> {
-  return on<HomeTab>("navigate", handler);
+/** A bandeja pediu outra aba (ou o Histórico de uma conta) com a janela já aberta. */
+export function onNavigate(handler: (navigation: Navigation) => void): Promise<UnlistenFn> {
+  return on<Navigation>("navigate", handler);
 }
 
 /** O backend releu o quadro (laço de 30 s, ou uma ação mudou algo). No

@@ -21,8 +21,9 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 // Os prefixos são o contrato: chave de usuário começa por um destes. Sem
-// `alerts` (o medidor não entra no porte); `tray` é superfície nova do Windows.
-const PREFIXES = ["panel", "settings", "format", "groups", "home", "tray"];
+// `alerts` (o medidor não entra no porte); `tray` e `history` (a aba
+// Histórico, 21/10/2026) são superfícies novas do Windows.
+const PREFIXES = ["panel", "settings", "format", "groups", "home", "tray", "history"];
 const LOCALES = ["en", "pt-BR"];
 const SKIP = new Set(["node_modules", "dist", "target", "gen"]);
 

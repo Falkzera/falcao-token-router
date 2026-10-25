@@ -8,6 +8,8 @@ import CCUsageCore
 /// o trabalho; esta view só apresenta e chama.
 struct GroupsView: View {
     @Bindable var store: RouterConfigStore
+    /// Para o atalho de cada conta abrir o Histórico (21/10/2026).
+    let navigation: HomeNavigation
 
     @ViewState private var pendingLogin: PendingLogin?
     @ViewState private var newGroupSheet = false
@@ -24,7 +26,8 @@ struct GroupsView: View {
                         ForEach(store.config.groups) { group in
                             GroupCard(store: store, group: group,
                                       onAddAccount: { startAddAccount(to: group.id) },
-                                      onRelogin: { startRelogin($0, in: group.id) })
+                                      onRelogin: { startRelogin($0, in: group.id) },
+                                      onHistory: { navigation.showHistory(of: $0.id, in: group.id) })
                         }
                     }
                     .padding(16)

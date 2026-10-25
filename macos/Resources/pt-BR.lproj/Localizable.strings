@@ -14,14 +14,12 @@
 "panel.groups" = "Grupos";
 "panel.settings" = "Ajustes";
 "panel.quit" = "Sair";
-"panel.enableLive" = "Ligar ao vivo";
+"panel.enableLive" = "Usar o sensor";
 
 /* Painel — de onde veio o número */
 "panel.provenance.live" = "ao vivo";
 "panel.provenance.cached.format" = "cache do Claude Code · há %@";
 "panel.provenance.stale.format" = "cache defasada · há %@";
-"panel.provenance.expired.format" = "credencial expirada · rode o Claude Code (cache de há %@)";
-"panel.provenance.offline.format" = "sem conexão · cache de há %@";
 "panel.provenance.derived" = "estimado do seu histórico";
 
 /* Painel — reset das janelas */
@@ -43,8 +41,8 @@
 "alerts.reset.session.title" = "Janela de 5h resetou";
 "alerts.reset.weekly.title" = "Janela semanal resetou";
 "alerts.reset.body" = "Capacidade cheia de novo.";
-"alerts.liveRequired.title" = "Alertas precisam da busca ao vivo";
-"alerts.liveRequired.body" = "Sem ela o app lê o cache do Claude Code, que pode estar horas atrasado — e um alerta em cima disso erra nos dois sentidos. Ligue em Ajustes → Números de uso.";
+"alerts.liveRequired.title" = "Alertas precisam do número ao vivo";
+"alerts.liveRequired.body" = "Sem ele o app lê o cache do Claude Code, que pode estar horas atrasado — e um alerta em cima disso erra nos dois sentidos. Ligue em Ajustes → Números de uso.";
 
 /* Ajustes — plano */
 "settings.section.plan" = "Plano";
@@ -65,7 +63,7 @@
 /* Ajustes — alertas */
 "settings.section.alerts" = "Alertas";
 "settings.alerts.thresholds.toggle" = "Avisar ao aproximar do teto";
-"settings.alerts.thresholds.help" = "Notifica ao passar de um limiar de consumo. O alerta só sai com a busca ao vivo ligada: sobre o cache, ele erraria nos dois sentidos — e o pior deles é o silêncio enquanto você estoura o teto.";
+"settings.alerts.thresholds.help" = "Notifica ao passar de um limiar de consumo. O alerta só sai com o número ao vivo ligado: sobre o cache, ele erraria nos dois sentidos — e o pior deles é o silêncio enquanto você estoura o teto.";
 "settings.alerts.thresholds.label" = "Limiares";
 "settings.alerts.thresholds.empty" = "Nenhum limiar selecionado — nada será avisado.";
 "settings.alerts.reset.toggle" = "Avisar quando a janela resetar";
@@ -73,8 +71,8 @@
 "settings.alerts.windows.label" = "Janelas";
 "settings.alerts.window.session" = "5 horas";
 "settings.alerts.window.weekly" = "semanal";
-"settings.alerts.needsLive" = "Alertas precisam da busca ao vivo.";
-"settings.alerts.enableLive" = "Ligar busca ao vivo";
+"settings.alerts.needsLive" = "Alertas precisam do número ao vivo.";
+"settings.alerts.enableLive" = "Ligar o número ao vivo";
 "settings.alerts.denied" = "Notificações negadas nos Ajustes do Sistema.";
 "settings.alerts.openSystem" = "Abrir Ajustes do Sistema";
 
@@ -205,3 +203,32 @@
 "settings.statusline.item.resets" = "Quando cada janela reseta";
 "settings.statusline.item.cost" = "Custo da sessão";
 "settings.statusline.item.email" = "Conta ativa";
+
+/* Aba Histórico (21/10/2026) */
+"home.tab.history" = "Histórico";
+"home.history.intro" = "Cada ponto é uma medição do `/usage` do Claude Code: a cada 5 horas com o app aberto, mais cada “Medir contas” e cada `router measure`.";
+"home.history.empty.title" = "Nenhum grupo ainda";
+"home.history.empty.detail" = "Crie um grupo na aba Grupos. As contas dele aparecem aqui, com um ponto por medição.";
+"home.history.group.empty" = "Nenhuma conta neste grupo ainda.";
+"home.history.account.measured.format" = "medida há %@";
+"home.history.account.never" = "sem medições ainda";
+"home.history.account.next.format" = "próxima às %@";
+"home.history.account.nextSoon" = "próxima em instantes";
+"home.history.account.scheduleOff" = "medição automática desligada";
+"home.history.chart.fiveHour" = "5 horas · últimos 7 dias";
+"home.history.chart.sevenDay" = "Semanal · últimas 4 semanas";
+"home.history.chart.threshold.format" = "troca em %@";
+"home.history.chart.empty" = "Sem pontos neste período.";
+"home.history.chart.label.format" = "%1$@ — último %2$@";
+"groups.account.history" = "Histórico de uso desta conta";
+"panel.account.history" = "Ver histórico";
+"settings.section.history" = "Histórico";
+"settings.history.measure" = "Medir as contas a cada 5 horas";
+"settings.history.measure.detail" = "Roda o `/usage` do Claude Code em cada conta — a mesma consulta do “Medir contas” — enquanto o app está aberto, e guarda cada resultado para a aba Histórico.";
+"settings.history.clear" = "Apagar o histórico…";
+"settings.history.clear.detail" = "Apaga os pontos de todas as contas deste Mac. As medições continuam, e o histórico recomeça na próxima.";
+"settings.history.clear.title" = "Apagar o histórico?";
+"settings.history.clear.message" = "Todos os pontos de todas as contas saem deste Mac, e a aba Histórico fica vazia. Não dá para desfazer. Grupos, contas e logins ficam como estão.";
+"settings.history.clear.confirm" = "Apagar";
+"settings.history.cleared" = "Histórico apagado ✓";
+"settings.history.clear.failed.format" = "Não foi possível apagar o histórico: %@";

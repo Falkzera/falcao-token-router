@@ -42,6 +42,10 @@ Funções pequenas atrás das quais mora o que é da plataforma.
   linha do arquivo; modo append (segue link, não troca o arquivo); arquivo ilegível = erro.
 - `process.rs` — `run_with_timeout`: comando curto com prazo (stdout por thread, mata ao
   estourar), sem console (`CREATE_NO_WINDOW` — do app cada consulta piscaria uma janela).
+- `console.rs` — `ignore_interrupts_in_this_process`: o `router launch` sobrevive ao Ctrl+C
+  enquanto o `claude` filho roda (sem `exec` no Windows, o shell voltaria ao prompt com o
+  `claude` ainda vivo). Handler próprio, não o atalho `SetConsoleCtrlHandler(NULL, TRUE)`, que
+  os filhos herdariam.
 - `links.rs` — `junction` (pastas, sem privilégio), `symlink_file` (flag
   `ALLOW_UNPRIVILEGED_CREATE`; sem Developer Mode falha com 1314), `is_junction`/`is_symlink`,
   `developer_mode_enabled` (registro `AppModelUnlock`, só para dica na UI/`doctor`).
@@ -53,6 +57,6 @@ Funções pequenas atrás das quais mora o que é da plataforma.
   mata o shell, e um `node` pendurado sobraria a cada render (o Windows não tem grupo de
   processos). Criado suspenso para nenhum neto escapar entre o `spawn` e a entrada no job.
 
-## Pendências (Fase 4+)
-- console (Ctrl+C no `launch`, na CLI). A política de execução do PowerShell mora em
-  `engine::terminal_report` desde a fase 5.
+## Pendências
+- Nenhuma aberta. O Ctrl+C no `launch` está em `console.rs`; a política de execução do
+  PowerShell mora em `engine::terminal_report` desde a fase 5.
