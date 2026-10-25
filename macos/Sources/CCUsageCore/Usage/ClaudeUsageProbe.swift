@@ -53,16 +53,18 @@ public struct ClaudeUsageProbe: Sendable {
     }
 
     public enum ProbeError: Error, Equatable {
-        /// O binário saiu com código diferente de zero e a saída fala de login:
-        /// perfil sem login. Quem chama segue para a próxima conta.
+        /// Perfil sem login: o binário saiu com código diferente de zero e a
+        /// saída fala de login, ou saiu com zero sem nenhuma linha `Current`
+        /// (ver `interpret`). Quem chama segue para a próxima conta.
         case notSignedIn
         /// Saiu com código diferente de zero por outro motivo — sem rede, um
         /// 429, uma bandeira que uma versão nova removeu, um crash. NÃO é "sem
         /// login": tratar como tal mandava relogar uma conta sã, e relogar é a
         /// operação mais arriscada do produto.
         case failed(status: Int32)
-        /// Rodou, respondeu, e não havia nenhuma linha `Current …` na saída.
-        /// Formato novo: é isto que a próxima versão precisa suportar.
+        /// Rodou, respondeu, e nenhuma linha `Current …` se leu. Na leitura
+        /// (`interpret`), só quando havia uma: formato novo, é isto que a
+        /// próxima versão precisa suportar.
         case unrecognized
         /// Estourou o prazo. Um Node travado não pode segurar a medição inteira.
         case timedOut
@@ -125,7 +127,7 @@ public struct ClaudeUsageProbe: Sendable {
     /// Mede um perfil. `now` entra por parâmetro porque a escolha do ano da data
     /// de reset depende dele.
     public func read(configDir: ConfigDir, now: Date = Date()) throws -> Reading {
-        try Self.parse(output(configDir), now: now)
+        try Self.interpret(output(configDir), now: now)
     }
 
     // MARK: - Rodar
@@ -197,6 +199,25 @@ public struct ClaudeUsageProbe: Sendable {
             throw ProbeError.failed(status: status)
         }
         return output
+    }
+
+    /// O que uma saída de código zero diz. Sem nenhuma linha `Current` é "sem
+    /// login", e não formato novo (25/10/2026): o `claude` deslogado sai com 0
+    /// e só o resumo do `--print` — visto pelo porte Windows no 2.1.280, e o
+    /// JavaScript é o mesmo nas duas plataformas. Antes caía em
+    /// `unrecognized`, e a conta deslogada nunca ganhava o selo. Formato novo é
+    /// quando há linha `Current` e ela não se lê.
+    static func interpret(_ output: String, now: Date) throws -> Reading {
+        do {
+            return try parse(output, now: now)
+        } catch ProbeError.unrecognized where !hasCurrentLine(output) {
+            throw ProbeError.notSignedIn
+        }
+    }
+
+    private static func hasCurrentLine(_ text: String) -> Bool {
+        text.split(whereSeparator: \.isNewline)
+            .contains { $0.drop(while: \.isWhitespace).hasPrefix("Current ") }
     }
 
     // MARK: - Ler o que ele disse

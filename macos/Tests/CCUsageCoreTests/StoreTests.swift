@@ -697,6 +697,29 @@ struct RouterConfigStoreTests {
         #expect(store.usageDetail[a.id]?.origin == .probe)
     }
 
+    /// A marcada sem login tem na casa uma credencial que a sonda já viu morta.
+    /// Passar o grupo para ela derrubaria as sessões abertas, que a conta
+    /// removida ainda atende — e, sem amostra, ela vinha primeiro na fila.
+    @Test("remover a conta em uso não passa o grupo para uma conta sem login")
+    func handOverSkipsASignedOutAccount() async throws {
+        let (store, kc, adapter, paths) = makeStore()
+        let group = store.addGroup(name: "trabalho")
+        let a = try #require(addAccount("conta1@exemplo.com", to: group.id, store: store,
+                                        kc: kc, adapter: adapter, paths: paths))
+        let b = try #require(addAccount("conta2@exemplo.com", to: group.id, store: store,
+                                        kc: kc, adapter: adapter, paths: paths))
+        let c = try #require(addAccount("conta3@exemplo.com", to: group.id, store: store,
+                                        kc: kc, adapter: adapter, paths: paths))
+        store.activate(a, in: store.config.groups[0])
+        await store.measureAccounts(in: store.config.groups[0],
+                                    using: probe(semLogin: [b.home.raw]))
+        try #require(store.isSignedOut(b.id))
+
+        store.removeAccount(a.id)
+
+        #expect(store.activeAccount(in: store.config.groups[0])?.id == c.id)
+    }
+
     /// A marca é o veredito da última medição QUE DISSE algo sobre o login: um
     /// prazo estourado não a põe nem a tira; responder de novo a tira.
     @Test("prazo estourado não mexe na marca; responder de novo a tira")

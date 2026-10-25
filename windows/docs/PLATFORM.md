@@ -141,7 +141,8 @@ after recording the sample — the sensor is the same in every mode:
 
 ## The measurement history
 
-Windows only (2026-10-21). Every probe measurement — **Measure accounts**,
+Since 2026-10-21, and on macOS too since its port (#36), in the same format — the
+two apps read each other's files. Every probe measurement — **Measure accounts**,
 `router measure`, and the app's own every-5-hours schedule — leaves a point in
 `<data dir>\history\<e-mail>.jsonl`. The engine writes it inside the probe
 (`measure_into`), after the sample and under the same engine lock:
@@ -320,7 +321,7 @@ folder. A real profile always has the folder, and the sandbox now creates it.
 | Data directory | `~/Library/Application Support/com.synqo.falcao-router` | `%LOCALAPPDATA%\com.synqo.falcao-router` (Local, not Roaming) |
 | Finding `claude` | three separate searches | one resolver: `ROUTER_CLAUDE_BIN`, `~\.local\bin\claude.exe`, `PATH`, `%APPDATA%\npm` (an npm `claude.cmd` shim is read and run as `node cli.js`, never through `cmd.exe`); Claude Desktop's copy and WindowsApps aliases are skipped |
 | Group status line | the router's line with the items the user keeps (`statusline.json`) | the same, or the user's own command after the sensor |
-| The probe | a button and `router measure` | the same, plus every 5 hours while the app runs; each reading kept in `history\<e-mail>.jsonl` for the History tab |
+| The probe | a button, `router measure`, and every 5 hours while the app runs; each reading kept in `history/<e-mail>.jsonl` | the same, in `history\<e-mail>.jsonl` |
 
 ## Deliberate differences
 

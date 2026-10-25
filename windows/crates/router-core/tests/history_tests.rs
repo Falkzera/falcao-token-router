@@ -1,4 +1,4 @@
-//! O histórico de uso (21/10/2026, só do Windows): um ponto por medição da
+//! O histórico de uso (21/10/2026): um ponto por medição da
 //! sonda em `<base>\history\<email>.jsonl`, para a aba Histórico do app.
 
 mod common;

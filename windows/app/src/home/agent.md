@@ -1,7 +1,7 @@
 # app/src/home — a janela Grupos / Histórico / Ajustes (≙ Settings/HomeWindow.swift + GroupsView.swift)
 
 ## Arquivos
-- `Home.svelte` — as três abas, **Grupos** (o produto), **Histórico** (21/10/2026, só do Windows)
+- `Home.svelte` — as três abas, **Grupos** (o produto), **Histórico** (21/10/2026; o macOS tem a sua desde o #36)
   e **Ajustes** (sem medidor nesta entrega).
   O tamanho é da janela (abre no último, 520×620 na 1ª vez; redimensiona e maximiza — o Rust
   cuida, `home_window.rs`), nunca do conteúdo: as abas têm alturas naturais diferentes e a

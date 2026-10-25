@@ -89,18 +89,24 @@ struct HistoryChart: View {
             }
     }
 
+    // Os nomes das dimensões são o que o VoiceOver lê de cada ponto: vêm do
+    // catálogo, senão o app em inglês fala português.
+    private static let axisWhen = String(localized: "home.history.chart.axis.when")
+    private static let axisUsage = String(localized: "home.history.chart.axis.usage")
+    private static let axisSegment = String(localized: "home.history.chart.axis.segment")
+
     @ChartContentBuilder
     private var lineMarks: some ChartContent {
         ForEach(Array(series.segments.enumerated()), id: \.offset) { index, segment in
             ForEach(segment) { point in
-                LineMark(x: .value("quando", point.at), y: .value("uso", point.fraction),
-                         series: .value("trecho", index))
+                LineMark(x: .value(Self.axisWhen, point.at), y: .value(Self.axisUsage, point.fraction),
+                         series: .value(Self.axisSegment, index))
                     .foregroundStyle(line)
                     .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
             }
         }
         ForEach(dots) { point in
-            PointMark(x: .value("quando", point.at), y: .value("uso", point.fraction))
+            PointMark(x: .value(Self.axisWhen, point.at), y: .value(Self.axisUsage, point.fraction))
                 .foregroundStyle(line)
                 .symbolSize(36)
         }
@@ -109,9 +115,9 @@ struct HistoryChart: View {
     @ChartContentBuilder
     private var selectionMarks: some ChartContent {
         if let shown {
-            RuleMark(x: .value("quando", shown.at))
+            RuleMark(x: .value(Self.axisWhen, shown.at))
                 .foregroundStyle(Color.secondary.opacity(0.4))
-            PointMark(x: .value("quando", shown.at), y: .value("uso", shown.fraction))
+            PointMark(x: .value(Self.axisWhen, shown.at), y: .value(Self.axisUsage, shown.fraction))
                 .foregroundStyle(line)
                 .symbolSize(70)
                 .annotation(position: .top, spacing: 4,

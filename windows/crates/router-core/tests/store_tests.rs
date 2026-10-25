@@ -437,6 +437,33 @@ fn the_next_one_skips_an_account_over_the_threshold() {
     );
 }
 
+/// A marcada sem login tem na casa uma credencial que a sonda já viu morta:
+/// passar o grupo para ela derrubaria as sessões abertas, que a conta removida
+/// ainda atende — e, sem amostra, ela vinha primeiro na fila.
+#[test]
+fn the_next_one_skips_a_signed_out_account() {
+    use router_core::engine::router_config_store::MeasureSummary;
+    let mut env = make_store();
+    let group = env.store.add_group("trabalho");
+    let a = env.add_account("conta1@exemplo.com", group.id);
+    let b = env.add_account("conta2@exemplo.com", group.id);
+    let c = env.add_account("conta3@exemplo.com", group.id);
+    env.store.activate(&a, &env.group(group.id));
+    env.store.finish_measure(MeasureSummary {
+        measured: vec![],
+        failed: 1,
+        signed_out: vec![b.id],
+    });
+    assert!(env.store.is_signed_out(b.id));
+
+    env.store.remove_account(a.id);
+
+    assert_eq!(
+        env.store.active_account(&env.group(group.id)).map(|x| x.id),
+        Some(c.id)
+    );
+}
+
 /// Sem ninguém com folga o grupo troca do mesmo jeito: ficar seria seguir na
 /// conta que o usuário acabou de remover.
 #[test]

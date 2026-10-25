@@ -45,7 +45,7 @@ tudo vive sob `windows/`, mais dois workflows: `windows.yml` (filtrado por camin
 - **Release `windows-v1.0.0`** publicada em 24/09/2026 (`windows-release.yml`).
 - **Histórico de uso** (21/10/2026, pedido do usuário; desenho em
   `docs/specs/2026-10-21-usage-history-design.md`): toda medição da sonda vira um ponto em
-  `<base>\history\<email>.jsonl` (só do Windows, fora do contrato com o macOS); o app mede cada
+  `<base>\history\<email>.jsonl` (no contrato com o macOS desde o #36); o app mede cada
   conta de 5 em 5 horas enquanto está aberto (chave nos Ajustes, ligada de fábrica) e a aba
   Histórico desenha a janela de 5h (7 dias) e a semanal (4 semanas). A sonda deixou de ser
   "nunca laço" — decisão do usuário.

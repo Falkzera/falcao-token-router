@@ -216,7 +216,19 @@ impl ClaudeUsageProbe {
     /// deslogado imprime no Windows. Linha `Current` que não se lê é formato novo.
     pub fn interpret(output: &ProbeOutput, now: DateTime<Utc>) -> Result<Reading, ProbeError> {
         if output.exit_code != Some(0) {
-            return Err(ProbeError::NotSignedIn);
+            // Código diferente de zero só é "sem login" quando a saída fala de
+            // login — a regra do macOS desde 10/2026 (25/10/2026). Antes
+            // qualquer código virava, e com o selo de sem login uma medição
+            // sem rede marcaria todas as contas. O stderr não é lido (ver
+            // `run`): o que não vier no stdout cai em falha, que conta no
+            // aviso mas não marca a conta.
+            if speaks_of_login(&output.stdout) {
+                return Err(ProbeError::NotSignedIn);
+            }
+            return Err(ProbeError::Failed(match output.exit_code {
+                Some(code) => format!("saída com o código {code}"),
+                None => "encerrado sem código de saída".to_string(),
+            }));
         }
         match Self::parse(&output.stdout, now) {
             Err(ProbeError::Unrecognized) if !has_current_line(&output.stdout) => {
@@ -335,6 +347,11 @@ fn stamp_regex() -> &'static Regex {
         )
         .expect("regex da data de reset")
     })
+}
+
+fn speaks_of_login(text: &str) -> bool {
+    let text = text.to_lowercase();
+    text.contains("login") || text.contains("log in") || text.contains("not logged")
 }
 
 fn has_current_line(text: &str) -> bool {
