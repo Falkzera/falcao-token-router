@@ -10,17 +10,17 @@ import Observation
 @MainActor
 @Observable
 public final class RouterConfigStore {
-    public private(set) var config: RouterConfig
+    public internal(set) var config: RouterConfig
     /// Uso 0–1 por conta, lido do sensor. Observável, para a lista de grupos
     /// redesenhar as barras quando o número muda.
-    public private(set) var usageSnapshot: [UUID: Double] = [:]
+    public internal(set) var usageSnapshot: [UUID: Double] = [:]
     /// Quando a amostra de cada conta foi colhida — a idade que a UI mostra
     /// para nunca fingir um frescor que o sensor passivo não tem.
-    public private(set) var usageSampledAt: [UUID: Date] = [:]
+    public internal(set) var usageSampledAt: [UUID: Date] = [:]
     /// O mesmo uso de `usageSnapshot`, mas com a janela de onde o número veio e
     /// as duas medidas. É o que deixa a UI rotular "66% · 7d" em vez de um "66%"
     /// solto que o usuário lê como sendo o das 5 horas.
-    public private(set) var usageDetail: [UUID: AccountUsage] = [:]
+    public internal(set) var usageDetail: [UUID: AccountUsage] = [:]
     /// As sessões do Claude Code vivas em cada grupo (grupo → sessões).
     ///
     /// Vem do registro que o próprio Claude Code escreve em
@@ -29,24 +29,24 @@ public final class RouterConfigStore {
     /// resposta que o `/status` não dá, e o contra-veneno do modo de falha
     /// silencioso: sessão que devia estar num grupo e subiu no perfil padrão
     /// aparece do lado errado da lista.
-    public private(set) var liveSessions: [UUID: [LiveSession]] = [:]
+    public internal(set) var liveSessions: [UUID: [LiveSession]] = [:]
     /// A conta ativa de cada grupo (grupo → conta). Observável, para a barra e o
     /// painel mostrarem quem serve cada grupo sem reler o disco a cada frame.
-    public private(set) var activeByGroup: [UUID: UUID] = [:]
+    public internal(set) var activeByGroup: [UUID: UUID] = [:]
     /// As contas que se mostraram SEM LOGIN, com quando: a sonda não achou login
     /// no perfil, ou "Usar" não achou credencial na casa. É o selo amarelo da
     /// tela — o aviso da medição dizia só QUANTAS, e não havia como saber qual
     /// relogar. Sai quando a conta prova o contrário (responde à sonda, relogin
     /// renovado, amostra do sensor mais nova que a marca). Só em memória: o
     /// formato em disco é o contrato com o Windows.
-    public private(set) var signedOut: [UUID: Date] = [:]
+    public internal(set) var signedOut: [UUID: Date] = [:]
     /// Última falha de uma ação, para a UI mostrar. `nil` quando tudo correu bem.
-    public private(set) var lastError: String?
+    public internal(set) var lastError: String?
     /// Contas com relogin em andamento. A rotação não espelha a ativa delas
     /// enquanto isso: o relogin grava a credencial NOVA na casa, e o espelho
     /// (grupo → casa) escreveria por cima a MORTA que motivou o relogin — que o
     /// fim do relogin empurraria de volta para o grupo (issue #12).
-    @ObservationIgnored private var reloginInFlight: Set<UUID> = []
+    @ObservationIgnored var reloginInFlight: Set<UUID> = []
     /// O grupo que está sendo sondado agora, ou `nil`. Observável porque a
     /// sondagem leva segundos — sem indicação, o clique parece não fazer nada.
     /// A agenda de 5 em 5 horas (`RouterConfigStore+History.swift`) usa a mesma
@@ -66,12 +66,12 @@ public final class RouterConfigStore {
     /// Espelho OBSERVÁVEL de `shellIntegrationInstalled`: aquele é computado
     /// lendo o disco, e computado não dispara re-render — o clique em "Ativar"
     /// funcionava e a tela ficava parada, parecendo botão morto.
-    public private(set) var integrationInstalled = false
+    public internal(set) var integrationInstalled = false
 
     /// O que a status line dos grupos mostra. **Observável e em memória**: uma
     /// computada que lesse o disco não re-renderizaria a tela ao mudar — foi
     /// exatamente o bug do botão "Ativar". O disco é a cópia, não a fonte da UI.
-    public private(set) var statusLineChoice = StatusLineChoice()
+    public internal(set) var statusLineChoice = StatusLineChoice()
     /// Caminho do binário `router` empacotado, que a integração de shell e a
     /// status line apontam. Setado pelo app ao iniciar; `nil` fora do app.
     @ObservationIgnored public var routerPath: String?
@@ -79,18 +79,19 @@ public final class RouterConfigStore {
     /// `true` só quando o `config.json` existia e foi lido inteiro. É a trava
     /// das limpezas que apagam o que o registro não cita: com o registro vazio
     /// por falha de leitura, tudo pareceria órfão.
-    @ObservationIgnored private var configLoadedFromDisk = false
+    @ObservationIgnored var configLoadedFromDisk = false
     /// Um `config.json` que não pôde ser lido NEM guardado de lado nunca é
     /// sobrescrito — ver `init`.
     @ObservationIgnored private var refuseToSave = false
 
-    // Do módulo, e não do arquivo: o histórico e a agenda moram numa extensão
-    // em outro arquivo (`RouterConfigStore+History.swift`, régua das 600 linhas).
+    // Do módulo, e não do arquivo: o store mora em cinco arquivos (este e as
+    // extensões `+Accounts`, `+Measure`, `+Terminal` e `+History`), pela régua
+    // das 600 linhas. Fora do módulo, nada disto aparece.
     @ObservationIgnored let paths: RouterPaths
     @ObservationIgnored let engine: RotationEngine
-    @ObservationIgnored private let keychain: any KeychainStore
-    @ObservationIgnored private let login: AccountLoginService
-    @ObservationIgnored private let usage: GroupUsageReader
+    @ObservationIgnored let keychain: any KeychainStore
+    @ObservationIgnored let login: AccountLoginService
+    @ObservationIgnored let usage: GroupUsageReader
 
     public init(paths: RouterPaths = RouterPaths(),
                 keychain: any KeychainStore = SecurityCLIKeychain(),
@@ -152,7 +153,7 @@ public final class RouterConfigStore {
         return .loaded(config)
     }
 
-    private func save() {
+    func save() {
         guard !refuseToSave else { return }
         do {
             try FileManager.default.createDirectory(
@@ -289,204 +290,6 @@ public final class RouterConfigStore {
         config.groups[i].configDir = target
     }
 
-    // MARK: - Contas
-
-    /// Reserva a casa de uma conta nova (o perfil onde ela fará login), sem
-    /// lançar nada. Quem conduz o login (o app, in-app) usa este caminho; o
-    /// resultado é confirmado depois por `finishPendingLogin`.
-    public func newAccountHome() -> (home: ConfigDir, accountID: UUID) {
-        let id = UUID()
-        let home = paths.accountHome(id)
-        try? FileManager.default.createDirectory(at: home.url, withIntermediateDirectories: true)
-        return (home, id)
-    }
-
-    /// Desfaz a casa reservada de um login que não virou conta — cancelado,
-    /// fechado, falho, ou que trouxe uma conta que já está no grupo.
-    ///
-    /// O `claude auth login` grava a credencial na casa ANTES de alguém saber de
-    /// quem ela é. Até 10/2026 nada a apagava: cada "Tentar de novo" depois de
-    /// uma duplicada deixava mais um refresh token vivo no chaveiro, que o app
-    /// não mostrava nem sabia remover.
-    ///
-    /// Só apaga o que é seguro: casa de uma conta que NÃO está no registro, e
-    /// dentro de `<base>/accounts/`. Relogin reusa a casa de uma conta que
-    /// existe, e por isso nunca passa daqui.
-    public func discardPendingHome(_ home: ConfigDir, accountID: UUID) {
-        guard config.account(accountID) == nil,
-              home.url.standardizedFileURL.path == paths.accountHome(accountID).url
-                .standardizedFileURL.path
-        else { return }
-        keychain.delete(service: engine.keychainService(for: home, provider: .anthropic))
-        try? FileManager.default.removeItem(at: home.url)
-    }
-
-    /// Apaga as casas que nenhuma conta do registro cita — sobras de logins
-    /// interrompidos (o app fechado no meio, ou anteriores à limpeza do
-    /// `discardPendingHome`). Roda na subida do app, quando nenhum login está
-    /// em andamento, e só com o `config.json` lido inteiro: com o registro vazio
-    /// por falha de leitura, tudo pareceria órfão.
-    public func discardOrphanHomes() {
-        guard configLoadedFromDisk else { return }
-        let accountsDir = paths.base.appending(path: "accounts")
-        guard let entries = try? FileManager.default.contentsOfDirectory(
-            at: accountsDir, includingPropertiesForKeys: nil) else { return }
-        let referenced = Set(config.accounts.map { $0.home.url.standardizedFileURL.path })
-        for entry in entries {
-            guard let id = UUID(uuidString: entry.lastPathComponent),
-                  !referenced.contains(entry.standardizedFileURL.path)
-            else { continue }
-            discardPendingHome(paths.accountHome(id), accountID: id)
-        }
-    }
-
-    /// O resultado de checar um login pendente.
-    public enum LoginOutcome: Sendable, Equatable {
-        /// Ainda não terminou; continue observando.
-        case pending
-        /// Entrou uma conta nova; foi adicionada ao grupo.
-        case added(Account)
-        /// O login trouxe uma conta que já está no grupo — quase sempre porque o
-        /// navegador ainda estava logado nela. O e-mail diz qual.
-        case duplicate(email: String)
-    }
-
-    /// Confere se um login pendente terminou. Distingue "ainda não" de "veio a
-    /// mesma conta de novo", que é o caso comum quando o navegador não pediu para
-    /// escolher a conta.
-    @discardableResult
-    public func finishPendingLogin(home: ConfigDir, accountID: UUID,
-                                   into groupID: UUID, provider: Provider = .anthropic)
-        -> LoginOutcome {
-        guard let identity = login.loginResult(inHome: home, keychain: keychain) else {
-            return .pending
-        }
-        // A mesma conta já está neste grupo: rejeita e diz o e-mail, para a UI
-        // explicar (provavelmente a sessão do navegador não trocou).
-        let inGroup = config.groups.first { $0.id == groupID }?.accountIDs ?? []
-        if config.accounts.contains(where: {
-            $0.identity.email == identity.email && inGroup.contains($0.id)
-        }) {
-            return .duplicate(email: identity.email)
-        }
-        let account = Account(id: accountID, provider: provider,
-                              identity: identity, home: home)
-        config.accounts.append(account)
-        if let i = config.groups.firstIndex(where: { $0.id == groupID }) {
-            config.groups[i].accountIDs.append(account.id)
-        }
-        save()
-        return .added(account)
-    }
-
-    /// O resultado de checar um relogin pendente.
-    public enum ReloginOutcome: Sendable, Equatable {
-        /// Ainda não terminou; continue observando.
-        case pending
-        /// A credencial nova entrou, na mesma conta. Se ela estava ativa num
-        /// grupo, o item do grupo já recebeu a credencial nova.
-        case renewed(Account)
-        /// O navegador logou OUTRA conta. Nada do registro muda; a UI explica
-        /// e oferece tentar de novo.
-        case wrongAccount(expected: String, got: String)
-    }
-
-    /// Confere se o relogin de uma conta existente terminou. Relogin reusa a
-    /// MESMA casa (o `claude auth login` sobrescreve credencial e identidade),
-    /// então sucesso aqui significa: casa com identidade + credencial de novo.
-    @discardableResult
-    public func finishRelogin(accountID: UUID) -> ReloginOutcome {
-        guard let i = config.accounts.firstIndex(where: { $0.id == accountID }),
-              let identity = login.loginResult(inHome: config.accounts[i].home,
-                                               keychain: keychain)
-        else { return .pending }
-
-        let expected = config.accounts[i].identity.email
-        guard identity.email == expected else {
-            // O `claude auth login` já gravou a credencial da OUTRA conta na casa
-            // desta. Deixada lá, ela ficava com o nome desta: "Usar" serviria a
-            // outra conta sob este nome, e o sensor carimbaria o consumo no
-            // e-mail errado (issue #12). Credencial e identidade estranhas
-            // saem; a conta volta a pedir relogin — a credencial que havia ali
-            // era a morta que motivou este.
-            engine.resetProfile(config.accounts[i].home, provider: config.accounts[i].provider)
-            reloginInFlight.remove(accountID)
-            return .wrongAccount(expected: expected, got: identity.email)
-        }
-        reloginInFlight.remove(accountID)
-        config.accounts[i].identity = identity  // tier/organização podem ter mudado
-        save()
-        signedOut[accountID] = nil
-        // Conta ativa num grupo: o item do grupo guarda a credencial MORTA que
-        // motivou o relogin — a nova precisa ir por cima, senão a próxima
-        // sessão continua no "Login expired".
-        for group in config.groups
-        where engine.activeAccount(in: group, config: config)?.id == accountID {
-            engine.pushHomeToGroup(config.accounts[i], in: group)
-        }
-        refreshUsage()
-        return .renewed(config.accounts[i])
-    }
-
-    /// Marca o início e o fim de um relogin, para a rotação não espelhar a conta
-    /// no meio dele (ver `reloginInFlight`). Idempotentes.
-    public func beginRelogin(_ accountID: UUID) { reloginInFlight.insert(accountID) }
-    public func endRelogin(_ accountID: UUID) { reloginInFlight.remove(accountID) }
-
-    /// Remove a conta do registro **e apaga a credencial dela**.
-    ///
-    /// Até 18/09/2026 só o registro saía: o item de chaveiro e a pasta da casa
-    /// ficavam para trás, com um refresh token vivo, para sempre. Num produto
-    /// pago isso é promessa quebrada — "remover a conta" tem de remover a conta.
-    ///
-    /// Se ela serve um grupo agora, o grupo passa para a próxima conta (ver
-    /// `handOver`) — a troca a quente de sempre, então a sessão viva segue, só
-    /// que atendida pela próxima. Até 22/10/2026 o item do grupo ficava
-    /// intocado: o grupo seguia servido pela conta removida, e a tela o
-    /// mostrava sem conta em uso.
-    ///
-    /// Sem próxima (era a única, ou nenhuma pode assumir), o item do GRUPO
-    /// segue intocado: pode haver sessão viva atendida por ele agora, e
-    /// derrubar o trabalho de alguém não é consequência aceitável de arrumar a
-    /// lista.
-    public func removeAccount(_ accountID: UUID) {
-        guard let account = config.account(accountID) else { return }
-        let service = engine.homeKeychainService(for: account)
-        // Apurado ANTES de a conta sair do registro: depois, a identidade no
-        // perfil do grupo não casa com conta nenhuma.
-        let served = config.groups
-            .filter { engine.activeAccount(in: $0, config: config)?.id == accountID }
-            .map(\.id)
-
-        config.accounts.removeAll { $0.id == accountID }
-        for i in config.groups.indices {
-            config.groups[i].accountIDs.removeAll { $0 == accountID }
-        }
-        save()
-        signedOut[accountID] = nil
-
-        for groupID in served { handOver(groupID) }
-
-        keychain.delete(service: service)
-        try? FileManager.default.removeItem(at: account.home.url)
-        refreshUsage()
-    }
-
-    /// Passa o grupo cuja conta ativa acabou de ser removida para a primeira
-    /// de `RotationEngine.successors` que aceitar a ativação — quem não pode
-    /// (sem credencial na casa, ativa noutro grupo) é pulada. Com a conta já
-    /// fora do registro, o `activate` não espelha a que sai: a casa dela vai
-    /// ser apagada. Se outra conta do registro já está no grupo (a CLI rodou a
-    /// rotação no meio), fica a escolha dela.
-    private func handOver(_ groupID: UUID) {
-        guard let group = config.groups.first(where: { $0.id == groupID }),
-              engine.activeAccount(in: group, config: config) == nil
-        else { return }
-        for candidate in engine.successors(for: group, config: config, usage: usageSnapshot) {
-            if (try? engine.activate(candidate, in: group, config: config)) != nil { return }
-        }
-    }
-
     // MARK: - Rotação (ações que tocam o sistema)
 
     /// A conta que serve um grupo agora.
@@ -522,82 +325,6 @@ public final class RouterConfigStore {
     /// A conta se mostrou sem login e ainda não provou o contrário.
     public func isSignedOut(_ accountID: UUID) -> Bool { signedOut[accountID] != nil }
 
-    /// Mede as contas de um grupo com a **sonda ativa**, e publica o resultado.
-    ///
-    /// É o que o sensor passivo não consegue: conta ociosa nunca serviu
-    /// mensagem nenhuma, então não tem amostra — aparecia como "pronta", sem
-    /// número, e a rotação a presumia fresca. A sonda pergunta ao binário
-    /// oficial e traz o quadro inteiro, inclusive o limite POR MODELO, que não
-    /// chega no `rate_limits` da status line e é o que estoura primeiro.
-    ///
-    /// Sob demanda (este botão) — e, com o app aberto, de 5 em 5 horas pela
-    /// agenda (`runScheduledMeasure`, 21/10/2026). Nunca no laço de 3 minutos:
-    /// cada conta custa um processo Node subindo do zero e uma requisição de
-    /// verdade. Medir cinco contas leva ~15s. Toda medição deixa um ponto no
-    /// histórico (`ProbeRecord`).
-    ///
-    /// `probe` é injetável para teste; sem ele, a sonda sobre o binário instalado.
-    public func measureAccounts(in group: AccountGroup, using probe: ClaudeUsageProbe? = nil) async {
-        guard measuringGroup == nil else { return }
-        measuringGroup = group.id
-        defer { measuringGroup = nil }
-
-        let contas = config.accounts(in: group)
-        let configNoClique = config
-        let engine = self.engine
-        let usageDir = paths.usageDir
-        let historyDir = paths.historyDir
-        let scratchBase = paths.base
-
-        // Conta por conta, e não só quantas: o aviso que dizia "N conta(s) não
-        // responderam" não deixava saber QUAL relogar.
-        let saldo = await Task.detached(priority: .userInitiated) {
-            () -> (responderam: [UUID], semLogin: [UUID], falhas: Int)? in
-            guard let sonda = probe ?? ClaudeUsageProbe.system(scratchBase: scratchBase)
-            else { return nil }
-            var responderam: [UUID] = [], semLogin: [UUID] = [], falhas = 0
-            for conta in contas {
-                // O perfil é decidido AGORA, conta a conta, relendo do disco
-                // quem está ativa: conta ativa vai pelo perfil do grupo, nunca
-                // pela casa (ver `probeConfigDir` — sondar a casa de uma conta
-                // ativa derruba a sessão viva). Decidido no clique, um
-                // `claude <grupo>` aberto em outro terminal no meio da medição
-                // fazia a sonda chegar na casa de uma conta que já estava ativa.
-                // Dentro do app, a rotação e o "Usar" esperam a medição.
-                let alvo = (email: conta.identity.email,
-                            dir: engine.probeConfigDir(for: conta, config: configNoClique))
-                do {
-                    let leitura = try sonda.read(configDir: alvo.dir)
-                    try ProbeRecord.write(leitura, email: alvo.email, configDir: alvo.dir,
-                                          usageDir: usageDir, historyDir: historyDir)
-                    responderam.append(conta.id)
-                } catch ClaudeUsageProbe.ProbeError.notSignedIn {
-                    falhas += 1
-                    semLogin.append(conta.id)
-                } catch {
-                    // Prazo estourado, formato novo: falha, mas não diz nada
-                    // sobre o login — a marca da conta fica como estava.
-                    falhas += 1
-                }
-            }
-            return (responderam: responderam, semLogin: semLogin, falhas: falhas)
-        }.value
-
-        // Texto cru, como o resto dos `lastError` deste arquivo: o core não
-        // carrega catálogo (a CLI `router` o linka e não tem bundle de app).
-        guard let saldo else {
-            lastError = "binário `claude` não encontrado — a sonda precisa dele"
-            refreshUsage()
-            return
-        }
-        lastError = saldo.falhas == 0 ? nil
-            : "\(saldo.falhas) conta(s) não responderam à sonda — veja se precisam de Relogar"
-        for id in saldo.responderam { signedOut[id] = nil }
-        let agora = Date()
-        for id in saldo.semLogin { signedOut[id] = agora }
-        refreshUsage()
-    }
-
     /// Relê o uso do sensor e a conta ativa de cada grupo, e publica ambos —
     /// e, desde 21/10/2026, o histórico de cada conta, para a aba Histórico
     /// ganhar o ponto novo sem esperar. Chamado pelo laço do app, e ao abrir a
@@ -629,100 +356,6 @@ public final class RouterConfigStore {
         refreshHistory()
     }
 
-    // MARK: - Integração com o terminal
-
-    /// O arquivo de shell que o usuário passa a dar `source`.
-    public var shellScriptURL: URL { paths.base.appending(path: "shell.sh") }
-
-    /// A linha que ativa a integração no shell (adicionada automaticamente).
-    public var shellSourceLine: String { "source \"\(shellScriptURL.path)\"" }
-
-    /// O profile do shell onde a linha é adicionada (zsh é o padrão do macOS).
-    public var profileURL: URL {
-        FileManager.default.homeDirectoryForCurrentUser.appending(path: ".zshrc")
-    }
-
-    /// `true` quando a linha da integração já está no `~/.zshrc`.
-    public var profileHasIntegration: Bool {
-        let resolved = profileURL.resolvingSymlinksInPath()
-        guard let content = try? String(contentsOf: resolved, encoding: .utf8) else { return false }
-        return content.contains(shellScriptURL.path)
-    }
-
-    /// `true` quando a integração já foi escrita (script + linha no profile).
-    public var shellIntegrationInstalled: Bool {
-        FileManager.default.fileExists(atPath: shellScriptURL.path) && profileHasIntegration
-    }
-
-    /// Escreve a função de shell e planta a status line do sensor em cada perfil
-    /// de grupo. Idempotente. Devolve a linha de `source` para a UI mostrar, ou
-    /// `nil` se o caminho do binário não é conhecido.
-    @discardableResult
-    public func installShellIntegration() -> String? {
-        guard let routerPath else {
-            lastError = "não foi possível localizar o binário do app"
-            return nil
-        }
-        do {
-            try FileManager.default.createDirectory(
-                at: paths.base, withIntermediateDirectories: true)
-            try ShellIntegration.shellFunction(routerPath: routerPath)
-                .write(to: shellScriptURL, atomically: true, encoding: .utf8)
-            // Planta a status line em cada perfil de grupo, preservando o
-            // settings.json que já houver (o padrão ~/.claude tem `model` etc.),
-            // e compartilha histórico + skills para o `--resume` funcionar.
-            for group in config.groups {
-                try? ShellIntegration.installStatusLine(
-                    routerPath: routerPath, into: group.configDir)
-                ProfileSharing.link(into: group.configDir, shareHistory: config.shareHistory)
-            }
-            // Adiciona a linha ao ~/.zshrc automaticamente — é o que torna isto
-            // plug-and-play: o usuário não edita arquivo nenhum.
-            try? ShellIntegration.ensureInProfile(
-                sourceLine: shellSourceLine, scriptPath: shellScriptURL.path,
-                profileURL: profileURL)
-            lastError = nil
-            integrationInstalled = shellIntegrationInstalled
-            return shellSourceLine
-        } catch {
-            lastError = "não foi possível instalar a integração: \(error)"
-            integrationInstalled = shellIntegrationInstalled
-            return nil
-        }
-    }
-
-    /// A integração instalada aponta para um binário que não é mais este.
-    ///
-    /// O `shell.sh` e a `statusLine` de cada perfil guardam o caminho
-    /// **absoluto** do `router`, e o `router` mora dentro do `.app`. Mover,
-    /// renomear ou reinstalar o app noutro lugar deixa os dois apontando para um
-    /// caminho que não existe — e o modo de falha é silencioso, que é o que o
-    /// torna grave: a função de shell não acha o binário, o `is-group` falha, e
-    /// `claude trabalho` cai no `command claude` do final, abrindo a sessão no
-    /// `~/.claude`, **na conta errada**, sem nenhum aviso.
-    public var integrationIsStale: Bool {
-        guard let routerPath,
-              FileManager.default.fileExists(atPath: shellScriptURL.path)
-        else { return false }  // não instalada não é obsoleta; é ausente.
-        let script = (try? String(contentsOf: shellScriptURL, encoding: .utf8)) ?? ""
-        if !script.contains(routerPath) { return true }
-        return config.groups.contains {
-            ShellIntegration.statusLineIsStale(routerPath: routerPath, in: $0.configDir)
-        }
-    }
-
-    /// Reescreve a integração quando ela ficou obsoleta. Devolve `true` se
-    /// mexeu em alguma coisa.
-    ///
-    /// Automático, e não um botão, justamente porque a falha é silenciosa: quem
-    /// foi atingido é quem não tem como saber que precisa apertá-lo. Roda na
-    /// subida do app, depois que o `routerPath` é conhecido.
-    @discardableResult
-    public func healShellIntegration() -> Bool {
-        guard integrationIsStale else { return false }
-        return installShellIntegration() != nil
-    }
-
     /// Roda uma volta da rotação automática em todos os grupos: cada grupo que
     /// passou do limiar e tem para onde ir, troca. Fail-safe: quem não tem
     /// destino fica onde está. Usa o `usageSnapshot` mais recente.
@@ -742,31 +375,6 @@ public final class RouterConfigStore {
             guard let target = engine.rotationTarget(
                 for: group, config: config, usage: usageSnapshot) else { continue }
             activate(target, in: group)
-        }
-    }
-
-    // MARK: - A escolha da status line
-
-    /// Liga ou desliga um item da linha. Grava na hora: a CLI relê a escolha a
-    /// cada render, então o efeito aparece na próxima atualização da sessão,
-    /// sem reabrir nada e sem reinstalar a integração.
-    public func setStatusLineItem(_ item: StatusLineChoice.Item, shown: Bool) {
-        statusLineChoice.setShown(item, shown)
-        saveStatusLineChoice()
-    }
-
-    /// Volta à linha completa.
-    public func restoreStatusLine() {
-        statusLineChoice = StatusLineChoice()
-        saveStatusLineChoice()
-    }
-
-    private func saveStatusLineChoice() {
-        do {
-            try statusLineChoice.save(to: StatusLineChoice.fileURL(base: paths.base))
-            lastError = nil
-        } catch {
-            lastError = "não foi possível salvar a escolha da status line: \(error)"
         }
     }
 }
