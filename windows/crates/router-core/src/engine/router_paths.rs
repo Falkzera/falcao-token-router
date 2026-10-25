@@ -10,6 +10,7 @@ use std::path::PathBuf;
 
 use super::config_dir::ConfigDir;
 use super::group_usage::GroupUsageStore;
+use super::usage_history::UsageHistory;
 use crate::ids::Id;
 
 #[derive(Clone, Debug)]
@@ -45,6 +46,12 @@ impl RouterPaths {
     /// Onde o sensor grava as amostras de uso: `<base>\usage`.
     pub fn usage_dir(&self) -> PathBuf {
         GroupUsageStore::directory(&self.base)
+    }
+
+    /// O histórico das medições da sonda: `<base>\history` (ver
+    /// `usage_history` — só do Windows, fora do contrato com o macOS).
+    pub fn history_dir(&self) -> PathBuf {
+        UsageHistory::directory(&self.base)
     }
 
     /// A escolha do usuário sobre a status line dos grupos, que a CLI lê a

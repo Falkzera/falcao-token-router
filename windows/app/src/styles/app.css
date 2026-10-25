@@ -36,6 +36,10 @@
   /* O âmbar da barra, escurecido para texto sobre fundo claro (contraste). */
   --warning-text: #9a7a12;
   --critical: #d95247;
+  /* A linha dos gráficos do Histórico: o verde do app com croma a mais, para
+     não se ler cinza. Validada pelo método de visualização (faixa de
+     luminosidade, croma ≥ 0,10, contraste ≥ 3:1 sobre a superfície). */
+  --chart-line: #1e7546;
 
   --radius: 8px;
 
@@ -67,6 +71,7 @@
     --accent: #6bb385;
     --accent-text: #0f2419;
     --warning-text: #e0b840;
+    --chart-line: #52a76d;
   }
 }
 

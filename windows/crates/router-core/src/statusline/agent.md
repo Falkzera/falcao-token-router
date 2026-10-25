@@ -30,6 +30,8 @@ sessão. O sensor (a amostra) não passa por aqui.
   encurtado a partir da home. O que não veio no JSON fica de fora, sem marcador. `reset_when`
   (pública, 23/09/2026) escreve o "quando" do reset — 5h `09:05`, semanal `seg (28) 9:00` — e a
   janela de Grupos do app escreve o reset com ELA: a tela e a sessão nunca discordam.
+  `weekday_abbrev` (pública, 21/10/2026): os nomes dos dias da linha, que as marcas de dia do
+  gráfico da aba Histórico também usam.
 
 ## Padrões
 - Puro: relógio (fase), idioma e suporte a cor entram como `Style`; o que a linha mostra entra

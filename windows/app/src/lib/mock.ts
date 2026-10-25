@@ -3,7 +3,10 @@
 // quadro e avisam a tela, como o backend de verdade. Cenário, idioma, janela,
 // aba e seleção vêm da URL:
 //   ?view=home|flyout  &state=uso|vazio|pronta|critico|erro  &lang=en|pt-BR
-//   &tab=groups|settings  &select=<conta>  &foreign=<e-mail>  &scripts=current|missing|stale
+//   &tab=groups|history|settings  &select=<conta>  &foreign=<e-mail>  &scripts=current|missing|stale
+// O histórico (aba Histórico, `mock-history.ts`):
+//   &historico=cheio|vazio|lacuna|desligado  &conta=<id> (abre já nela, como o atalho do painel)
+//   &apagar=falha (o "Apagar o histórico…" dos Ajustes falha)
 // A integração de terminal e os ajustes:
 //   &terminal=ausente|ok|bloqueado|parcial|velha|semrouter  &devmode=1
 //   &install=falha (Ativar grava só parte)  &diretiva=1 (Permitir não vence a política)
@@ -39,6 +42,7 @@ import type {
   TerminalView,
   UsageView,
 } from "./types";
+import { mockHistory } from "./mock-history";
 
 function param(name: string): string | null {
   return new URLSearchParams(window.location.search).get(name);
@@ -49,7 +53,8 @@ function mockLocale(): Locale {
 }
 
 function mockTab(): HomeTab {
-  return param("tab") === "settings" ? "settings" : "groups";
+  const tab = param("tab");
+  return tab === "settings" || tab === "history" ? tab : "groups";
 }
 
 const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
@@ -286,8 +291,12 @@ const settings: SettingsView = {
   autostartFailure: null,
   showInTaskbar: param("taskbar") === "1",
   hiddenSummary: (param("resumo")?.split(",").filter(Boolean) ?? []) as SummaryItem[],
+  scheduledMeasure: param("historico") !== "desligado",
   version: "0.1.0-mock",
 };
+
+/** "Apagar o histórico…" já foi usado: o histórico simulado fica vazio. */
+let historyCleared = false;
 
 // MARK: - Status line
 
@@ -583,10 +592,15 @@ const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
     publishLogin();
     return changed();
   },
-  app_info: (): AppInfo => ({ locale: mockLocale(), initialTab: mockTab() }),
+  // `&conta=<id>`: a janela abre no Histórico já nessa conta (o atalho do painel).
+  app_info: (): AppInfo => ({
+    locale: mockLocale(),
+    initialTab: param("conta") ? "history" : mockTab(),
+    initialAccount: param("conta"),
+  }),
   get_snapshot: () => structuredClone(state),
   fit_flyout: () => undefined,
-  open_home: (args) => console.info("mock: abrir a janela na aba", args.tab),
+  open_home: (args) => console.info("mock: abrir a janela na aba", args.tab, "na conta", args.account),
   quit_app: () => console.info("mock: sair"),
   copy_text: async (args) => {
     await navigator.clipboard?.writeText(String(args.text)).catch(() => undefined);
@@ -708,6 +722,22 @@ const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
     const hidden = args.hidden as SummaryItem[];
     settings.hiddenSummary = order.filter((item) => hidden.includes(item));
     return { ...settings };
+  },
+  get_history: () =>
+    mockHistory(state.groups, mockLocale(), historyCleared ? "vazio" : param("historico"), settings.scheduledMeasure),
+  set_scheduled_measure: (args) => {
+    settings.scheduledMeasure = Boolean(args.on);
+    changed();
+    return { ...settings };
+  },
+  // Como o Rust: devolve quantos arquivos saíram (um por conta com histórico).
+  clear_history: () => {
+    if (param("apagar") === "falha") throw new Error("Acesso negado. (os error 5)");
+    const accounts = new Set(state.groups.flatMap((g) => g.accounts.map((a) => a.id)));
+    const removed = historyCleared || param("historico") === "vazio" ? 0 : accounts.size;
+    historyCleared = true;
+    changed();
+    return removed;
   },
   open_url: (args) => {
     const url = String(args.url);

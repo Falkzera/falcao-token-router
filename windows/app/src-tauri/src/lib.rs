@@ -2,17 +2,20 @@
 //!
 //! Apresentação e orquestração: a regra de negócio mora no `router-core`, a
 //! marca (o anel) no `gauge-mark`. Aqui ficam a bandeja, as duas janelas (o
-//! flyout da bandeja e a janela de Grupos/Ajustes), o laço de rotação, o login
-//! por ConPTY e a ponte de comandos com o front em Svelte.
+//! flyout da bandeja e a janela de Grupos/Histórico/Ajustes), o laço de
+//! rotação com a medição de 5 em 5 horas, o login por ConPTY e a ponte de
+//! comandos com o front em Svelte.
 
 mod commands;
 mod flyout;
+mod history;
 mod home_window;
 mod i18n;
 mod locale;
 mod login;
 mod login_output;
 mod login_session;
+mod measure_schedule;
 mod rotation_loop;
 mod settings;
 mod snapshot;
@@ -32,13 +35,15 @@ use tauri::{
 };
 
 use settings::SettingsStore;
-use state::{AppState, HomeTab};
+use state::{AppState, HomeTab, Navigation};
 
-/// O rótulo da janela única (Grupos / Ajustes), num lugar só: é escrito aqui e
-/// lido por quem a abre — rótulo repetido em vários arquivos falha em silêncio.
+/// O rótulo da janela única (Grupos / Histórico / Ajustes), num lugar só: é
+/// escrito aqui e lido por quem a abre — rótulo repetido em vários arquivos
+/// falha em silêncio.
 pub const HOME_WINDOW: &str = "home";
 
-/// O evento que pede à janela aberta para trocar de aba.
+/// O evento que pede à janela aberta para trocar de aba (e, no atalho do
+/// Histórico, mostrar uma conta).
 const NAVIGATE: &str = "navigate";
 
 /// O que o front precisa saber antes de qualquer outra coisa.
@@ -48,13 +53,17 @@ struct AppInfo {
     locale: locale::Locale,
     /// A aba com que a janela abre (a bandeja pode ter pedido Ajustes).
     initial_tab: HomeTab,
+    /// A conta que o Histórico mostra ao abrir (o atalho do painel da bandeja).
+    initial_account: Option<String>,
 }
 
 #[tauri::command]
 fn app_info(state: State<'_, AppState>) -> AppInfo {
+    let navigation = state.take_request();
     AppInfo {
         locale: state.locale,
-        initial_tab: state.take_tab(),
+        initial_tab: navigation.tab,
+        initial_account: navigation.account,
     }
 }
 
@@ -70,7 +79,8 @@ fn fit_flyout(app: AppHandle, height: f64) {
     flyout::fit_height(&app, height);
 }
 
-/// Uma porta do rodapé do flyout: fecha o flyout e abre a janela na aba.
+/// Uma porta do flyout: fecha o flyout e abre a janela na aba — e, no atalho
+/// do cartão de uma conta, o Histórico já nela.
 ///
 /// `async` de propósito. Um comando síncrono roda na thread principal, DENTRO do
 /// handler de requisição do WebView2 — e com a janela de Grupos fechada (o
@@ -79,9 +89,9 @@ fn fit_flyout(app: AppHandle, height: f64) {
 /// de forma reentrante, e a espera do controller nunca termina. A documentação
 /// do `WebviewWindowBuilder` (tauri 2.11) avisa e manda usar comando `async`.
 #[tauri::command]
-async fn open_home(app: AppHandle, tab: HomeTab) {
+async fn open_home(app: AppHandle, tab: HomeTab, account: Option<String>) {
     flyout::hide(&app);
-    show_home(&app, tab);
+    show_home_to(&app, Navigation { tab, account });
 }
 
 #[tauri::command]
@@ -97,18 +107,24 @@ fn copy_text(app: AppHandle, text: String) -> Result<(), String> {
     app.clipboard().write_text(text).map_err(|e| e.to_string())
 }
 
-/// Mostra a janela de Grupos/Ajustes na aba pedida, criando-a se preciso, e a
-/// traz para a frente — o app vive na bandeja e não se ativa sozinho.
+/// Mostra a janela de Grupos/Histórico/Ajustes na aba pedida, criando-a se
+/// preciso, e a traz para a frente — o app vive na bandeja e não se ativa
+/// sozinho.
 pub fn show_home(app: &AppHandle, tab: HomeTab) {
+    show_home_to(app, Navigation::to(tab));
+}
+
+/// O mesmo, com o destino inteiro (a aba e a conta do atalho do Histórico).
+fn show_home_to(app: &AppHandle, navigation: Navigation) {
     if let Some(window) = app.get_webview_window(HOME_WINDOW) {
-        let _ = window.emit(NAVIGATE, tab);
+        let _ = window.emit(NAVIGATE, navigation);
         let _ = window.unminimize();
         let _ = window.show();
         let _ = window.set_focus();
         return;
     }
     let state = app.state::<AppState>();
-    state.request_tab(tab);
+    state.request(navigation);
     let settings = app.state::<SettingsStore>();
     let size = home_window::WindowSize::opening(settings.get().home_window);
     // O acompanhamento parte do tamanho de abertura: aberta maximizada, é para
@@ -224,6 +240,8 @@ pub fn run() {
             commands::dismiss_error,
             commands::foreign_default_login,
             commands::measure_group,
+            history::get_history,
+            history::clear_history,
             terminal::terminal_report,
             terminal::install_integration,
             terminal::allow_profiles_for,
@@ -231,6 +249,7 @@ pub fn run() {
             settings::set_autostart,
             settings::set_show_in_taskbar,
             settings::set_hidden_summary,
+            settings::set_scheduled_measure,
             settings::open_url,
             status_line::get_status_line,
             status_line::set_status_line,
