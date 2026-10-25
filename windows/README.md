@@ -32,7 +32,7 @@ claude            → plain Claude Code, as before
 ## Install
 
 Download `FalcaoTokenRouter_<version>_x64-setup.exe` from the
-[current Windows release, `windows-v1.0.0`](../../../releases/tag/windows-v1.0.0),
+[current Windows release, `windows-v1.1.0`](../../../releases/tag/windows-v1.1.0),
 and run it.
 
 > This repository releases each platform on its own tag, so the GitHub

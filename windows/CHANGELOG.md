@@ -9,6 +9,11 @@ a fix on one platform never waits for the other's calendar.
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-10-25
+
+A usage history, a tag on the account that needs signing in again, and the
+fixes from the first month of use — one of them for a freeze of the whole app.
+
 ### Added
 
 - **Usage history.** A **History** tab draws two lines per account — the 5-hour
@@ -18,34 +23,52 @@ a fix on one platform never waits for the other's calendar.
   by default); **Measure accounts** and `router measure` add their points too.
   More than 7½ hours without a point breaks the line instead of guessing. Hover a
   chart, or focus it and use ← →, to read a point. The points are kept for 90 days
-  in `%LOCALAPPDATA%\com.synqo.falcao-router\history`.
+  in `%LOCALAPPDATA%\com.synqo.falcao-router\history` — the same files the macOS
+  app writes.
 - **A shortcut to each account's history**: the chart button next to every account
   on the Groups tab, and **View history** on an account's card in the tray panel,
-  open the History tab right on that account.
-- **Delete history…** in **Settings → History** empties the history of every
-  account, after a confirmation. Measuring goes on, and the history starts over
-  with the next measurement.
-
-### Changed
-
-- **Removing the account in use hands the group to the next one.** Before, the
-  group kept being served by the removed account — off the list, its login gone
-  from this computer but still alive in the group's profile — and the window
-  showed the group with no account in use. Now the next account takes over right
-  away (the first in the preference order with room under the threshold, the
-  same rule as rotation), through the usual hot swap, so open sessions keep
-  going on it. If it was the group's only account, the group's profile is left
-  alone, so a live session isn't cut off.
-
-### Fixed
-
-- **A signed-out account is now named, not just counted.** "Measure accounts"
-  used to say only how many accounts didn't answer. The account the probe finds
+  open the History tab right on that account. **Delete history…**, in
+  **Settings → History**, empties it after a confirmation.
+- **A signed-out account is named, not just counted.** "Measure accounts" used
+  to say only how many accounts didn't answer. The account the probe finds
   signed out (or that "Use" finds with no login on this computer) now carries a
   yellow "signed out" tag in the Groups window, the flyout and the account
   card; in the Groups window the tag opens "Log in again". It clears when the
   account answers a measurement, a login is renewed, or a session it serves
-  reports usage again.
+  reports usage again. The every-5-hours measurement sets and clears it too.
+
+### Changed
+
+- **Removing the account in use hands the group to the next one**, through the
+  usual hot swap, so open sessions keep going on it. Before, the group kept
+  being served by the removed account and the window showed it with no account
+  in use. An account marked signed out is skipped; if nobody can take over, the
+  group's profile is left alone, so a live session isn't cut off.
+
+### Fixed
+
+- **Opening Groups or Settings from the flyout could freeze the whole app**,
+  tray included, when the Groups window had been closed. The window is now
+  created the way WebView2 requires.
+- **One account, one place.** The same refresh token in two profiles dies on
+  the first renewal, and a few paths still allowed it: freeing `~\.claude`,
+  going back to a dedicated profile, and a switch that saved the credential but
+  not the identity. Each ended in a session stuck on *Login expired*.
+- **Rotation no longer gets stuck** on an account it can't activate, no longer
+  undoes a manual "Use" on an unmeasured account, and no longer swaps out a
+  login that isn't a router account. It also waits while "Measure accounts"
+  runs, which could otherwise probe an account through its home right after it
+  became active.
+- **A forgotten "Add account" window no longer turns rotation off** for every
+  group: only signing an existing account in again holds it.
+- **A user name with an apostrophe** (`D'Angelo`), an ampersand or a parenthesis
+  broke the status line command, and with it the sensor.
+- **An `alias claude` in `.bashrc`** (older Claude Code installers left one)
+  disabled the Git Bash integration in silence, so `claude work` opened plain
+  `claude` on the wrong account.
+- **A measurement without a network connection no longer marks every account as
+  signed out**: only an answer that talks about signing in does.
+- **Yellow starts at 66%** on the status line too, like the tray.
 
 ## [1.0.0] — 2026-09-24
 
@@ -94,5 +117,6 @@ instead, so an update over a live session works.
 The inherited token meter (JSONL cost, pricing, alerts), code signing and arm64
 are out of scope for this first release.
 
-[Unreleased]: https://github.com/Falkzera/falcao-token-router/compare/windows-v1.0.0...HEAD
+[Unreleased]: https://github.com/Falkzera/falcao-token-router/compare/windows-v1.1.0...HEAD
+[1.1.0]: https://github.com/Falkzera/falcao-token-router/releases/tag/windows-v1.1.0
 [1.0.0]: https://github.com/Falkzera/falcao-token-router/releases/tag/windows-v1.0.0
