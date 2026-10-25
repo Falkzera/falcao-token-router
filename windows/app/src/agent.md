@@ -9,10 +9,11 @@ ou `flyout`; no navegador, `?view=`). Runes do Svelte 5 (`$state`, `$derived`, `
   `html[data-view]` (o flyout tem altura do conteúdo, sem rolagem) e `html[data-host]`
   (`browser`: a janela Grupos/Ajustes simulada numa moldura 520×620; no app ela é do usuário e
   o corpo a acompanha).
-- `panel/` — o flyout da bandeja. `home/` — a janela Grupos/Ajustes. `lib/` — ponte com o
-  backend, tipos, i18n, formatação, relógio, ícones, backend simulado. `locales/` — os
-  catálogos en/pt-BR. `styles/app.css` — tokens claro/escuro (inclusive as cores de uso) e a coluna das páginas da
-  janela (`--page-inline`).
+- `panel/` — o flyout da bandeja. `home/` — a janela Grupos/Histórico/Ajustes. `lib/` — ponte
+  com o backend, tipos, i18n, formatação, relógio, ícones, o gráfico de linha, backend simulado.
+  `locales/` — os catálogos en/pt-BR. `styles/app.css` — tokens claro/escuro (inclusive as cores
+  de uso e a da linha dos gráficos, `--chart-line`) e a coluna das páginas da janela
+  (`--page-inline`).
 
 ## Padrões
 - **Toda string de UI vem do catálogo**, pela função `t("chave", …args)`; as chaves são as do
@@ -21,4 +22,5 @@ ou `flyout`; no navegador, `?view=`). Runes do Svelte 5 (`$state`, `$derived`, `
 - Chave de catálogo sempre LITERAL no código (nada de `` `groups.error.${x}` ``): é o que deixa o
   verificador achar as chaves usadas.
 - O front nunca chama `invoke` direto: tudo por `lib/api.ts`.
-- Percentual nunca é calculado aqui: vem pronto do backend.
+- Percentual nunca é calculado aqui: vem pronto do backend. Nos gráficos também: a fração só
+  POSICIONA o ponto; o texto (%, horas) vem escrito do Rust.

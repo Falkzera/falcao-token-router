@@ -2,20 +2,13 @@ import Foundation
 import UserNotifications
 import CCUsageCore
 
-/// Entrega um alerta ao usuário. Protocolo para o coordenador ser exercitável
-/// sem disparar notificação de verdade.
-@MainActor
-protocol AlertPresenting {
-    func present(_ alert: Alert)
-}
-
 /// Traduz `Alert` — que carrega fato, não frase — em notificação do sistema.
 ///
 /// Toda a redação em português vive aqui, junto do resto das strings de usuário,
 /// e não no `CCUsageCore`. É o que vai permitir localizar o app sem localizar o
 /// core junto.
 @MainActor
-struct UserNotificationPresenter: AlertPresenting {
+struct UserNotificationPresenter {
     func present(_ alert: Alert) {
         let content = UNMutableNotificationContent()
         (content.title, content.body) = Self.copy(for: alert)

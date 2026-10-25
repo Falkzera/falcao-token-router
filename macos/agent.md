@@ -12,7 +12,7 @@ Esta pasta é autocontida: `Package.swift`, `VERSION`, `CHANGELOG.md` e
 - `README.md` — o guia de quem instala num Mac: DMG, quarentena, integração de terminal, compilar do fonte, e o rito de release.
 - `CHANGELOG.md` — o histórico desta plataforma. O Windows tem o dele.
 - `VERSION` — a única fonte da versão do macOS; a tag `macos-v$(VERSION)` tem de bater, e o `release.yml` confere.
-- `Package.swift` — três alvos: `CCUsageCore` (motor, sem UI), `FalcaoTokenRouter` (app), `router` (CLI embutida).
+- `Package.swift` — três alvos: `CCUsageCore` (motor, sem UI), `FalcaoTokenRouter` (app), `router` (CLI embutida). Cada alvo exclui os seus `agent.md` (o `exclude` não aceita glob: pasta nova pede linha nova, e o aviso "unhandled file" volta para lembrar).
 - `Sources/CCUsageCore/` — motor: grupos, rotação, espelhamento de credencial, sensor, sonda, medidor. **Não importa SwiftUI** — é o que deixa tudo testável sem janela.
 - `Sources/FalcaoTokenRouter/` — o app e **todas** as strings de usuário.
 - `Sources/router/` — a CLI que o bundle carrega (`statusline`, `launch`, `is-group`, `rotate`, `measure`, `doctor`).

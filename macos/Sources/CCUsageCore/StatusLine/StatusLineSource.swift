@@ -39,7 +39,13 @@ public enum StatusLineSource {
                   let line = text.split(separator: "\n").first(where: { $0.contains("gitdir:") }),
                   let target = line.split(separator: ":", maxSplits: 1).last
             else { return nil }
-            gitDir = dir.appending(path: target.trimmingCharacters(in: .whitespaces))
+            // O git grava o `gitdir:` do worktree com caminho ABSOLUTO; o
+            // `appending(path:)` o concatenaria ao do worktree, o HEAD não seria
+            // achado e a busca subiria até o `.git` do repositório principal —
+            // mostrando o branch dele, com toda a confiança.
+            let gitdir = target.trimmingCharacters(in: .whitespaces)
+            gitDir = gitdir.hasPrefix("/") ? URL(fileURLWithPath: gitdir)
+                                          : dir.appending(path: gitdir)
         }
 
         guard let head = try? String(contentsOf: gitDir.appending(path: "HEAD"), encoding: .utf8)

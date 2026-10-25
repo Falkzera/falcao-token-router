@@ -8,6 +8,9 @@ struct AccountRow: View {
     /// legenda é lido como o das 5 horas, e quase sempre é o semanal.
     let usage: AccountUsage?
     let sampledAt: Date?
+    /// Durante "Medir contas" trocar de conta espera: a sonda decide, conta a
+    /// conta, por qual perfil medir (ver `RouterConfigStore.measureAccounts`).
+    let isMeasuring: Bool
     let onSwitch: () -> Void
     /// Abre o Histórico nesta conta (21/10/2026).
     let onHistory: () -> Void
@@ -76,6 +79,7 @@ struct AccountRow: View {
             if !isActive {
                 Button("groups.account.use", action: onSwitch)
                     .controlSize(.small).buttonStyle(.bordered)
+                    .disabled(isMeasuring)
             }
             // O atalho para o Histórico DESTA conta: sempre visível, ao lado do
             // menu — é ele que leva da lista ao gráfico sem procurar a conta.

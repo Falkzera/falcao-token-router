@@ -6,6 +6,9 @@
 //! rotação porque o `rate_limits` só muda quando há atividade: reconsultar mais
 //! rápido não traz número novo, só trabalho. A releitura é barata (arquivos
 //! pequenos) e deixa o número da bandeja acompanhar o sensor.
+//!
+//! A cada volta de rotação a partir da 2ª (3 min depois da subida), olha
+//! também a agenda da medição de 5 em 5 horas (`measure_schedule`).
 
 use std::thread;
 use std::time::Duration;
@@ -13,6 +16,7 @@ use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::login::LoginState;
+use crate::measure_schedule;
 use crate::state::AppState;
 use crate::tray;
 
@@ -25,13 +29,16 @@ const ROTATE_EVERY_TICKS: u64 = 6;
 pub const SNAPSHOT_CHANGED: &str = "snapshot-changed";
 
 /// Uma volta: relê (e, se `rotate`, roda a rotação), redesenha, avisa as janelas.
-/// Com um login em andamento a rotação fica para a próxima volta (ver
-/// `LoginState::in_progress`).
+/// A rotação fica para a próxima volta com um relogin em andamento (ver
+/// `LoginState::relogin_in_progress`) ou durante "Medir contas": a medição decide
+/// por qual perfil sondar cada conta, e trocar a ativa no meio a faria sondar a
+/// casa de uma conta ativa — o que derruba a sessão viva.
 pub fn tick(app: &AppHandle, rotate: bool) {
     let rotate = rotate
         && !app
             .try_state::<LoginState>()
-            .is_some_and(|login| login.in_progress());
+            .is_some_and(|login| login.relogin_in_progress())
+        && app.state::<AppState>().measuring().is_none();
     {
         let state = app.state::<AppState>();
         let mut store = state.store();
@@ -51,7 +58,14 @@ pub fn start(app: AppHandle) {
             // Como no macOS, a primeira volta (com rotação) é já na subida.
             let mut count: u64 = 0;
             loop {
-                tick(&app, count.is_multiple_of(ROTATE_EVERY_TICKS));
+                let rotate = count.is_multiple_of(ROTATE_EVERY_TICKS);
+                tick(&app, rotate);
+                // A medição de 5 em 5 horas olha a agenda junto com a rotação,
+                // a partir da 2ª volta: na abertura do Windows ela não disputa
+                // a máquina com tudo o mais que sobe junto.
+                if rotate && count > 0 {
+                    measure_schedule::check(&app);
+                }
                 count += 1;
                 thread::sleep(REFRESH_EVERY);
             }

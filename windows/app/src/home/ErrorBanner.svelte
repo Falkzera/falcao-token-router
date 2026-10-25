@@ -15,6 +15,8 @@
         return t("groups.error.activate.noCredential");
       case "activateBusyElsewhere":
         return t("groups.error.activate.busyElsewhere.format", e.group);
+      case "activateLiveInDefaultProfile":
+        return t("groups.error.activate.liveInDefaultProfile");
       case "activateWriteFailed":
         return t("groups.error.activate.writeFailed.format", e.detail);
       case "routerPathUnknown":

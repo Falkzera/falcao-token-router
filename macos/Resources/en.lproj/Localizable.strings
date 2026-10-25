@@ -14,14 +14,12 @@
 "panel.groups" = "Groups";
 "panel.settings" = "Settings";
 "panel.quit" = "Quit";
-"panel.enableLive" = "Fetch live";
+"panel.enableLive" = "Use the sensor";
 
 /* Panel — where the number came from */
 "panel.provenance.live" = "live";
 "panel.provenance.cached.format" = "Claude Code cache · %@ ago";
 "panel.provenance.stale.format" = "stale cache · %@ old";
-"panel.provenance.expired.format" = "credential expired · run Claude Code (cache %@ old)";
-"panel.provenance.offline.format" = "offline · cache %@ old";
 "panel.provenance.derived" = "estimated from your history";
 
 /* Panel — window resets */
@@ -43,7 +41,7 @@
 "alerts.reset.session.title" = "5-hour window reset";
 "alerts.reset.weekly.title" = "Weekly window reset";
 "alerts.reset.body" = "Capacity is back.";
-"alerts.liveRequired.title" = "Alerts need live fetching";
+"alerts.liveRequired.title" = "Alerts need the live number";
 "alerts.liveRequired.body" = "Without it the app reads Claude Code's cache, which can be hours stale — and an alert built on that is wrong in both directions. Turn it on in Settings → Usage numbers.";
 
 /* Settings — plan */
@@ -65,7 +63,7 @@
 /* Settings — alerts */
 "settings.section.alerts" = "Alerts";
 "settings.alerts.thresholds.toggle" = "Warn when approaching the ceiling";
-"settings.alerts.thresholds.help" = "Notifies when usage crosses a threshold. Alerts only fire with live fetching on: built on the cache, they would be wrong in both directions — and the worse one is silence while you blow past the ceiling.";
+"settings.alerts.thresholds.help" = "Notifies when usage crosses a threshold. Alerts only fire with the live number on: built on the cache, they would be wrong in both directions — and the worse one is silence while you blow past the ceiling.";
 "settings.alerts.thresholds.label" = "Thresholds";
 "settings.alerts.thresholds.empty" = "No threshold selected — nothing will be reported.";
 "settings.alerts.reset.toggle" = "Warn when the window resets";
@@ -73,8 +71,8 @@
 "settings.alerts.windows.label" = "Windows";
 "settings.alerts.window.session" = "5 hours";
 "settings.alerts.window.weekly" = "weekly";
-"settings.alerts.needsLive" = "Alerts need live fetching.";
-"settings.alerts.enableLive" = "Turn on live fetching";
+"settings.alerts.needsLive" = "Alerts need the live number.";
+"settings.alerts.enableLive" = "Turn on the live number";
 "settings.alerts.denied" = "Notifications denied in System Settings.";
 "settings.alerts.openSystem" = "Open System Settings";
 

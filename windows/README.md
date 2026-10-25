@@ -3,10 +3,11 @@
 A notification-area app that keeps several Claude Code accounts in **groups** and
 switches the active one for you when it runs out — without ending your session.
 
-This is the Windows port of the [macOS app](../README.md): the same idea, the same
-rules and the same files, rewritten in Rust with a Tauri tray app. It covers the
-router — groups, the automatic switch, the sensor, the probe and the `router`
-command. The macOS app's token and cost meter is not part of it.
+This is the Windows app of [Falcão Token Router](../README.md): the same idea, the
+same rules and the same files as the [macOS app](../macos/README.md), written in
+Rust with a Tauri tray app. It covers the router — groups, the automatic switch,
+the sensor, the probe and the `router` command. The macOS app's token and cost
+meter is not part of it.
 
 ```
 claude work       → a session on the "work" group's accounts; switches at the threshold
@@ -31,11 +32,13 @@ claude            → plain Claude Code, as before
 ## Install
 
 Download `FalcaoTokenRouter_<version>_x64-setup.exe` from the
-[latest Windows release](../../../releases/tag/windows-v1.0.0) and run it.
+[current Windows release, `windows-v1.0.0`](../../../releases/tag/windows-v1.0.0),
+and run it.
 
 > This repository releases each platform on its own tag, so the GitHub
 > *latest release* link is ambiguous here — it may point at a macOS release.
-> [All Windows releases](../../../releases?q=windows-v) are tagged `windows-v*`.
+> Windows releases are tagged `windows-v*`, and the
+> [releases page](../../../releases) names the system in every title.
 
 To try an unreleased change instead, open the latest successful run of the
 [*Windows* workflow](../../../actions/workflows/windows.yml) and download the
@@ -149,17 +152,28 @@ that didn't, and the last line is `tudo certo.` (all good) or `há problemas aci
 
 ## Using the app
 
-- **The tray icon** is a ring filled with the active account's usage — green, then
-  yellow from 66%, red from 90%. Its tooltip has one line per group: account,
+- **The tray icon** is a ring filled with the active account's usage — in the
+  taskbar's own color (white or near-black), then yellow from 66% and red from
+  90%. Its tooltip has one line per group: account,
   window, percentage, where the number came from and how old it is.
 - **Left click** opens the accounts table next to the icon; click an account for
-  its details. **Right click** has Groups, Settings and Quit.
+  its details, and **View history** there for its charts. **Right click** has
+  Groups, Settings and Quit.
 - **Groups** has what the walkthrough used and, per group, the rotation order (drag,
   or ↑/↓), **Log in again…** for an account whose login expired, **Remove account**,
   **Measure accounts**, rename, default and delete.
+- **History** draws two lines per account: the 5-hour window over the last 7 days
+  and the weekly window over the last 4 weeks, with the group's threshold dashed.
+  Each point is one measurement (see [What the numbers mean](#what-the-numbers-mean));
+  more than 7½ hours without one — the app closed, the PC asleep — breaks the line
+  instead of guessing. Hover a chart, or focus it and use ← →, to read a point. The
+  chart button next to each account on the Groups tab opens History right on that
+  account.
 - **Settings**: the **Status line** (below), the **Groups summary** (what each
   account row shows: the 5-hour and 7-day usage, the model limit, and when each
-  one resets — everything by default), **Open at login** and **Show in taskbar**.
+  one resets — everything by default), **Measure accounts every 5 hours** (on by
+  default) and **Delete history…** (asks first; measuring goes on, and the history
+  starts over with the next measurement), **Open at login** and **Show in taskbar**.
 
 Resize or maximize the window as you like; it reopens at its last size. Closing it
 leaves the app running in the notification area; **Quit** ends it. The app follows your Windows language — English or Portuguese.
@@ -195,10 +209,13 @@ Every number carries its window, its source and its age: the tooltip reads
   served. An account that hasn't served a message yet shows **ready**, not a number.
 - **Measure accounts** (or `router measure work`) asks the official `claude` for
   `/usage`, account by account. It sees idle accounts and the per-model limit, which
-  never reaches the status line. It takes a few seconds per account, so it's a
-  button, never a loop.
+  never reaches the status line. It takes a few seconds per account. While the app
+  is open it also runs on its own — each account 5 hours after its last
+  measurement — and every measurement, whoever asked for it, becomes a point on the
+  **History** tab. **Settings → History** turns the schedule off.
 
-The switch compares the **larger** of the 5-hour and 7-day windows with the
+The switch compares the **largest** of the 5-hour window, the 7-day window and —
+once the account has been measured — its tightest per-model window with the
 threshold.
 
 ## Known issues
@@ -228,7 +245,8 @@ threshold.
 |---|---|
 | The app and `router.exe` | `%LOCALAPPDATA%\FalcaoTokenRouter` |
 | Groups, accounts, their profiles, the samples | `%LOCALAPPDATA%\com.synqo.falcao-router` — the same layout as the macOS app's `Application Support` folder |
-| The status line choice | `statusline.json` in that same folder (Windows only) |
+| The status line choice | `statusline.json` in that same folder — the macOS app reads the same items; running your own command is Windows-only for now |
+| The measurement history | `history\` in that same folder: one `<e-mail>.jsonl` per account, kept 90 days (Windows only); **Settings → History → Delete history…** empties it |
 | The app's own settings, and its window's cache | `%APPDATA%\com.synqo.falcao-token-router`, and the same name under `%LOCALAPPDATA%` |
 | The terminal integration | one line in each `$PROFILE` and in `~/.bashrc`, pointing at `shell.ps1` / `shell.sh` in the router's folder |
 

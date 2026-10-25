@@ -100,14 +100,18 @@ impl LoginState {
         flow.view()
     }
 
-    /// Um login em andamento: a volta de rotação espera. Ela espelha grupo →
+    /// Um RELOGIN em andamento: a volta de rotação espera. Ela espelha grupo →
     /// casa da conta ativa e, num relogin dessa conta, pisaria na credencial
     /// nova que o `claude auth login` acabou de gravar, antes de ela chegar ao
     /// grupo (o macOS tinha essa corrida).
-    pub fn in_progress(&self) -> bool {
-        self.flow()
-            .as_ref()
-            .is_some_and(|f| f.state.phase.in_progress())
+    ///
+    /// Só relogin: a casa reservada de "Adicionar conta" não é de ninguém, e a
+    /// rotação nunca a toca. Esperar por qualquer login fazia um "Adicionar
+    /// conta" esquecido aberto desligar o rodízio de todos os grupos.
+    pub fn relogin_in_progress(&self) -> bool {
+        self.flow().as_ref().is_some_and(|f| {
+            matches!(f.kind, LoginKind::Relogin { .. }) && f.state.phase.in_progress()
+        })
     }
 }
 

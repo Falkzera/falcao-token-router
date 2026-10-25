@@ -69,7 +69,11 @@
       </section>
       {#if selectedAccount}
         <div class="card">
-          <AccountDetail account={selectedAccount} onClose={() => (selected = null)} />
+          <AccountDetail
+            account={selectedAccount}
+            onClose={() => (selected = null)}
+            onHistory={(accountId) => openHome("history", accountId)}
+          />
         </div>
       {/if}
     {/if}

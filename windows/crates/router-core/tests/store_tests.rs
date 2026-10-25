@@ -423,6 +423,59 @@ fn clear_default_leaves_no_group_in_dot_claude() {
         .all(|g| !g.config_dir.is_default));
 }
 
+/// "Deixar o ~\.claude livre" só mudava o caminho: a conta de lá continuava
+/// servindo o `claude` puro, e a rotação seguinte a ativava também no dedicado
+/// novo — duas cópias de um refresh token que gira.
+#[test]
+fn clearing_the_default_keeps_the_live_account_in_one_place() {
+    let mut env = make_store();
+    let group = env.store.add_group("trabalho"); // padrão: o ~\.claude
+    let a = env.add_account("conta1@exemplo.com", group.id);
+    let b = env.add_account("conta2@exemplo.com", group.id);
+    env.store.activate(&a, &env.group(group.id));
+    let default_location = env
+        .adapter
+        .credential_location(&env.group(group.id).config_dir);
+    env.creds
+        .write(&cred("cred-a-RENOVADO"), &default_location)
+        .unwrap();
+
+    env.store.clear_default();
+    let moved = env.group(group.id);
+    assert!(!moved.config_dir.is_default);
+    // A casa da conta que ficou no ~\.claude recebeu o token vivo antes da troca.
+    assert_eq!(
+        env.creds.read(&env.adapter.credential_location(&a.home)),
+        Some(cred("cred-a-RENOVADO"))
+    );
+
+    env.store.rotate_all();
+    assert_eq!(
+        env.store.active_account(&env.group(group.id)).map(|x| x.id),
+        Some(b.id)
+    );
+}
+
+/// O dedicado de um grupo é sempre o mesmo caminho; saindo dele e voltando, a
+/// identidade velha fazia o espelho gravar uma cadeia morta na casa da conta.
+#[test]
+fn the_dedicated_profile_left_behind_is_emptied() {
+    let mut env = make_store();
+    env.store.add_group("pessoal"); // padrão
+    let work = env.store.add_group("trabalho"); // dedicado
+    let c = env.add_account("conta3@exemplo.com", work.id);
+    env.store.activate(&c, &env.group(work.id));
+    let dedicated = env.group(work.id).config_dir;
+    assert!(env.adapter.identity(&dedicated).is_some());
+
+    env.store.make_default(work.id);
+
+    assert!(env.adapter.identity(&dedicated).is_none());
+    assert!(!env
+        .creds
+        .exists(&env.adapter.credential_location(&dedicated)));
+}
+
 // --- Regressões do porte ---
 
 /// O limiar vive entre 50% e 100%: abaixo disso a conta troca antes de servir
@@ -938,4 +991,149 @@ fn the_last_error_can_be_dismissed() {
 
     env.store.clear_last_error();
     assert_eq!(env.store.last_error(), None);
+}
+
+// --- medição automática (de 5 em 5 horas, 21/10/2026) ---
+
+/// Um ponto no histórico de uma conta, `hours` horas atrás.
+fn measured(env: &Env, email: &str, hours: i64) {
+    use router_core::engine::usage_history::{UsageHistory, UsageHistoryPoint};
+    let point = UsageHistoryPoint {
+        sampled_at: Utc::now() - chrono::Duration::hours(hours),
+        five_hour_percent: Some(0.1),
+        five_hour_resets_at: None,
+        seven_day_percent: Some(0.2),
+        seven_day_resets_at: None,
+        models: Vec::new(),
+    };
+    UsageHistory::append(&point, email, &env.paths.history_dir(), Utc::now()).unwrap();
+}
+
+/// A agenda mede, grupo a grupo e na ordem da lista, só as contas VENCIDAS.
+#[test]
+fn the_schedule_plans_only_due_accounts_group_by_group() {
+    use std::collections::HashMap;
+
+    let mut env = make_store();
+    let work = env.store.add_group_with("trabalho", false);
+    let personal = env.store.add_group_with("pessoal", false);
+    let a = env.add_account("conta1@exemplo.com", work.id);
+    let b = env.add_account("conta2@exemplo.com", work.id);
+    let c = env.add_account("conta3@exemplo.com", personal.id);
+    // A conta1 foi medida há 1 h (não vence); a conta3, há 6 h (vence); a
+    // conta2 nunca foi medida (vence).
+    measured(&env, "conta1@exemplo.com", 1);
+    measured(&env, "conta3@exemplo.com", 6);
+
+    let plans = env
+        .store
+        .scheduled_measure_plans(Utc::now(), &HashMap::new());
+
+    let shape: Vec<(Id, Vec<Id>)> = plans
+        .iter()
+        .map(|(g, p)| (*g, p.targets.iter().map(|t| t.account_id).collect()))
+        .collect();
+    assert_eq!(shape, [(work.id, vec![b.id]), (personal.id, vec![c.id])]);
+    assert!(!shape.iter().any(|(_, ids)| ids.contains(&a.id)));
+}
+
+/// A conta que está em dois grupos é medida uma vez só — no primeiro.
+#[test]
+fn an_account_in_two_groups_is_measured_once() {
+    use std::collections::HashMap;
+
+    let mut env = make_store();
+    let work = env.store.add_group_with("trabalho", false);
+    let personal = env.store.add_group_with("pessoal", false);
+    let shared = env.add_account("conta1@exemplo.com", work.id);
+    env.add_account("conta2@exemplo.com", personal.id);
+    // A compartilhada entra também no 2º grupo, pelo `config.json`.
+    let mut config = env.store.config().clone();
+    config.groups[1].account_ids.insert(0, shared.id);
+    std::fs::write(
+        env.paths.config_file(),
+        serde_json::to_vec(&config).unwrap(),
+    )
+    .unwrap();
+    let store = open(env.tmp.path(), &env.creds, &env.adapter);
+
+    let plans = store.scheduled_measure_plans(Utc::now(), &HashMap::new());
+
+    let all: Vec<Id> = plans
+        .iter()
+        .flat_map(|(_, p)| p.targets.iter().map(|t| t.account_id))
+        .collect();
+    assert_eq!(all.iter().filter(|id| **id == shared.id).count(), 1);
+    assert_eq!(plans[0].0, work.id);
+    assert_eq!(plans[0].1.targets[0].account_id, shared.id);
+    assert_eq!(plans[1].0, personal.id);
+}
+
+/// A tentativa da agenda segura a conta que falhou (deslogada) por 5 horas.
+#[test]
+fn a_recent_attempt_keeps_an_account_out_of_the_plan() {
+    use std::collections::HashMap;
+
+    let mut env = make_store();
+    let group = env.store.add_group_with("trabalho", false);
+    let a = env.add_account("conta1@exemplo.com", group.id);
+
+    let tried = HashMap::from([(a.id, Utc::now() - chrono::Duration::hours(1))]);
+    assert!(env
+        .store
+        .scheduled_measure_plans(Utc::now(), &tried)
+        .is_empty());
+
+    let long_ago = HashMap::from([(a.id, Utc::now() - chrono::Duration::hours(5))]);
+    assert_eq!(
+        env.store
+            .scheduled_measure_plans(Utc::now(), &long_ago)
+            .len(),
+        1
+    );
+}
+
+/// Na agenda também, a conta ATIVA é sondada pelo perfil do grupo — nunca
+/// pela casa (a regra do `probe_targets`).
+#[test]
+fn the_schedule_probes_the_active_account_through_its_group() {
+    use std::collections::HashMap;
+
+    let mut env = make_store();
+    let group = env.store.add_group_with("trabalho", false);
+    let a = env.add_account("conta1@exemplo.com", group.id);
+    env.store.activate(&a, &env.group(group.id));
+
+    let plans = env
+        .store
+        .scheduled_measure_plans(Utc::now(), &HashMap::new());
+    assert_eq!(
+        plans[0].1.targets[0].dir.raw,
+        env.group(group.id).config_dir.raw
+    );
+}
+
+/// "Apagar o histórico" pelo store: os pontos de todas as contas saem, e a
+/// próxima medição recomeça o histórico.
+#[test]
+fn clearing_the_history_empties_it_for_every_account() {
+    use router_core::engine::usage_history::UsageHistory;
+
+    let mut env = make_store();
+    let group = env.store.add_group_with("trabalho", false);
+    env.add_account("conta1@exemplo.com", group.id);
+    env.add_account("conta2@exemplo.com", group.id);
+    measured(&env, "conta1@exemplo.com", 1);
+    measured(&env, "conta2@exemplo.com", 7);
+
+    assert_eq!(env.store.clear_history().unwrap(), 2);
+
+    let dir = env.paths.history_dir();
+    assert!(UsageHistory::read("conta1@exemplo.com", &dir).is_empty());
+    assert!(UsageHistory::read("conta2@exemplo.com", &dir).is_empty());
+    // Sem ponto nenhum, as duas voltam a vencer na agenda.
+    let plans = env
+        .store
+        .scheduled_measure_plans(Utc::now(), &std::collections::HashMap::new());
+    assert_eq!(plans[0].1.targets.len(), 2);
 }

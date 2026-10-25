@@ -12,13 +12,13 @@
   `ProbeTarget`. `parse` (linhas `Current …`, `·`=U+00B7, CRLF normalizado; `session` → 5h,
   `all models` → 7d, outro escopo → por modelo, a 1ª ocorrência vence), `reset_date` (zona IANA
   via `chrono-tz` tirada ANTES de am/pm, senão fuso local; `MMM d, h:mma`/`MMM d, ha` do Windows
-  e `MMM d 'at' …` do macOS; ano = candidato mais perto de `now`), `plan` (3 primeiras linhas,
-  palavra inteira), `interpret` (código ≠ 0 ou saída SEM linha `Current` = `NotSignedIn`; linha
+  e `MMM d 'at' …` do macOS; ano = candidato mais perto de `now`), `interpret` (código ≠ 0 ou saída SEM linha `Current` = `NotSignedIn`; linha
   `Current` ilegível = `Unrecognized`), o executor (`--print --no-session-persistence
   --strict-mcp-config /usage`, cwd `probe-scratch`, ambiente direto sem `CLAUDE_CODE*`,
   `CLAUDE_CONFIG_DIR` só no dedicado, stdin nulo, stderr descartado, `CREATE_NO_WINDOW`, prazo
   45 s → `TerminateProcess`, stdout lido aos pedaços) e `measure_into` (grava a amostra `probe`
-  sob a trava do motor).
+  e o ponto do histórico — `engine::usage_history` — sob a trava do motor; o 3º parâmetro é a
+  base do router, de onde saem a trava e o `history\`).
 
 ## Decisões
 - 22/09/2026 (spike): deslogado no Windows sai com código **0** e só o resumo do `--print` —
@@ -27,3 +27,6 @@
   feature flag que `DISABLE_TELEMETRY` fecha) — igual ao macOS.
 - O plano é casado por palavra inteira: um aviso que fale de "projects" não vira "pro" (no macOS
   a busca é por substring; na pasta limpa da sonda o aviso não aparece, mas não custa).
+- 21/10/2026: a sonda deixou de ser "nunca laço" no Windows — o app a roda de 5 em 5 horas por
+  conta (para o histórico, pedido do usuário), com uma chave nos Ajustes. Nunca no laço de 3
+  minutos. Toda medição, de onde vier, deixa um ponto no histórico.

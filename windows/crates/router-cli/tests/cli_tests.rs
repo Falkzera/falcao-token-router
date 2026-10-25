@@ -251,6 +251,25 @@ fn measure_names_an_unknown_group_and_an_empty_one() {
     assert!(stdout(&out).contains("nenhuma conta para medir."));
 }
 
+/// Toda medição deixa um ponto no histórico (21/10/2026) — a da CLI também;
+/// a conta que não respondeu, não.
+#[test]
+fn measure_leaves_a_point_in_the_history() {
+    use router_core::engine::usage_history::UsageHistory;
+
+    let w = world(2);
+    fs::remove_file(w.accounts[1].home.path().join(".credentials.json")).unwrap();
+
+    w.sandbox.run(&["measure"]);
+
+    let dir = w.sandbox.paths().history_dir();
+    let history = UsageHistory::read("conta1@exemplo.com", &dir);
+    assert_eq!(history.len(), 1);
+    assert_eq!(history[0].five_hour_percent, Some(0.12));
+    assert_eq!(history[0].seven_day_percent, Some(0.34));
+    assert!(UsageHistory::read("conta2@exemplo.com", &dir).is_empty());
+}
+
 // --- statusline ---
 
 /// O sensor cai no `--profile` embutido quando o `CLAUDE_CONFIG_DIR` não chega

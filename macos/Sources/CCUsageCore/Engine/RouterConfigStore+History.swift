@@ -17,10 +17,11 @@ public struct MeasurePlan: Sendable, Equatable {
 /// O histórico e a medição de 5 em 5 horas (21/10/2026). Arquivo à parte do
 /// `RouterConfigStore.swift` pela régua de 600 linhas de produção.
 extension RouterConfigStore {
-    /// As contas de um grupo com o perfil por onde medir cada uma — decidido
-    /// AQUI, com o config na mão: conta ativa vai pelo perfil do grupo, nunca
-    /// pela casa (ver `probeConfigDir` — sondar a casa de uma conta ativa
-    /// derruba a sessão viva). O botão e a agenda passam por aqui.
+    /// As contas de um grupo com o perfil por onde medir cada uma, pelo config
+    /// de agora: conta ativa vai pelo perfil do grupo, nunca pela casa (ver
+    /// `probeConfigDir` — sondar a casa de uma conta ativa derruba a sessão
+    /// viva). É o plano; na hora de sondar, `runScheduledMeasure` decide o
+    /// perfil de novo.
     public func probeTargets(in group: AccountGroup) -> [ProbeTarget] {
         config.accounts(in: group).map {
             ProbeTarget(accountID: $0.id, email: $0.identity.email,
@@ -68,6 +69,8 @@ extension RouterConfigStore {
         let usageDir = paths.usageDir
         let historyDir = paths.historyDir
         let scratchBase = paths.base
+        let engine = self.engine
+        let configNow = config
         for plan in plans {
             // A marca passa de grupo em grupo sem se apagar no meio: o botão
             // não começa outra medição entre dois grupos.
@@ -76,8 +79,15 @@ extension RouterConfigStore {
             await Task.detached(priority: .utility) {
                 guard let probe = ClaudeUsageProbe.system(scratchBase: scratchBase) else { return }
                 for target in targets {
-                    guard let reading = try? probe.read(configDir: target.dir) else { continue }
-                    try? ProbeRecord.write(reading, email: target.email, configDir: target.dir,
+                    // O perfil é decidido de novo AGORA, relendo do disco quem
+                    // está ativa (a regra do `measureAccounts`): o plano foi
+                    // feito antes, e cada conta leva segundos. Um `claude
+                    // <grupo>` aberto em outro terminal no meio faria a sonda
+                    // chegar na casa de uma conta que já estava ativa.
+                    let dir = configNow.accounts.first { $0.id == target.accountID }
+                        .map { engine.probeConfigDir(for: $0, config: configNow) } ?? target.dir
+                    guard let reading = try? probe.read(configDir: dir) else { continue }
+                    try? ProbeRecord.write(reading, email: target.email, configDir: dir,
                                            usageDir: usageDir, historyDir: historyDir)
                 }
             }.value

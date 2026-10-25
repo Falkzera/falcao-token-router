@@ -50,16 +50,17 @@ public struct ClaudeUsageProbe: Sendable {
         public let weeklyAll: Double?
         public let weeklyAllResetsAt: Date?
         public let models: [ModelWindow]
-        /// A linha de plano que o `/usage` imprime no topo, copiada como veio.
-        public let plan: String?
     }
 
     public enum ProbeError: Error, Equatable {
-        /// O Claude Code não está instalado em nenhum lugar conhecido.
-        case notInstalled
-        /// O binário saiu com código diferente de zero — na prática, perfil sem
-        /// login. Não é erro para mostrar: quem chama segue para a próxima conta.
+        /// O binário saiu com código diferente de zero e a saída fala de login:
+        /// perfil sem login. Quem chama segue para a próxima conta.
         case notSignedIn
+        /// Saiu com código diferente de zero por outro motivo — sem rede, um
+        /// 429, uma bandeira que uma versão nova removeu, um crash. NÃO é "sem
+        /// login": tratar como tal mandava relogar uma conta sã, e relogar é a
+        /// operação mais arriscada do produto.
+        case failed(status: Int32)
         /// Rodou, respondeu, e não havia nenhuma linha `Current …` na saída.
         /// Formato novo: é isto que a próxima versão precisa suportar.
         case unrecognized
@@ -158,9 +159,10 @@ public struct ClaudeUsageProbe: Sendable {
         process.standardInput = FileHandle.nullDevice
         let out = Pipe()
         process.standardOutput = out
-        // Descartado, não canalizado: um pipe que ninguém lê enche em 64 KB e
-        // trava o processo até o cão de guarda matá-lo.
-        process.standardError = FileHandle.nullDevice
+        // No MESMO pipe da saída, que é lido até o fim: é o stderr que diz por
+        // que um código diferente de zero aconteceu (ver `outcome`), e lido até
+        // o EOF ele não enche nem trava o processo.
+        process.standardError = out
 
         try process.run()
 
@@ -172,13 +174,29 @@ public struct ClaudeUsageProbe: Sendable {
         let data = out.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
 
-        if process.terminationReason == .uncaughtSignal { throw ProbeError.timedOut }
-        guard process.terminationStatus == 0 else {
-            // Código diferente de zero é o Claude Code se recusando a responder,
-            // que na prática é perfil sem login. Quem chama segue em frente.
-            throw ProbeError.notSignedIn
+        return try outcome(status: process.terminationStatus,
+                           signaled: process.terminationReason == .uncaughtSignal,
+                           output: String(decoding: data, as: UTF8.self))
+    }
+
+    /// O desfecho de uma sondagem, pelo código de saída e pelo que ela disse.
+    ///
+    /// Sinal TERM é o cão de guarda (prazo estourado); outro sinal é crash.
+    /// Código diferente de zero só vira "sem login" quando a saída fala de
+    /// login — até 10/2026 qualquer código virava, e o `router measure` mandava
+    /// "use Relogar no app" para uma conta sã que só estava sem rede.
+    static func outcome(status: Int32, signaled: Bool, output: String) throws -> String {
+        if signaled {
+            throw status == SIGTERM ? ProbeError.timedOut : ProbeError.failed(status: status)
         }
-        return String(decoding: data, as: UTF8.self)
+        guard status == 0 else {
+            let text = output.lowercased()
+            if text.contains("login") || text.contains("log in") || text.contains("not logged") {
+                throw ProbeError.notSignedIn
+            }
+            throw ProbeError.failed(status: status)
+        }
+        return output
     }
 
     // MARK: - Ler o que ele disse
@@ -223,19 +241,7 @@ public struct ClaudeUsageProbe: Sendable {
         }
         return Reading(session: session, sessionResetsAt: sessionReset,
                        weeklyAll: weekly, weeklyAllResetsAt: weeklyReset,
-                       models: models, plan: plan(in: text))
-    }
-
-    /// A linha de plano do topo, copiada como impressa. Só as primeiras linhas:
-    /// mais abaixo o texto fala de consumo, e "Max" aparece em prosa.
-    static func plan(in text: String) -> String? {
-        let head = text.split(whereSeparator: \.isNewline).prefix(3).joined(separator: "\n")
-        for frase in ["Max 20x", "Max 5x", "Pro", "Team", "subscription"] {
-            if let faixa = head.range(of: frase, options: .caseInsensitive) {
-                return String(head[faixa])
-            }
-        }
-        return nil
+                       models: models)
     }
 
     /// `Sep 18 at 7:29pm (America/Maceio)` → `Date`.

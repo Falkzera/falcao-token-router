@@ -6,8 +6,10 @@ then the `agent.md` of wherever you're about to touch.
 Almost everything below was discovered by observing Claude Code, not by reading
 documentation — none of it is documented by Anthropic. Where a fact was verified
 against a real install, the code comment says when. Treat every one of them as
-"true on macOS, as of the version noted", and verify before building on it
-elsewhere.
+"true on the system and Claude Code version noted", and verify before building on
+it elsewhere. This map describes the macOS app; the Windows app follows the same
+design, and every Windows fact it relies on is in
+[`windows/docs/PLATFORM.md`](../windows/docs/PLATFORM.md).
 
 ## The constraint
 
@@ -17,9 +19,10 @@ this design follows from taking that seriously:
 - **The app makes no network calls.** Not one.
 - **The app never authenticates.** Sign-in runs the official `claude auth login`
   binary; the app never sees a password or a token.
-- **The app never refreshes OAuth.** It copies a keychain *blob* between items.
-  It never decodes it to use a token, and `ClaudeCredentials` has no field for a
-  refresh token — the guarantee is structural.
+- **The app never refreshes OAuth.** It copies the credential between items as
+  an opaque blob and never decodes it to use a token: no type in the engine has
+  a field for one, so the guarantee is structural. Even the plan the meter needs
+  is read from `.claude.json`, not from the keychain.
 
 The consequence is that usage has to come from somewhere the official client
 already put it. There are two such places, and they are the two measurement
@@ -27,15 +30,16 @@ paths below.
 
 ## The three targets
 
-| Target | Role |
-|---|---|
-| `CCUsageCore` | The engine. No SwiftUI. Everything testable without a window. |
-| `FalcaoTokenRouter` | The SwiftUI app. Menu bar, panel, groups window, settings. Every user-facing string. |
-| `router` | The CLI the app bundles at `Contents/MacOS/router`. The shell and the status line call it. |
+| Target (macOS) | Windows | Role |
+|---|---|---|
+| `CCUsageCore` | `router-core` | The engine. No UI. Everything testable without a window. |
+| `FalcaoTokenRouter` | `windows/app` (Tauri + Svelte) | The app. Menu bar or tray, panel, groups window, settings. Every user-facing string. |
+| `router` | `router.exe` | The CLI the app ships (`Contents/MacOS/router`, or beside the Windows app's exe). The shell and the status line call it. |
 
-`CCUsageCore/Engine` is the router product. The rest of `CCUsageCore` — `Aggregation`,
+`CCUsageCore/Engine` is the router product, with `StatusLine` (the line the sensor
+prints) and `Usage` (the probe). The rest of `CCUsageCore` — `Aggregation`,
 `Models`, `Parsing`, `Pricing` — is the token *meter* this project grew out of,
-which still powers the "Meter" tab.
+which still powers the macOS "Meter" tab; the Windows app doesn't carry it.
 
 ## Profiles, homes and groups
 
@@ -57,6 +61,10 @@ The credential for a profile is a keychain item named
 a `~` or a trailing slash changes the hash and points at an item that doesn't
 exist. The blob has no identity in it; who the credential belongs to is written
 in the `.claude.json` next to it (`oauthAccount.emailAddress`).
+
+On Windows the credential is a file inside the profile,
+`<profile>\.credentials.json`, with no hash in its name — and a live session
+re-reads it only when the file's modification time changes.
 
 On top of that, the product defines:
 
@@ -84,7 +92,9 @@ Activating an account in a group (`RotationEngine.activate`):
 
 That's it. A live session re-reads its keychain item on the next request and is
 served by the new account — no restart, no `--resume`, no lost context. This was
-proved on a real session before anything else was built.
+proved on a real session before anything else was built. (On Windows the copy is
+a freshly written file — temp + rename — so its modification time changes; a
+copy that keeps the old timestamp swaps nothing.)
 
 Two rules make it safe, and both exist because their absence killed accounts:
 
@@ -94,9 +104,14 @@ Two rules make it safe, and both exist because their absence killed accounts:
   the group item back to the leaving account's home. The home is the truth only
   when the account is idle; `rotateAll` also mirrors periodically so it never
   falls too far behind.
-- **One account, one place.** The same account active in two groups would be two
-  copies of a rotating refresh token, and the second renewal invalidates the
-  first — silently. The engine refuses.
+- **One account, one place.** The same account live in two profiles would be
+  two copies of a rotating refresh token, and the second renewal invalidates the
+  first — silently. The engine refuses, and the rotation skips such an account
+  instead of insisting on it. "Two profiles" includes `~/.claude` when no group
+  uses it: after the default group moves out, the account left there keeps
+  serving plain `claude`. A group that changes profile mirrors its active
+  account first and empties the dedicated profile it leaves (and the one it
+  enters), so nothing live is left behind and nothing stale comes back.
 
 Corollary: re-activating the account that is *already* active must never copy
 home → group. That would overwrite the rotated token with a stale one ("Login
@@ -138,11 +153,16 @@ without it every poll launches whatever the user has configured. Telemetry is
 deliberately left on: the per-model line is behind a feature gate that
 `DISABLE_TELEMETRY` closes.
 
-It costs a Node cold start and a real request per account, so it's a button and
-a command (`router measure`), never a loop. **An active account is probed
-through its group profile, never its home** (`probeConfigDir`): probing the home
-would renew with the stale refresh token and rotate the chain out from under the
-live session.
+It costs a Node cold start and a real request per account, so on macOS it's a
+button and a command (`router measure`), never a loop. The Windows app adds one
+schedule — each account again 5 hours after its last measurement, while the app
+runs, on by default — and keeps every reading in `history/<email>.jsonl` for a
+History tab; that file is Windows-only, outside the shared contract.
+
+**An active account is probed through its group profile, never its home**
+(`probeConfigDir`): probing the home would renew with the stale refresh token and
+rotate the chain out from under the live session. The Windows schedule follows the
+same rule.
 
 ### Provenance
 
@@ -185,10 +205,11 @@ never `idle`.
 ## The terminal integration
 
 `claude <group>` is a shell function (`shell.sh`, sourced from `~/.zshrc`) that
-asks `router is-group` and, if yes, `exec`s `router launch <group>`, which
+asks `router is-group` and, if yes, runs `router launch <group>`, which
 activates the right account and `execvp`s the real `claude` with
 `CLAUDE_CONFIG_DIR` set (or unset, for the default group). Anything else falls
-through to the binary.
+through to the binary — or to the user's own `alias claude`, which the script
+saves and chains, since an alias would otherwise win over the function.
 
 The failure mode is silent: in a terminal opened before the integration was
 installed, `claude trabalho` is just an argument, and the session opens in
@@ -198,17 +219,21 @@ path; the app heals both at launch if the `.app` has moved.
 
 `router doctor` checks all of this and names what's wrong.
 
-## What's macOS-specific
+## What's system-specific
 
-| Piece | macOS | Where |
-|---|---|---|
-| Credential store | Keychain, via `/usr/bin/security` (same binary Claude Code uses — avoids the authorization prompt) | `SecurityCLIKeychain` |
-| Process liveness | `sysctl(KERN_PROC_PID)` start time | `ProcessLiveness` |
-| Sign-in terminal | `openpty` | `LoginSession` |
-| UI | SwiftUI `MenuBarExtra`, `Window`, `LSUIElement`, `SMAppService` | `FalcaoTokenRouter` |
-| Shell | zsh function in `~/.zshrc` | `ShellIntegration` |
-| Data directory | `~/Library/Application Support/<bundle-id>/` | `RouterPaths` |
+| Piece | macOS | Windows | Where (macOS) |
+|---|---|---|---|
+| Credential store | Keychain, via `/usr/bin/security` (same binary Claude Code uses — avoids the authorization prompt) | `<profile>\.credentials.json`, opaque blob, temp + rename | `SecurityCLIKeychain` |
+| Process liveness | `sysctl(KERN_PROC_PID)` start time | `OpenProcess` + `GetProcessTimes` | `ProcessLiveness` |
+| Sign-in terminal | `openpty` | ConPTY | `LoginSession` |
+| UI | SwiftUI `MenuBarExtra`, `Window`, `LSUIElement`, `SMAppService` | Tauri tray, flyout and window | `FalcaoTokenRouter` |
+| Shell | zsh function in `~/.zshrc` | PowerShell `$PROFILE`s and Git Bash `~/.bashrc` | `ShellIntegration` |
+| Data directory | `~/Library/Application Support/com.synqo.falcao-router/` | `%LOCALAPPDATA%\com.synqo.falcao-router` | `RouterPaths` |
+
+The data directory keeps that name on purpose, apart from the app's bundle id: on
+macOS the keychain item is a hash of each profile's path, so renaming the
+directory would put every credential out of reach.
 
 Everything else — the config model, the sample format, the rotation rules, the
-`/usage` parser, the sessions registry reader — is plain Foundation and reads
+`/usage` parser, the sessions registry reader — is platform-neutral logic over
 files Claude Code writes the same way everywhere. See `PORTING.md`.

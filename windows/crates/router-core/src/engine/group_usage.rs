@@ -137,10 +137,11 @@ impl GroupUsageStore {
         base.join("usage")
     }
 
-    /// Nome de arquivo estável e seguro para um e-mail (mantém letra, dígito,
-    /// `.`, `@`, `-`; o resto vira `_`).
-    pub fn file_name(email: &str) -> String {
-        let safe: String = email
+    /// O e-mail como pedaço de nome de arquivo, estável e seguro (mantém
+    /// letra, dígito, `.`, `@`, `-`; o resto vira `_`). O histórico usa a
+    /// mesma limpeza.
+    pub fn safe_stem(email: &str) -> String {
+        email
             .chars()
             .map(|c| {
                 if c.is_alphanumeric() || c == '.' || c == '@' || c == '-' {
@@ -149,8 +150,12 @@ impl GroupUsageStore {
                     '_'
                 }
             })
-            .collect();
-        format!("{safe}.json")
+            .collect()
+    }
+
+    /// O arquivo da amostra de um e-mail: `<limpo>.json`.
+    pub fn file_name(email: &str) -> String {
+        format!("{}.json", Self::safe_stem(email))
     }
 
     /// Grava a amostra da conta, de forma atômica. **Preserva o bloco por modelo**
