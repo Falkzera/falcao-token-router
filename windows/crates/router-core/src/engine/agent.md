@@ -38,7 +38,9 @@ Modelos, formato da amostra, leitor de uso, credencial, rotação e o store. Sem
   perfil; `activate` (reativar só espelha grupo→casa; recusa conta ativa noutro grupo; espelha a
   que sai; copia casa→grupo e grava a identidade); `mirror_group_to_home` (só se mudou);
   `push_home_to_group` (só pós-relogin); `mirror_active`; `probe_config_dir` (ativa → perfil do
-  grupo, nunca a casa); `next_account`/`rotation_target` (sem amostra = fresca; limiar estrito).
+  grupo, nunca a casa); `next_account`/`rotation_target` (sem amostra = fresca; limiar estrito);
+  `successors` (quem assume o grupo da conta ativa removida: com folga antes, as demais depois,
+  cada parte na ordem).
 - `account_login_service.rs` — `login_result`: identidade no `.claude.json` **e** credencial
   completa na casa; uma sem a outra é login pela metade.
 - `router_config_store/` — ≙ `RouterConfigStore` (sem UI). Um tipo só, a fachada que a UI
@@ -99,6 +101,11 @@ Modelos, formato da amostra, leitor de uso, credencial, rotação e o store. Sem
   conta que a lista esqueceu; remover conta só apaga pasta sob `<base>\accounts\`.
 - 22/09/2026: trava do motor é segurança a mais, não portão — sem ela no prazo (5 s), segue.
 - O item do GRUPO não é apagado ao remover conta nem grupo (paridade macOS): pode haver sessão viva.
+- 22/10/2026: remover a conta ATIVA passa o grupo para a próxima (`hand_over` no `accounts.rs`,
+  na ordem do `successors`, pulando quem não pode assumir) — a troca a quente de sempre, a sessão
+  viva segue pela próxima. Antes o grupo seguia servido pela conta removida e a tela o mostrava
+  sem conta em uso; a rotação nem o corrigia com "Trocar sozinho" desligado. Sem próxima (era a
+  única), o item fica, pela regra acima.
 
 - 22/09/2026: a função `claude` do router ENCADEIA a que já existia no perfil (nesta máquina o
   perfil do PowerShell define uma que escolhe a conta do `claude` puro) — sobrescrevê-la mudaria
