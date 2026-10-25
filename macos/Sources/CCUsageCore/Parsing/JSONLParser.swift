@@ -14,9 +14,9 @@ public enum JSONLParser {
 
     // MARK: - Decode
 
-    // JSONDecoder não é Sendable, mas decodificar com uma instância que nunca é
-    // mutada é seguro para uso concorrente.
-    nonisolated(unsafe) private static let decoder = JSONDecoder()
+    // Uma instância só, nunca mutada: o `JSONDecoder` é `Sendable` no SDK do
+    // macOS 26, e decodificar com ela de várias threads é seguro.
+    private static let decoder = JSONDecoder()
 
     private static let isoWithFraction = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
     private static let isoPlain = Date.ISO8601FormatStyle(includingFractionalSeconds: false)

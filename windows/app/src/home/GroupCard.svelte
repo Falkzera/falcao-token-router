@@ -23,6 +23,7 @@
     onSnapshot,
     onAddAccount,
     onRelogin,
+    onHistory,
   }: {
     group: GroupView;
     /** O comando só funciona com a integração de pé — o aviso leva até ela. */
@@ -33,6 +34,8 @@
     onSnapshot: (snapshot: Snapshot) => void;
     onAddAccount: () => void;
     onRelogin: (account: AccountView) => void;
+    /** O atalho de cada conta: a aba Histórico já nela. */
+    onHistory: (account: AccountView) => void;
   } = $props();
 
   // MARK: renomear
@@ -250,6 +253,7 @@
           first={index === 0}
           last={index === ordered.length - 1}
           onUse={async () => onSnapshot(await api.activateAccount(account.id, group.id))}
+          onHistory={() => onHistory(account)}
           onRelogin={() => onRelogin(account)}
           onRemove={() => (pending = { kind: "removeAccount", account })}
           onMove={(delta) => move(account.id, delta)}

@@ -16,7 +16,9 @@ tocada e o rodapé. Sem as seções do medidor (sessão local, valor): o porte �
   ("reseta 13:20 · em 4h 6m", "reseta seg (28) 9:00 · em 4d 13h" — o "quando" escrito pelo núcleo,
   o que falta contado de AGORA; a de 5h que não começou diz "começa na próxima mensagem" — o
   `session` do `Gauge`), quem mediu (antena = sensor, medidor = sonda) e
-  a janela por modelo embaixo com carimbo próprio. Janela vencida = "sem medida válida".
+  a janela por modelo embaixo com carimbo próprio. Janela vencida = "sem medida válida". No pé,
+  "Ver histórico" (21/10/2026): `open_home("history", conta)` — fecha o flyout e abre a janela
+  no Histórico já nesta conta.
 - `MiniBar.svelte` (a barra desenha a de 5h, a coluna vizinha; sem medida a trilha fica vazia),
   `ModelBadge.svelte` (quando quem manda é a janela por modelo), `SessionsBadge.svelte` (ponto
   cheio se alguma sessão trabalha ou espera o usuário).

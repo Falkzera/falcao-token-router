@@ -1,5 +1,5 @@
 name: Port to another platform
-description: You want to bring this to Linux, Windows, or somewhere else
+description: You want to bring this to Linux, or somewhere else it doesn't run yet
 labels: ["help wanted", "needs-triage"]
 body:
   - type: markdown
@@ -8,11 +8,12 @@ body:
         Ports are welcome, and this issue is how one starts: it makes the work
         visible so nobody duplicates it, and it's where the platform-specific
         findings get written down. Read `docs/PORTING.md` first — it maps each
-        macOS-specific piece to what a port needs.
+        system-specific piece to what a port needs — and
+        `windows/docs/PLATFORM.md`, which is how the Windows port answered it.
 
-        The maintainer works on macOS and can't test your platform. A port lives
-        or dies on its own tests, and on verifying every assumption in
-        `docs/ARCHITECTURE.md` against your own Claude Code install.
+        The maintainers can't test your platform. A port lives or dies on its
+        own tests, and on verifying every assumption in `docs/ARCHITECTURE.md`
+        against your own Claude Code install.
 
   - type: dropdown
     id: platform
@@ -20,7 +21,6 @@ body:
       label: Platform
       options:
         - "Linux"
-        - "Windows"
         - "Other (say which below)"
     validations:
       required: true
@@ -30,7 +30,8 @@ body:
     attributes:
       label: What have you verified on your platform?
       description: >
-        Where does Claude Code store credentials there? Is the session registry
+        Where does Claude Code store credentials there, and does a live session
+        pick up a swapped one? Is the session registry
         (`<config>/sessions/<pid>.json`) written? Does the status line receive
         `rate_limits`? Even "I checked X and it's the same" is valuable.
       placeholder: |
@@ -45,9 +46,10 @@ body:
     attributes:
       label: Approach
       description: >
-        Reusing `CCUsageCore` with a new adapter and UI? A rewrite in another
-        language reading the same files? Both are fine — say which, so the
-        review can be about the right things.
+        Reusing an engine (`CCUsageCore` in Swift, `router-core` in Rust) with a
+        new adapter and UI? A rewrite in another language reading the same
+        files? Both are fine — say which, so the review can be about the right
+        things.
     validations:
       required: false
 
@@ -55,7 +57,7 @@ body:
     id: invariants
     attributes:
       label: The invariants hold everywhere
-      description: These are the review criteria for a port, same as for macOS.
+      description: These are the review criteria for a port, same as for macOS and Windows.
       options:
         - label: No network calls of the app's own — usage comes from the official client
         - label: No OAuth refresh; the refresh token has no reader

@@ -12,7 +12,7 @@ Esta pasta é autocontida: `Package.swift`, `VERSION`, `CHANGELOG.md` e
 - `README.md` — o guia de quem instala num Mac: DMG, quarentena, integração de terminal, compilar do fonte, e o rito de release.
 - `CHANGELOG.md` — o histórico desta plataforma. O Windows tem o dele.
 - `VERSION` — a única fonte da versão do macOS; a tag `macos-v$(VERSION)` tem de bater, e o `release.yml` confere.
-- `Package.swift` — três alvos: `CCUsageCore` (motor, sem UI), `FalcaoTokenRouter` (app), `router` (CLI embutida).
+- `Package.swift` — três alvos: `CCUsageCore` (motor, sem UI), `FalcaoTokenRouter` (app), `router` (CLI embutida). Cada alvo exclui os seus `agent.md` (o `exclude` não aceita glob: pasta nova pede linha nova, e o aviso "unhandled file" volta para lembrar).
 - `Sources/CCUsageCore/` — motor: grupos, rotação, espelhamento de credencial, sensor, sonda, medidor. **Não importa SwiftUI** — é o que deixa tudo testável sem janela.
 - `Sources/FalcaoTokenRouter/` — o app e **todas** as strings de usuário.
 - `Sources/router/` — a CLI que o bundle carrega (`statusline`, `launch`, `is-group`, `rotate`, `measure`, `doctor`).
@@ -24,7 +24,7 @@ Esta pasta é autocontida: `Package.swift`, `VERSION`, `CHANGELOG.md` e
 - **`swift test` puro não funciona** sob Command Line Tools. Use `./Scripts/test.sh`, que injeta o plugin de macro e o `Testing.framework`. Está no `CONTRIBUTING.md`.
 - **Nunca escrever `@State`** — do SDK do macOS 26 em diante é macro do SwiftUI e o plugin só vem no Xcode. Use `@ViewState` (`Sources/FalcaoTokenRouter/ViewState.swift`).
 - **O `icon.sh` escreve fora desta pasta.** O banner e o card social são do produto, não da plataforma, e vão para `../docs/art` — ele usa `$REPO`, não `$ROOT`.
-- **O que esta pasta compartilha com `windows/` não é código, é o formato em disco:** `config.json`, as casas por conta e `usage/<email>.json`. Mudar esse formato é mudar as duas plataformas.
+- **O que esta pasta compartilha com `windows/` não é código, é o formato em disco:** `config.json`, as casas por conta, `usage/<email>.json` e — desde 21/10/2026 — `history/<email>.jsonl`. Mudar esse formato é mudar as duas plataformas.
 
 ## Decisões com data
 - **24/09/2026** — a pasta nasce. Antes, este projeto era a raiz do repositório e o `windows/` era hóspede; a estrutura contradizia a documentação, que trata portes como cidadãos de primeira classe. `CHANGELOG.md` e `VERSION` vieram junto, porque o Windows já tinha os dele.

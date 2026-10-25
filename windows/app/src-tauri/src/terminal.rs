@@ -75,7 +75,6 @@ pub struct TerminalView {
     pub shells: Vec<ShellView>,
     pub developer_mode: bool,
     pub fully_installed: bool,
-    pub blocked_by_policy: bool,
     /// "Ativar" resolve algo: scripts ausentes ou citando outro router, ou um
     /// shell sem a linha no perfil. A política que bloqueia e o `.bash_profile`
     /// que ignora o `.bashrc` NÃO se resolvem instalando — têm correção
@@ -121,7 +120,6 @@ fn view(report: &TerminalReport, router_found: bool) -> TerminalView {
             .collect(),
         developer_mode: report.developer_mode,
         fully_installed: router_found && report.fully_installed(),
-        blocked_by_policy: report.blocked_by_policy(),
         needs_install: report.scripts != ScriptsState::Current
             || report.shells.iter().any(|s| !s.loads_integration),
     }
@@ -289,7 +287,7 @@ mod tests {
         let v = view(&report(ScriptsState::Current, shells), true);
         assert!(!v.needs_install);
         assert!(!v.fully_installed);
-        assert!(v.blocked_by_policy);
+        assert!(v.shells[1].policy_blocks);
         assert_eq!(v.shells[1].policy.as_deref(), Some("Restricted"));
     }
 

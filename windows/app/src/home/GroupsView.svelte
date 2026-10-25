@@ -12,9 +12,11 @@
   import NewGroupDialog from "./NewGroupDialog.svelte";
   import TerminalSection from "./TerminalSection.svelte";
 
-  let { onAddAccount, onRelogin }: {
+  let { onAddAccount, onRelogin, onHistory }: {
     onAddAccount: (groupId: string) => void;
     onRelogin: (account: AccountView, groupId: string) => void;
+    /** O atalho de cada conta: a aba Histórico já nela, no grupo do clique. */
+    onHistory: (account: AccountView, groupId: string) => void;
   } = $props();
 
   let snapshot = $state<Snapshot | null>(null);
@@ -110,6 +112,7 @@
             onSnapshot={(next) => (snapshot = next)}
             onAddAccount={() => onAddAccount(group.id)}
             onRelogin={(account) => onRelogin(account, group.id)}
+            onHistory={(account) => onHistory(account, group.id)}
           />
         {/each}
         <!-- Depois dos grupos: sem grupo, `claude <grupo>` não teria o que abrir. -->

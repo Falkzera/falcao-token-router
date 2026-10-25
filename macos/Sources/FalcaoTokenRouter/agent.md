@@ -4,13 +4,14 @@
 O app SwiftUI de menu bar: painel de uso e UMA janela com duas abas — Grupos (o produto) e Medidor (os ajustes). Toda lógica de domínio vem de `CCUsageCore`; aqui é apresentação e orquestração.
 
 ## Arquivos
-- `App.swift` — cenas (MenuBarExtra, Window `home`), `AppDelegate` (política de Dock + reabrir no clique do ícone), stores estáticos, laço de rotação de 180s (`refreshUsage` + `rotateAll`), e o `CommandGroup(replacing: .appSettings)` que devolve o ⌘,.
-- `Settings/HomeWindow.swift` — a janela única: `TabView` de Grupos e Medidor. Define `HomeTab`, o store `HomeNavigation` (qual aba abrir — vem do painel, de outra cena), `SettingsCommand` (o item de menu do ⌘,) e `HomeWindowID` (o id da cena num lugar só).
+- `App.swift` — cenas (MenuBarExtra, Window `home`), `AppDelegate` (política de Dock + reabrir no clique do ícone), stores estáticos, laço de rotação de 180s (`refreshUsage` + `rotateAll`, e a partir da 2ª volta a agenda da medição de 5 em 5 horas), e o `CommandGroup(replacing: .appSettings)` que devolve o ⌘,.
+- `Settings/HomeWindow.swift` — a janela única: `TabView` de Grupos, Histórico e Medidor. Define `HomeTab`, o store `HomeNavigation` (qual aba abrir — vem do painel, de outra cena — e `historyFocus`, a conta que o Histórico deve mostrar), `SettingsCommand` (o item de menu do ⌘,) e `HomeWindowID` (o id da cena num lugar só).
+- `Settings/HistoryView.swift` / `HistoryCard.swift` / `HistoryChart.swift` — a aba Histórico: dois gráficos de linha por conta (Swift Charts).
 - `Panel/UsagePanel.swift` — o painel do menu bar: contas por grupo, sessão (com rótulo do perfil medido) OU detalhamento da conta selecionada, valor, rodapé. `selectedAccount` mora aqui e desce como `Binding` para a tabela.
 - `Panel/AccountsSection.swift` — a tabela de contas por grupo (rótulo da janela, barra, %, idade da amostra, "pronta"). Define `AccountHelp` (o tooltip da linha, compartilhado com Grupos), `ModelBadge` (a marca de que quem manda é uma janela por modelo), `SessionsBadge` (quantas sessões vivas o grupo tem) e `UsageAge` (limiares `stale` 1h / `veryStale` 12h), compartilhado com `GroupsView`.
 - `Panel/WindowReading.swift` — rótulo + valor de UMA janela do `rate_limits`, usado pelo painel e pela tela de Grupos para as duas aparecerem lado a lado.
-- `Settings/GroupsView.swift` — a aba do produto: cartões de grupo, login/relogin em folha (pty), integração de terminal, confirmações destrutivas.
-- `Settings/SettingsView.swift` — a aba do MEDIDOR (plano, sensor, alertas, teto, sistema).
+- `Settings/GroupsView.swift` — a aba do produto: a lista de grupos e o login pendente. Os cartões, a linha de conta, a folha de login, a de grupo novo e a integração de terminal moram cada um no seu arquivo em `Settings/` (ver o `agent.md` de lá).
+- `Settings/SettingsView.swift` — a aba do MEDIDOR (plano, sensor, alertas, teto, sistema), com a `StatusLineSection` — o que a status line dos grupos mostra.
 - `LoginSession.swift` — roda `claude auth login` num pty e observa a saída (link + "Login successful").
 - `RouterBinary.swift` — caminho do `router` embutido no bundle.
 - `ViewState.swift` — o typealias que substitui `@State` (ver Padrões).
@@ -80,8 +81,12 @@ O app SwiftUI de menu bar: painel de uso e UMA janela com duas abas — Grupos (
 - 2026-09-22: a janela abre sozinha no lançamento quando não há grupo nenhum (primeira execução) ou quando o Dock está ligado, via `defaultLaunchBehavior`. Decidido uma vez, no lançamento: reavaliar faria a janela reaparecer sozinha no meio do uso.
 - 2026-09-22: `RouterConfigStore.init` passou a chamar `refreshUsage()`. A etiqueta do menu bar é desenhada antes do primeiro laço, e com `activeByGroup` vazio ela saía sem o nome da conta — que é a única coisa que ela existe para dizer. O rótulo vive num `NSStatusItem`, onde o rastreamento de observação não é confiável, então não se corrigia depois.
 
+- 2026-10-21: **aba Histórico**, porta do porte Windows (PR #35). A janela passou a ter três abas (Grupos, Histórico, Medidor), e o tamanho fixo de 520×620 ficou: o Histórico rola. O laço de 180 s olha a agenda da medição de 5 em 5 horas a partir da 2ª volta — na subida do Mac ela não disputa a máquina com o resto — numa `Task` à parte, para a rotação não esperar a sonda. O atalho de cada conta (botão de gráfico em Grupos, "Ver histórico" no cartão da conta no painel) passa por `HomeNavigation.showHistory`.
+- 2026-10-21: os gráficos são **Swift Charts** (vem com o sistema; nenhuma dependência nova). A linha não usa o `calm` do semáforo — dessaturado, numa linha fina ele se lê cinza —, e sim o verde do porte Windows, um tom por aparência (`UsageColor.chartLine`). As chaves do Histórico ficam em `home.history.*`: um prefixo `history` novo no `check-strings.sh` leria o `"history.jsonl"` do `ProfileSharing` como chave sem tradução.
+
 ## Pendências conhecidas
+- A dica do ponto vem do `chartXSelection` (21/10/2026), escrito sem um Mac à mão: falta conferir no uso se ela aparece com o ponteiro parado em cima ou só no clique/arrasto. Se for só no clique, o hover é um `chartOverlay` com `onContinuousHover`.
 - A etiqueta do menu bar (ícone + % + nome) custa ~70 pontos. Em barra disputada ela é a primeira a sair, e não há API para saber que isso aconteceu. O Dock é a saída; encurtar a etiqueta é a alternativa, ao custo de tirar da barra justamente o nome da conta.
 - O detalhamento por conta não tem tokens/min nem valor (o sensor não colhe isso); só sairia da medição local, que é de um perfil só.
 - Seção Sessão/Valor mede só o perfil padrão; medir por grupo é evolução futura.
-- `setNickname` existe no store sem UI correspondente.
+- O apelido da conta (`nickname` no `config.json`) vira o rótulo dela quando existe, mas não há UI para defini-lo — só editando o arquivo. O `setNickname` do store saiu em 04/10/2026 por não ter chamador.

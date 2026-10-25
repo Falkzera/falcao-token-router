@@ -17,11 +17,10 @@ final class AlertCoordinator {
 
     @ObservationIgnored private var policy = AlertPolicy()
     @ObservationIgnored private let settings: AppSettings
-    @ObservationIgnored private let presenter: any AlertPresenting
+    @ObservationIgnored private let presenter = UserNotificationPresenter()
 
-    init(settings: AppSettings, presenter: any AlertPresenting = UserNotificationPresenter()) {
+    init(settings: AppSettings) {
         self.settings = settings
-        self.presenter = presenter
     }
 
     func handle(_ snapshot: UsageSnapshot) {

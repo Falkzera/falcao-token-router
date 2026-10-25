@@ -16,7 +16,7 @@
 
 use std::path::{Path, PathBuf};
 
-use chrono::{Datelike, NaiveDateTime, Timelike};
+use chrono::{Datelike, NaiveDateTime, Timelike, Weekday};
 
 use crate::usage::usage_percent::UsagePercent;
 
@@ -273,12 +273,13 @@ fn mix(a: [u8; 3], b: [u8; 3], k: f64) -> [u8; 3] {
     std::array::from_fn(|i| (a[i] as f64 + (b[i] as f64 - a[i] as f64) * k).round() as u8)
 }
 
-/// Cor por severidade, a mesma regra de antes da status line do router (e do
-/// macOS): ≥0,90 vermelho, ≥0,70 amarelo, senão verde.
+/// Cor por severidade, a régua do painel e da bandeja (`gauge-mark`): ≥0,90
+/// vermelho, ≥0,66 amarelo, senão verde. Até 10/2026 aqui era 0,70 (nas duas
+/// plataformas), e uma conta a 68% saía amarela na bandeja e verde no terminal.
 fn tone(fraction: f64) -> &'static str {
     if fraction >= 0.90 {
         RED
-    } else if fraction >= 0.70 {
+    } else if fraction >= 0.66 {
         YELLOW
     } else {
         GREEN
@@ -310,15 +311,21 @@ pub fn reset_when(at: NaiveDateTime, with_day: bool, portuguese: bool) -> String
     }
 }
 
-/// "seg (28) 9:00" / "Mon (28) 9:00": o reset semanal pode cair em qualquer
-/// dia. Hora sem zero à esquerda, de propósito.
-fn day_and_time(at: NaiveDateTime, portuguese: bool) -> String {
+/// O dia da semana abreviado como a linha o escreve ("seg" / "Mon"). Público:
+/// as marcas de dia do gráfico da aba Histórico usam os mesmos nomes.
+pub fn weekday_abbrev(weekday: Weekday, portuguese: bool) -> &'static str {
     const PT: [&str; 7] = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
     const EN: [&str; 7] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     let names = if portuguese { PT } else { EN };
+    names[weekday.num_days_from_sunday() as usize]
+}
+
+/// "seg (28) 9:00" / "Mon (28) 9:00": o reset semanal pode cair em qualquer
+/// dia. Hora sem zero à esquerda, de propósito.
+fn day_and_time(at: NaiveDateTime, portuguese: bool) -> String {
     format!(
         "{} ({}) {}:{:02}",
-        names[at.weekday().num_days_from_sunday() as usize],
+        weekday_abbrev(at.weekday(), portuguese),
         at.day(),
         at.hour(),
         at.minute()
@@ -678,6 +685,8 @@ mod tests {
         };
         assert!(colored(0.95).contains("\x1b[31m█████ 95%"));
         assert!(colored(0.80).contains("\x1b[33m████░ 80%"));
+        // A régua da bandeja: 68% já é aviso.
+        assert!(colored(0.68).contains("\x1b[33m"));
         assert!(colored(0.10).contains("\x1b[32m█░░░░ 10%"));
     }
 

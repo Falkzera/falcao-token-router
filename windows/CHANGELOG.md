@@ -1,11 +1,30 @@
 # Changelog — Windows
 
-The Windows port versions on its own, with `windows-v*` tags. The macOS app has
-its own `CHANGELOG.md` at the repository root and its own `macos-v*` tags:
+The Windows app versions on its own, with `windows-v*` tags. The macOS app has
+its own [`macos/CHANGELOG.md`](../macos/CHANGELOG.md) and its own `macos-v*` tags:
 a fix on one platform never waits for the other's calendar.
 
 > ⚠️ `releases/latest` is **ambiguous** in this repository — it resolves to
 > whichever platform released last. Link to a tag, never to `/latest`.
+
+## [Unreleased]
+
+### Added
+
+- **Usage history.** A **History** tab draws two lines per account — the 5-hour
+  window over the last 7 days and the weekly window over the last 4 weeks — from
+  the probe's measurements, with the group's threshold dashed on both. While the
+  app is open it measures each account every 5 hours (**Settings → History**, on
+  by default); **Measure accounts** and `router measure` add their points too.
+  More than 7½ hours without a point breaks the line instead of guessing. Hover a
+  chart, or focus it and use ← →, to read a point. The points are kept for 90 days
+  in `%LOCALAPPDATA%\com.synqo.falcao-router\history`.
+- **A shortcut to each account's history**: the chart button next to every account
+  on the Groups tab, and **View history** on an account's card in the tray panel,
+  open the History tab right on that account.
+- **Delete history…** in **Settings → History** empties the history of every
+  account, after a confirmation. Measuring goes on, and the history starts over
+  with the next measurement.
 
 ## [1.0.0] — 2026-09-24
 
@@ -54,4 +73,5 @@ instead, so an update over a live session works.
 The inherited token meter (JSONL cost, pricing, alerts), code signing and arm64
 are out of scope for this first release.
 
+[Unreleased]: https://github.com/Falkzera/falcao-token-router/compare/windows-v1.0.0...HEAD
 [1.0.0]: https://github.com/Falkzera/falcao-token-router/releases/tag/windows-v1.0.0
