@@ -22,7 +22,8 @@
   de ser padrão, apagar), o comando do terminal com copiar (✓ por 2 s) e o aviso da integração
   (um link que rola até a seção), auto-troca, limiar (o número acompanha o arrasto; GRAVA SÓ AO
   SOLTAR), a lista reordenável e o rodapé (adicionar conta, "Medir contas" com spinner — uma
-  medição por vez).
+  medição por vez). Remover a conta em uso (com outra no grupo) confirma com o texto que diz
+  que o grupo passa para a próxima (`messageActive`).
 - `TerminalSection.svelte` — a integração de terminal (≙ TerminalIntegrationRow): "Conferindo…"
   até o quadro chegar; convite + "Ativar"; depois, uma linha por shell (PS 7, PS 5.1, Git Bash)
   com ✓/⚠ e a correção de cada problema — "Ativar" só quando instalar resolve (`needsInstall`),

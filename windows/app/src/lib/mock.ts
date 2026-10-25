@@ -656,10 +656,12 @@ const handlers: Record<string, (args: Record<string, unknown>) => unknown> = {
     state.lastError = null;
     return changed();
   },
+  // A conta em uso sai e o grupo passa para a próxima. Aqui é sempre a primeira
+  // que sobrou; a regra de verdade (folga antes, na ordem) é do motor.
   remove_account: (args) => {
     for (const g of state.groups) {
       g.accounts = g.accounts.filter((a) => a.id !== args.accountId);
-      if (g.activeAccountId === args.accountId) g.activeAccountId = null;
+      if (g.activeAccountId === args.accountId) g.activeAccountId = g.accounts[0]?.id ?? null;
     }
     return changed();
   },

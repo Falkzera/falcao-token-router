@@ -23,7 +23,8 @@ Credencial/adapter falsos em memória ou pastas temporárias — nada toca o sis
   estranho no `~\.claude`, contas exclusivas, medição em três passos, casa pendente descartada)
   + o plano da medição de 5 em 5 horas (só as vencidas, grupo a grupo, conta em dois grupos uma
   vez, tentativa recente segura a conta, ativa pelo grupo) + apagar o histórico (todas as
-  contas, e elas voltam a vencer).
+  contas, e elas voltam a vencer) + remover a conta em uso (o grupo passa para a próxima; a
+  única deixa o grupo como está).
 - `history_tests.rs` — o histórico de uso (21/10/2026): ordem, poda de 90 dias, linha estragada
   pulada, nome do `usage\` com `.jsonl`, data sem fração, janela ausente fora da linha; a
   sonda gravando o ponto (falha no histórico não derruba a medição; medição falha não deixa

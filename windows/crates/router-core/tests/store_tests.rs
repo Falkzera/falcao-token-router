@@ -16,7 +16,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use chrono::Utc;
-use router_core::engine::credential_store::CredentialStore;
+use router_core::engine::credential_store::{CredentialBlob, CredentialStore};
 use router_core::engine::group_usage::{GroupUsageSample, GroupUsageStore, UsageOrigin};
 use router_core::engine::provider::ProviderAdapter;
 use router_core::engine::router_config_store::{LoginOutcome, ReloginOutcome, RouterConfigStore};
@@ -358,6 +358,162 @@ fn removing_an_account_drops_it_from_the_group_lists() {
 
     assert!(env.store.config().accounts.is_empty());
     assert!(env.group(group.id).account_ids.is_empty());
+}
+
+// MARK: - Remover a conta em uso
+
+impl Env {
+    /// O sensor mediu `fraction` (5h) para a conta, e o store releu o quadro.
+    fn seed_usage(&mut self, email: &str, group: Id, fraction: f64) {
+        let sample = GroupUsageSample::new(
+            self.group(group).config_dir.raw.clone(),
+            Some(email.into()),
+            Some(fraction),
+            None,
+            None,
+            None,
+            Utc::now(),
+            None,
+            UsageOrigin::Sensor,
+        );
+        GroupUsageStore::write(&sample, email, &self.paths.usage_dir()).unwrap();
+        self.store.refresh_usage();
+    }
+
+    fn group_credential(&self, group: Id) -> Option<CredentialBlob> {
+        self.creds.read(
+            &self
+                .adapter
+                .credential_location(&self.group(group).config_dir),
+        )
+    }
+}
+
+/// Remover a conta em uso passa o grupo para a próxima, na hora: antes o grupo
+/// seguia servido pela conta removida, e a tela o mostrava sem conta em uso.
+#[test]
+fn removing_the_active_account_hands_the_group_to_the_next_one() {
+    let mut env = make_store();
+    let group = env.store.add_group("trabalho");
+    let a = env.add_account("conta1@exemplo.com", group.id);
+    let b = env.add_account("conta2@exemplo.com", group.id);
+    env.store.activate(&a, &env.group(group.id));
+
+    env.store.remove_account(a.id);
+
+    assert_eq!(
+        env.store.active_account(&env.group(group.id)).map(|x| x.id),
+        Some(b.id)
+    );
+    assert_eq!(
+        env.group_credential(group.id),
+        Some(cred("cred-conta2@exemplo.com"))
+    );
+    assert_eq!(
+        env.store.active_by_group().get(&group.id),
+        Some(&b.id),
+        "o quadro publicado não acompanhou"
+    );
+    assert!(env.store.last_error().is_none());
+}
+
+/// "A próxima" é a da rotação: a primeira da ordem com folga. A que passou do
+/// limiar fica para depois.
+#[test]
+fn the_next_one_skips_an_account_over_the_threshold() {
+    let mut env = make_store();
+    let group = env.store.add_group("trabalho");
+    let a = env.add_account("conta1@exemplo.com", group.id);
+    let _b = env.add_account("conta2@exemplo.com", group.id);
+    let c = env.add_account("conta3@exemplo.com", group.id);
+    env.store.activate(&a, &env.group(group.id));
+    env.seed_usage("conta2@exemplo.com", group.id, 0.95);
+
+    env.store.remove_account(a.id);
+
+    assert_eq!(
+        env.store.active_account(&env.group(group.id)).map(|x| x.id),
+        Some(c.id)
+    );
+}
+
+/// Sem ninguém com folga o grupo troca do mesmo jeito: ficar seria seguir na
+/// conta que o usuário acabou de remover.
+#[test]
+fn with_every_other_account_over_the_threshold_it_still_hands_over() {
+    let mut env = make_store();
+    let group = env.store.add_group("trabalho");
+    let a = env.add_account("conta1@exemplo.com", group.id);
+    let b = env.add_account("conta2@exemplo.com", group.id);
+    env.store.activate(&a, &env.group(group.id));
+    env.seed_usage("conta2@exemplo.com", group.id, 0.99);
+
+    env.store.remove_account(a.id);
+
+    assert_eq!(
+        env.store.active_account(&env.group(group.id)).map(|x| x.id),
+        Some(b.id)
+    );
+}
+
+/// Quem não pode assumir (aqui, sem credencial na casa — precisa de Relogar) é
+/// pulada, e a seguinte assume.
+#[test]
+fn an_account_that_cannot_take_over_is_skipped() {
+    let mut env = make_store();
+    let group = env.store.add_group("trabalho");
+    let a = env.add_account("conta1@exemplo.com", group.id);
+    let b = env.add_account("conta2@exemplo.com", group.id);
+    let c = env.add_account("conta3@exemplo.com", group.id);
+    env.store.activate(&a, &env.group(group.id));
+    env.creds.delete(&env.adapter.credential_location(&b.home));
+
+    env.store.remove_account(a.id);
+
+    assert_eq!(
+        env.store.active_account(&env.group(group.id)).map(|x| x.id),
+        Some(c.id)
+    );
+}
+
+/// Era a única: não há para onde ir, e a cópia do grupo fica — apagá-la
+/// derrubaria a sessão viva que ela atende.
+#[test]
+fn removing_the_only_account_leaves_the_group_copy_alone() {
+    let mut env = make_store();
+    let group = env.store.add_group("trabalho");
+    let a = env.add_account("conta1@exemplo.com", group.id);
+    env.store.activate(&a, &env.group(group.id));
+
+    env.store.remove_account(a.id);
+
+    assert_eq!(
+        env.group_credential(group.id),
+        Some(cred("cred-conta1@exemplo.com"))
+    );
+    assert!(env.store.active_by_group().get(&group.id).is_none());
+}
+
+/// Remover uma conta que não está em uso não mexe no grupo.
+#[test]
+fn removing_an_idle_account_keeps_the_active_one() {
+    let mut env = make_store();
+    let group = env.store.add_group("trabalho");
+    let a = env.add_account("conta1@exemplo.com", group.id);
+    let b = env.add_account("conta2@exemplo.com", group.id);
+    env.store.activate(&a, &env.group(group.id));
+    let location = env
+        .adapter
+        .credential_location(&env.group(group.id).config_dir);
+    let writes = env.creds.writes_to(&location);
+
+    env.store.remove_account(b.id);
+
+    assert_eq!(
+        env.store.active_account(&env.group(group.id)).map(|x| x.id),
+        Some(a.id)
+    );
+    assert_eq!(env.creds.writes_to(&location), writes);
 }
 
 #[test]
