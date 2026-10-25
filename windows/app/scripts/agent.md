@@ -1,6 +1,6 @@
 # app/scripts
 
-- `check-strings.mjs` — ≙ `Scripts/check-strings.sh`: chave usada (TS, Svelte e o Rust da
+- `check-strings.mjs` — ≙ `macos/Scripts/check-strings.sh`: chave usada (TS, Svelte e o Rust da
   bandeja) presente nos dois catálogos; nenhuma tradução órfã; chaves só nos prefixos
   `panel|settings|format|groups|home|tray|history` (sem `alerts`: o medidor não entra no porte;
   `tray` e `history` — a aba Histórico, 21/10/2026 — são superfícies novas); placeholders iguais

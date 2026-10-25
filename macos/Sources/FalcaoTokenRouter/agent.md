@@ -9,8 +9,8 @@ O app SwiftUI de menu bar: painel de uso e UMA janela com duas abas — Grupos (
 - `Panel/UsagePanel.swift` — o painel do menu bar: contas por grupo, sessão (com rótulo do perfil medido) OU detalhamento da conta selecionada, valor, rodapé. `selectedAccount` mora aqui e desce como `Binding` para a tabela.
 - `Panel/AccountsSection.swift` — a tabela de contas por grupo (rótulo da janela, barra, %, idade da amostra, "pronta"). Define `AccountHelp` (o tooltip da linha, compartilhado com Grupos), `ModelBadge` (a marca de que quem manda é uma janela por modelo), `SessionsBadge` (quantas sessões vivas o grupo tem) e `UsageAge` (limiares `stale` 1h / `veryStale` 12h), compartilhado com `GroupsView`.
 - `Panel/WindowReading.swift` — rótulo + valor de UMA janela do `rate_limits`, usado pelo painel e pela tela de Grupos para as duas aparecerem lado a lado.
-- `Settings/GroupsView.swift` — a aba do produto: cartões de grupo, login/relogin em folha (pty), integração de terminal, confirmações destrutivas.
-- `Settings/SettingsView.swift` — a aba do MEDIDOR (plano, sensor, alertas, teto, sistema).
+- `Settings/GroupsView.swift` — a aba do produto: a lista de grupos e o login pendente. Os cartões, a linha de conta, a folha de login, a de grupo novo e a integração de terminal moram cada um no seu arquivo em `Settings/` (ver o `agent.md` de lá).
+- `Settings/SettingsView.swift` — a aba do MEDIDOR (plano, sensor, alertas, teto, sistema), com a `StatusLineSection` — o que a status line dos grupos mostra.
 - `LoginSession.swift` — roda `claude auth login` num pty e observa a saída (link + "Login successful").
 - `RouterBinary.swift` — caminho do `router` embutido no bundle.
 - `ViewState.swift` — o typealias que substitui `@State` (ver Padrões).
@@ -84,4 +84,4 @@ O app SwiftUI de menu bar: painel de uso e UMA janela com duas abas — Grupos (
 - A etiqueta do menu bar (ícone + % + nome) custa ~70 pontos. Em barra disputada ela é a primeira a sair, e não há API para saber que isso aconteceu. O Dock é a saída; encurtar a etiqueta é a alternativa, ao custo de tirar da barra justamente o nome da conta.
 - O detalhamento por conta não tem tokens/min nem valor (o sensor não colhe isso); só sairia da medição local, que é de um perfil só.
 - Seção Sessão/Valor mede só o perfil padrão; medir por grupo é evolução futura.
-- `setNickname` existe no store sem UI correspondente.
+- O apelido da conta (`nickname` no `config.json`) vira o rótulo dela quando existe, mas não há UI para defini-lo — só editando o arquivo. O `setNickname` do store saiu em 04/10/2026 por não ter chamador.

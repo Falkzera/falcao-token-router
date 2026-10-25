@@ -28,5 +28,7 @@ Par do `windows/crates/router-core/src/statusline/`, portado dele.
 - **24/09/2026 — a escolha guarda os ESCONDIDOS, não os mostrados.** É de propósito: um item novo numa versão futura aparece para todos, como "a completa menos o que eu tirei". Guardar os mostrados esconderia toda novidade de quem já tem o arquivo.
 - **24/09/2026 — a escolha mora em arquivo, não no `UserDefaults`.** A CLI roda fora do app e não lê o `UserDefaults`; e ela não entra no `config.json`, que é o formato combinado com o Windows.
 
+- 2026-10-04: o amarelo da linha passou de 0,70 para 0,66, a régua do painel e da bandeja — uma conta a 68% saía amarela no painel e verde no terminal e na prévia. E o branch de um worktree: o `gitdir:` vem com caminho absoluto, e concatená-lo ao do worktree fazia a linha mostrar o branch do repositório principal.
+
 ## Pendências
 - O modo "meu comando" (roda o comando do usuário depois do sensor, com botão Testar) — próximo PR, par do `command.rs` do Windows. O `StatusLineChoice` já carrega `mode` e `command` para não precisar migrar arquivo depois.

@@ -15,8 +15,12 @@ final class FakeKeychain: KeychainStore, @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         return items[service]
     }
+    /// Itens cuja escrita falha — para exercitar o espelho que não grava.
+    var failWritesTo: Set<String> = []
+
     func write(_ secret: String, service: String) throws {
         lock.lock(); defer { lock.unlock() }
+        if failWritesTo.contains(service) { throw CocoaError(.fileWriteNoPermission) }
         items[service] = secret
         writes.append((service, secret))
     }
@@ -46,9 +50,17 @@ final class FakeAdapter: ProviderAdapter, @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         return identities[dir.raw]
     }
+    /// Liga a falha na gravação da identidade (o `.claude.json` que não grava).
+    var failIdentityWrites = false
+
     func writeIdentity(_ identity: AccountIdentity, toConfigDir dir: ConfigDir) throws {
         lock.lock(); defer { lock.unlock() }
+        if failIdentityWrites { throw CocoaError(.fileWriteNoPermission) }
         identities[dir.raw] = identity
+    }
+    func clearIdentity(inConfigDir dir: ConfigDir) throws {
+        lock.lock(); defer { lock.unlock() }
+        identities[dir.raw] = nil
     }
     func launchCommand() -> (executable: String, arguments: [String]) { ("claude", []) }
 }
@@ -244,9 +256,9 @@ struct RotationDecisionTests {
         let kc = FakeKeychain()
         let adapter = FakeAdapter()
         let engine = RotationEngine(keychain: kc, adapters: [adapter])
-        let a = Account(provider: .anthropic, identity: ident("a@k.com"),
+        let a = Account(provider: .anthropic, identity: ident("a@exemplo.com"),
                         home: .dedicated("/Users/exemplo/.claude-a"))
-        let b = Account(provider: .anthropic, identity: ident("b@k.com"),
+        let b = Account(provider: .anthropic, identity: ident("b@exemplo.com"),
                         home: .dedicated("/Users/exemplo/.claude-b"))
         try? kc.write("ca", service: adapter.keychainService(forConfigDir: a.home))
         try? kc.write("cb", service: adapter.keychainService(forConfigDir: b.home))
@@ -313,7 +325,7 @@ struct RotationDecisionTests {
 struct RouterConfigTests {
     @Test("sobrevive a um ciclo de codificação")
     func roundTrips() throws {
-        let a = Account(provider: .anthropic, identity: ident("a@k.com"),
+        let a = Account(provider: .anthropic, identity: ident("a@exemplo.com"),
                         home: .dedicated("/Users/exemplo/.claude-a"), nickname: "principal")
         let group = AccountGroup(name: "trabalho", accountIDs: [a.id],
                                  configDir: .standard(home: "/Users/exemplo"))
@@ -330,11 +342,11 @@ struct RouterConfigTests {
     @Test("preserva campos desconhecidos do oauthAccount")
     func preservesOpaqueIdentity() throws {
         let raw: [String: JSONValue] = [
-            "emailAddress": .string("a@k.com"),
+            "emailAddress": .string("a@exemplo.com"),
             "organizationUuid": .string("abc-123"),
             "campoNovoQueNaoConhecemos": .bool(true),
         ]
-        let identity = AccountIdentity(email: "a@k.com", organizationName: "K",
+        let identity = AccountIdentity(email: "a@exemplo.com", organizationName: "Acme",
                                        rateLimitTier: nil, raw: raw)
         let data = try JSONEncoder().encode(identity)
         let back = try JSONDecoder().decode(AccountIdentity.self, from: data)
@@ -354,13 +366,13 @@ struct AnthropicAdapterFileTests {
         let dir = ConfigDir.dedicated(tmp.path)   // não existe ainda
         let adapter = AnthropicAdapter()
         let identity = AccountIdentity(
-            email: "z@k.com", organizationName: "K", rateLimitTier: nil,
-            raw: ["emailAddress": .string("z@k.com"), "organizationName": .string("K")])
+            email: "z@exemplo.com", organizationName: "Acme", rateLimitTier: nil,
+            raw: ["emailAddress": .string("z@exemplo.com"), "organizationName": .string("Acme")])
 
         try adapter.writeIdentity(identity, toConfigDir: dir)
 
         let back = adapter.identity(inConfigDir: dir)
-        #expect(back?.email == "z@k.com")
+        #expect(back?.email == "z@exemplo.com")
         try? FileManager.default.removeItem(at: tmp)
     }
 
@@ -373,20 +385,20 @@ struct AnthropicAdapterFileTests {
         try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
         let dir = ConfigDir.dedicated(tmp.path)
         let json = try JSONSerialization.data(withJSONObject: [
-            "oauthAccount": ["emailAddress": "old@k.com"],
+            "oauthAccount": ["emailAddress": "old@exemplo.com"],
             "cachedUsageUtilization": ["fetchedAtMs": 1],
             "projects": ["/x": ["hasTrustDialogAccepted": true]],
         ])
         try json.write(to: dir.globalConfigURL)
 
         try AnthropicAdapter().writeIdentity(
-            AccountIdentity(email: "new@k.com", organizationName: nil, rateLimitTier: nil,
-                            raw: ["emailAddress": .string("new@k.com")]),
+            AccountIdentity(email: "new@exemplo.com", organizationName: nil, rateLimitTier: nil,
+                            raw: ["emailAddress": .string("new@exemplo.com")]),
             toConfigDir: dir)
 
         let root = try JSONSerialization.jsonObject(
             with: Data(contentsOf: dir.globalConfigURL)) as! [String: Any]
-        #expect((root["oauthAccount"] as? [String: Any])?["emailAddress"] as? String == "new@k.com")
+        #expect((root["oauthAccount"] as? [String: Any])?["emailAddress"] as? String == "new@exemplo.com")
         #expect(root["cachedUsageUtilization"] == nil)          // limpo
         #expect(root["projects"] != nil)                        // preservado
         #expect(root["hasCompletedOnboarding"] as? Bool == true) // sem isto, tela de login
@@ -441,6 +453,33 @@ struct ProviderEnvTests {
         #expect(direct["ANTHROPIC_MODEL"] == "claude-opus-5")
         #expect(direct["PATH"] == "/usr/bin")
     }
+
+    /// Issue #11: o perfil lido de outro lugar, a identidade federada e os
+    /// endpoints alternativos serviam a sessão por algo que não é a conta que o
+    /// grupo ativou — e o sensor carimbava o consumo no e-mail do perfil.
+    @Test("remove o perfil alternativo, a identidade federada e as famílias Foundry/AWS")
+    func stripsTheIssue11Variables() {
+        let env = [
+            "ANTHROPIC_CONFIG_DIR": "/outro/perfil",
+            "ANTHROPIC_IDENTITY_TOKEN": "jwt", "ANTHROPIC_IDENTITY_TOKEN_FILE": "/x/jwt",
+            "ANTHROPIC_FEDERATION_RULE_ID": "r", "ANTHROPIC_ORGANIZATION_ID": "o",
+            "CLAUDE_CODE_USE_FOUNDRY": "1", "AWS_BEARER_TOKEN_BEDROCK": "b",
+            // Famílias por prefixo: inclusive um nome que ainda não existe hoje.
+            "ANTHROPIC_FOUNDRY_RESOURCE": "acme", "ANTHROPIC_FOUNDRY_ALGO_NOVO": "x",
+            "ANTHROPIC_AWS_WORKSPACE_ID": "w",
+            "PATH": "/usr/bin",
+        ]
+        let direct = ProviderEnv.direct(env)
+        #expect(direct.keys.sorted() == ["PATH"])
+    }
+
+    /// No macOS o nome de variável tem caixa, e o Claude Code lê a maiúscula —
+    /// apagar `anthropic_aws_x` mexeria no ambiente do usuário sem motivo.
+    @Test("o prefixo compara com caixa, como o sistema")
+    func prefixesAreCaseSensitive() {
+        let direct = ProviderEnv.direct(["anthropic_aws_coisa": "fica"])
+        #expect(direct["anthropic_aws_coisa"] == "fica")
+    }
 }
 
 // MARK: - O leitor de uso e o tempo
@@ -452,14 +491,14 @@ struct GroupUsageReaderDecayTests {
         let tmp = URL(fileURLWithPath: NSTemporaryDirectory())
             .appending(path: "usage-\(UUID().uuidString)")
         try? FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
-        let a = Account(provider: .anthropic, identity: ident("a@k.com"),
+        let a = Account(provider: .anthropic, identity: ident("a@exemplo.com"),
                         home: .dedicated("/Users/exemplo/.claude-a"))
         let sample = GroupUsageSample(
-            configDirRaw: "/x", email: "a@k.com",
+            configDirRaw: "/x", email: "a@exemplo.com",
             fiveHourPercent: five, fiveHourResetsAt: fiveResets,
             sevenDayPercent: seven, sevenDayResetsAt: sevenResets,
             sampledAt: Date(timeIntervalSince1970: 1000))
-        try? GroupUsageStore.write(sample, forEmail: "a@k.com", in: tmp)
+        try? GroupUsageStore.write(sample, forEmail: "a@exemplo.com", in: tmp)
         let config = RouterConfig(accounts: [a], groups: [])
         return (GroupUsageReader(usageDir: tmp), config, a, tmp)
     }
@@ -584,5 +623,141 @@ struct UsagePercentTests {
         #expect(UsagePercent.text(0) == "0%")
         #expect(UsagePercent.text(1) == "100%")
         #expect(UsagePercent.text(0.005) == "1%")
+    }
+}
+
+
+// MARK: - Uma conta, um lugar (10/2026)
+
+@Suite("Uma conta, um lugar")
+struct OneAccountOnePlaceTests {
+    /// O `~/.claude` destes testes; o grupo roda num perfil dedicado.
+    private let home = ConfigDir.standard(home: "/Users/exemplo")
+
+    private func setup() -> (RotationEngine, FakeKeychain, FakeAdapter, RouterConfig,
+                             Account, Account, AccountGroup) {
+        let kc = FakeKeychain()
+        let adapter = FakeAdapter()
+        let engine = RotationEngine(keychain: kc, adapters: [adapter], defaultProfile: home)
+        let a = Account(provider: .anthropic, identity: ident("conta-a@exemplo.com"),
+                        home: .dedicated("/Users/exemplo/casas/a"))
+        let b = Account(provider: .anthropic, identity: ident("conta-b@exemplo.com"),
+                        home: .dedicated("/Users/exemplo/casas/b"))
+        try? kc.write("cred-a", service: adapter.keychainService(forConfigDir: a.home))
+        try? kc.write("cred-b", service: adapter.keychainService(forConfigDir: b.home))
+        let group = AccountGroup(name: "trabalho", accountIDs: [a.id, b.id],
+                                 configDir: .dedicated("/Users/exemplo/grupos/t"))
+        return (engine, kc, adapter, RouterConfig(accounts: [a, b], groups: [group]),
+                a, b, group)
+    }
+
+    /// Depois de "deixar o ~/.claude livre", a conta que estava lá continua
+    /// servindo o `claude` puro. Ativá-la no perfil dedicado, a partir da casa,
+    /// deixava a cadeia em dois itens — e a primeira renovação matava a outra.
+    @Test("a conta do ~/.claude, sem grupo nele, não é ativada em outro perfil")
+    func accountLiveInTheDefaultProfileIsBusy() throws {
+        let (engine, _, adapter, config, a, b, group) = setup()
+        try adapter.writeIdentity(a.identity, toConfigDir: home)
+
+        #expect(throws: RotationEngine.RotationError.accountLiveInDefaultProfile(accountID: a.id)) {
+            try engine.activate(a, in: group, config: config)
+        }
+        #expect(engine.nextAccount(for: group, config: config, usage: [:])?.id == b.id)
+    }
+
+    @Test("a rotação pula a conta sem credencial na casa e tenta a seguinte")
+    func accountWithoutCredentialIsSkipped() {
+        let (engine, kc, adapter, config, a, b, group) = setup()
+        kc.delete(service: adapter.keychainService(forConfigDir: a.home))
+        #expect(engine.nextAccount(for: group, config: config, usage: [:])?.id == b.id)
+    }
+
+    /// Até 10/2026 a conta ativa noutro grupo continuava sendo a escolhida: a
+    /// troca recusava, a volta seguinte escolhia a mesma, e o grupo ficava
+    /// preso na conta estourada — calado.
+    @Test("a rotação pula a conta ativa em outro grupo e tenta a seguinte")
+    func accountActiveElsewhereIsSkipped() throws {
+        let (engine, _, adapter, config, a, b, group) = setup()
+        let other = AccountGroup(name: "pessoal", accountIDs: [a.id],
+                                 configDir: .dedicated("/Users/exemplo/grupos/p"))
+        let both = RouterConfig(accounts: config.accounts, groups: [group, other])
+        try adapter.writeIdentity(a.identity, toConfigDir: other.configDir)
+
+        #expect(engine.nextAccount(for: group, config: both, usage: [:])?.id == b.id)
+    }
+
+    /// Ativa sem amostra é tão fresca quanto qualquer candidata sem amostra. A
+    /// regra antiga a tratava como estourada, e um "Usar" manual numa conta
+    /// ainda não medida era desfeito três minutos depois.
+    @Test("a ativa sem amostra fica onde está")
+    func activeWithoutSampleStays() throws {
+        let (engine, _, _, config, _, b, group) = setup()
+        try engine.activate(b, in: group, config: config)
+        #expect(engine.rotationTarget(for: group, config: config, usage: [:]) == nil)
+    }
+
+    /// O `~/.claude` de quem já usava o `claude` antes do app tem um login que
+    /// não é conta do router. A rotação não o troca sozinha: apagaria esse
+    /// login sem cópia. Ativar ali continua possível como escolha explícita.
+    @Test("perfil com login de fora: a rotação não troca sozinha, o \"Usar\" troca")
+    func foreignLoginIsNotRotatedAway() throws {
+        let (engine, _, adapter, config, a, _, group) = setup()
+        let foreign = AccountIdentity(email: "fora@exemplo.com", organizationName: nil,
+                                      rateLimitTier: nil, raw: [:])
+        try adapter.writeIdentity(foreign, toConfigDir: group.configDir)
+
+        #expect(engine.rotationTarget(for: group, config: config, usage: [:]) == nil)
+        try engine.activate(a, in: group, config: config)
+        #expect(engine.activeAccount(in: group, config: config)?.id == a.id)
+    }
+
+    /// Com o segredo novo e a identidade velha, o espelho seguinte gravaria a
+    /// credencial da conta nova na casa da que saiu.
+    @Test("identidade que não grava devolve o item do grupo ao que era")
+    func failedIdentityWriteRollsTheSecretBack() throws {
+        let (engine, kc, adapter, config, a, b, group) = setup()
+        try engine.activate(a, in: group, config: config)
+        let groupService = adapter.keychainService(forConfigDir: group.configDir)
+
+        adapter.failIdentityWrites = true
+        #expect(throws: RotationEngine.RotationError.self) {
+            try engine.activate(b, in: group, config: config)
+        }
+        #expect(kc.read(service: groupService) == "cred-a")
+        #expect(engine.activeAccount(in: group, config: config)?.id == a.id)
+    }
+
+    /// O espelho é o que guarda o token vivo da conta que sai. Se ele não grava,
+    /// sobrescrever o item do grupo perderia esse token.
+    @Test("espelho que falha aborta a troca")
+    func failedMirrorAbortsTheSwitch() throws {
+        let (engine, kc, adapter, config, a, b, group) = setup()
+        try engine.activate(a, in: group, config: config)
+        let groupService = adapter.keychainService(forConfigDir: group.configDir)
+        try kc.write("cred-a-RENOVADO", service: groupService)
+
+        kc.failWritesTo = [adapter.keychainService(forConfigDir: a.home)]
+        #expect(throws: RotationEngine.RotationError.self) {
+            try engine.activate(b, in: group, config: config)
+        }
+        #expect(kc.read(service: groupService) == "cred-a-RENOVADO")
+        #expect(engine.activeAccount(in: group, config: config)?.id == a.id)
+    }
+
+    @Test("esvaziar um perfil dedicado tira item e identidade; o ~/.claude nunca")
+    func resetProfileNeverTouchesTheDefault() throws {
+        let (engine, kc, adapter, _, a, _, group) = setup()
+        try kc.write("viva", service: adapter.keychainService(forConfigDir: group.configDir))
+        try adapter.writeIdentity(a.identity, toConfigDir: group.configDir)
+        try kc.write("do-claude-puro", service: adapter.keychainService(forConfigDir: home))
+        try adapter.writeIdentity(a.identity, toConfigDir: home)
+
+        engine.resetProfile(group.configDir, provider: .anthropic)
+        engine.resetProfile(home, provider: .anthropic)
+
+        #expect(!kc.exists(service: adapter.keychainService(forConfigDir: group.configDir)))
+        #expect(adapter.identity(inConfigDir: group.configDir) == nil)
+        #expect(kc.read(service: adapter.keychainService(forConfigDir: home)) == "do-claude-puro")
+        #expect(adapter.identity(inConfigDir: home)?.email == a.identity.email)
     }
 }

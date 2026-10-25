@@ -29,6 +29,170 @@ struct RouterConfigStoreTests {
         try? kc.write("cred-\(email)", service: adapter.keychainService(forConfigDir: home))
     }
 
+    /// Adiciona uma conta ao grupo pelo caminho do login.
+    private func addAccount(_ email: String, to group: AccountGroup, store: RouterConfigStore,
+                            kc: FakeKeychain, adapter: FakeAdapter) throws -> Account {
+        let begun = store.newAccountHome()
+        seedLogin(email, home: begun.home, kc: kc, adapter: adapter)
+        guard case .added(let account) = store.finishPendingLogin(
+            home: begun.home, accountID: begun.accountID, into: group.id) else {
+            throw CocoaError(.featureUnsupported)
+        }
+        return account
+    }
+
+    /// "Deixar o ~/.claude livre" só mudava o caminho do grupo. A conta que
+    /// servia o `~/.claude` continuava lá, servindo o `claude` puro — e a volta
+    /// seguinte da rotação a ativava também no perfil dedicado novo, a partir
+    /// da casa: duas cópias de um refresh token que gira.
+    @Test("deixar o ~/.claude livre: a conta de lá fica só lá, e o grupo segue com outra")
+    func clearDefaultKeepsTheLiveAccountInOnePlace() throws {
+        let (store, kc, adapter, _) = makeStore()
+        let group = store.addGroup(name: "trabalho")  // padrão: o ~/.claude
+        let a = try addAccount("conta1@exemplo.com", to: group, store: store, kc: kc, adapter: adapter)
+        let b = try addAccount("conta2@exemplo.com", to: group, store: store, kc: kc, adapter: adapter)
+        store.activate(a, in: store.config.groups[0])
+        // O claude puro renova o token no item do ~/.claude.
+        try kc.write("cred-a-RENOVADO",
+                     service: adapter.keychainService(forConfigDir: group.configDir))
+
+        store.clearDefault()
+        let moved = store.config.groups[0]
+        #expect(!moved.configDir.isDefault)
+        // A casa da conta que ficou no ~/.claude recebeu o token vivo antes da troca.
+        #expect(kc.read(service: adapter.keychainService(forConfigDir: a.home)) == "cred-a-RENOVADO")
+
+        store.rotateAll()
+        #expect(adapter.identity(inConfigDir: moved.configDir)?.email == b.identity.email)
+        #expect(kc.read(service: adapter.keychainService(forConfigDir: moved.configDir))
+                == "cred-\(b.identity.email)")
+    }
+
+    /// O perfil dedicado de um grupo é sempre o mesmo caminho. Saindo dele e
+    /// voltando, a identidade velha que ficava lá fazia o espelho gravar uma
+    /// cadeia morta na casa da conta.
+    @Test("o perfil dedicado que fica para trás é esvaziado")
+    func theDedicatedProfileLeftBehindIsEmptied() throws {
+        let (store, kc, adapter, _) = makeStore()
+        _ = store.addGroup(name: "pessoal")            // padrão
+        let work = store.addGroup(name: "trabalho")    // dedicado
+        let c = try addAccount("conta3@exemplo.com", to: work, store: store, kc: kc, adapter: adapter)
+        store.activate(c, in: store.config.groups[1])
+        let dedicated = work.configDir
+        #expect(adapter.identity(inConfigDir: dedicated)?.email == c.identity.email)
+
+        store.makeDefault(work.id)
+
+        #expect(adapter.identity(inConfigDir: dedicated) == nil)
+        #expect(!kc.exists(service: adapter.keychainService(forConfigDir: dedicated)))
+        // A casa ficou com o token que estava no grupo.
+        #expect(kc.read(service: adapter.keychainService(forConfigDir: c.home))
+                == "cred-\(c.identity.email)")
+    }
+
+    /// O `claude auth login` grava a credencial na casa antes de alguém saber de
+    /// quem ela é. Um login cancelado, falho ou duplicado deixava esse refresh
+    /// token vivo no chaveiro para sempre.
+    @Test("descartar a casa de um login que não virou conta apaga a credencial e a pasta")
+    func discardingAPendingHomeRemovesItsCredential() throws {
+        let (store, kc, adapter, _) = makeStore()
+        _ = store.addGroup(name: "trabalho")
+        let begun = store.newAccountHome()
+        seedLogin("conta1@exemplo.com", home: begun.home, kc: kc, adapter: adapter)
+        let service = adapter.keychainService(forConfigDir: begun.home)
+        #expect(kc.exists(service: service))
+
+        store.discardPendingHome(begun.home, accountID: begun.accountID)
+
+        #expect(!kc.exists(service: service))
+        #expect(!FileManager.default.fileExists(atPath: begun.home.url.path))
+    }
+
+    @Test("a casa de uma conta do registro nunca é descartada como pendente")
+    func aRegisteredHomeIsNeverDiscarded() throws {
+        let (store, kc, adapter, _) = makeStore()
+        let group = store.addGroup(name: "trabalho")
+        let account = try addAccount("conta1@exemplo.com", to: group, store: store, kc: kc, adapter: adapter)
+
+        store.discardPendingHome(account.home, accountID: account.id)
+
+        #expect(kc.exists(service: adapter.keychainService(forConfigDir: account.home)))
+    }
+
+    /// O app fechado no meio de um login deixava a casa — com a credencial — para
+    /// trás. A varredura da subida as acha pelo registro.
+    @Test("a varredura da subida apaga as casas que nenhuma conta cita")
+    func orphanHomesAreSweptAtLaunch() throws {
+        let (store, kc, adapter, paths) = makeStore()
+        let group = store.addGroup(name: "trabalho")  // grava o config.json
+        let kept = try addAccount("conta1@exemplo.com", to: group, store: store, kc: kc, adapter: adapter)
+        let orphan = store.newAccountHome()
+        seedLogin("conta2@exemplo.com", home: orphan.home, kc: kc, adapter: adapter)
+
+        // A subida seguinte, com o mesmo disco.
+        let restarted = RouterConfigStore(paths: paths, keychain: kc, adapters: [adapter])
+        restarted.discardOrphanHomes()
+
+        #expect(!kc.exists(service: adapter.keychainService(forConfigDir: orphan.home)))
+        #expect(kc.exists(service: adapter.keychainService(forConfigDir: kept.home)))
+    }
+
+    /// Com o registro vazio por falha de leitura, TODA casa pareceria órfã. A
+    /// varredura não roda sem um `config.json` lido inteiro.
+    @Test("sem config.json lido, a varredura não apaga nada")
+    func noSweepWithoutAReadableConfig() throws {
+        let (store, kc, adapter, paths) = makeStore()
+        let group = store.addGroup(name: "trabalho")
+        let account = try addAccount("conta1@exemplo.com", to: group, store: store, kc: kc, adapter: adapter)
+        try Data("{ isto não é json".utf8).write(to: paths.configFile)
+
+        let restarted = RouterConfigStore(paths: paths, keychain: kc, adapters: [adapter])
+        restarted.discardOrphanHomes()
+
+        #expect(kc.exists(service: adapter.keychainService(forConfigDir: account.home)))
+    }
+
+    /// Um `config.json` ilegível virava registro vazio, sem aviso, e o primeiro
+    /// `save` gravava por cima: grupos e contas sumiam, com casas e itens de
+    /// chaveiro órfãos.
+    @Test("config.json ilegível vai para o lado, com aviso, e não é sobrescrito")
+    func anUnreadableConfigIsSetAsideNotOverwritten() throws {
+        let (_, kc, adapter, paths) = makeStore()
+        try FileManager.default.createDirectory(at: paths.base, withIntermediateDirectories: true)
+        let garbage = Data("{ \"groups\": [ isto não é json".utf8)
+        try garbage.write(to: paths.configFile)
+
+        let store = RouterConfigStore(paths: paths, keychain: kc, adapters: [adapter])
+        #expect(store.config.groups.isEmpty)
+        #expect(store.lastError != nil)
+        _ = store.addGroup(name: "novo")  // grava um config.json novo
+
+        let aside = try FileManager.default.contentsOfDirectory(atPath: paths.base.path)
+            .filter { $0.hasPrefix("config.unreadable-") }
+        #expect(aside.count == 1)
+        #expect(try Data(contentsOf: paths.base.appending(path: aside[0])) == garbage)
+    }
+
+    /// Sem o grupo, ninguém mais sobrescreve o item dele — e o item guardava o
+    /// refresh token vivo da última conta ativa, para sempre.
+    @Test("apagar um grupo dedicado leva o item de chaveiro e a pasta dele")
+    func removingADedicatedGroupTakesItsCredentialAlong() throws {
+        let (store, kc, adapter, _) = makeStore()
+        _ = store.addGroup(name: "pessoal")            // padrão
+        let work = store.addGroup(name: "trabalho")    // dedicado
+        let a = try addAccount("conta1@exemplo.com", to: work, store: store, kc: kc, adapter: adapter)
+        store.activate(a, in: store.config.groups[1])
+        let groupService = adapter.keychainService(forConfigDir: work.configDir)
+        #expect(kc.exists(service: groupService))
+        try FileManager.default.createDirectory(at: work.configDir.url,
+                                                withIntermediateDirectories: true)
+
+        store.removeGroup(work.id)
+
+        #expect(!kc.exists(service: groupService))
+        #expect(!FileManager.default.fileExists(atPath: work.configDir.url.path))
+    }
+
     @Test("o primeiro grupo é o padrão; o segundo é dedicado")
     func firstGroupIsDefault() {
         let (store, _, _, _) = makeStore()
@@ -132,6 +296,32 @@ struct RouterConfigStoreTests {
 
         #expect(outcome == .wrongAccount(expected: "conta2@exemplo.com", got: "intrusa@exemplo.com"))
         #expect(store.config.account(account.id)?.identity.email == "conta2@exemplo.com")
+        // Issue #12: a credencial da intrusa não fica na casa desta conta — senão
+        // "Usar" serviria a intrusa sob o nome dela.
+        #expect(!kc.exists(service: adapter.keychainService(forConfigDir: account.home)))
+        #expect(adapter.identity(inConfigDir: account.home) == nil)
+    }
+
+    /// Issue #12: o espelho periódico (grupo → casa) no meio de um relogin
+    /// escreveria por cima da credencial NOVA a morta que motivou o relogin — e
+    /// o fim do relogin empurraria a morta de volta para o grupo.
+    @Test("durante o relogin da ativa, a rotação não espelha por cima da credencial nova")
+    func rotationDoesNotMirrorOverARelogin() throws {
+        let (store, kc, adapter, _) = makeStore()
+        let group = store.addGroup(name: "trabalho")
+        let account = try addAccount("conta1@exemplo.com", to: group, store: store, kc: kc, adapter: adapter)
+        store.activate(account, in: store.config.groups[0])
+        let groupService = adapter.keychainService(forConfigDir: group.configDir)
+        let homeService = adapter.keychainService(forConfigDir: account.home)
+        try kc.write("cred-MORTA", service: groupService)   // o que motivou o relogin
+
+        store.beginRelogin(account.id)
+        try kc.write("cred-NOVA", service: homeService)      // o login oficial gravou
+        store.rotateAll()
+        #expect(kc.read(service: homeService) == "cred-NOVA")
+
+        #expect(store.finishRelogin(accountID: account.id) == .renewed(store.config.account(account.id)!))
+        #expect(kc.read(service: groupService) == "cred-NOVA")
     }
 
     /// Apagar o grupo leva junto as contas que só existiam nele — órfãs não

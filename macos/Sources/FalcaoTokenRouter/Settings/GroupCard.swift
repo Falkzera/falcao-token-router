@@ -167,6 +167,7 @@ struct GroupCard: View {
                            isActive: account.id == active?.id,
                            usage: store.usageDetail[account.id],
                            sampledAt: store.usageSampledAt[account.id],
+                           isMeasuring: store.measuringGroup != nil,
                            onSwitch: { store.activate(account, in: group) },
                            onRelogin: { onRelogin(account) },
                            onRemove: { pendingDelete = account })

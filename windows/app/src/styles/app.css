@@ -29,6 +29,8 @@
   --accent: #2f6b4f;
   --accent-text: #ffffff;
 
+  /* Verde dessaturado de propósito: o estado normal é a maior parte do tempo,
+     e um verde vivo nesse papel vira ruído. */
   --calm: #5c9e73;
   --warning: #e0b840;
   /* O âmbar da barra, escurecido para texto sobre fundo claro (contraste). */

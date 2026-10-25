@@ -135,8 +135,9 @@ function series(points: Raw[], weekly: boolean, now: number, locale: Locale): Hi
   };
 }
 
+/** A conta da UI não carrega e-mail; como no `mock.ts`, ele sai do rótulo. */
 function account(
-  a: { id: string; label: string; email: string },
+  a: { id: string; label: string },
   scenario: string | null,
   scheduleOn: boolean,
   now: number,
@@ -148,7 +149,7 @@ function account(
   return {
     id: a.id,
     label: a.label,
-    email: a.email,
+    email: `${a.label}@exemplo.com`,
     lastMeasuredAt: last === null ? null : iso(last),
     nextMeasureAt: next === null ? null : iso(next),
     nextMeasureLabel: next === null ? null : when(next, false, locale),

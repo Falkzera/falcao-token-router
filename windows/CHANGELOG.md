@@ -1,7 +1,7 @@
 # Changelog — Windows
 
-The Windows port versions on its own, with `windows-v*` tags. The macOS app has
-its own `CHANGELOG.md` at the repository root and its own `macos-v*` tags:
+The Windows app versions on its own, with `windows-v*` tags. The macOS app has
+its own [`macos/CHANGELOG.md`](../macos/CHANGELOG.md) and its own `macos-v*` tags:
 a fix on one platform never waits for the other's calendar.
 
 > ⚠️ `releases/latest` is **ambiguous** in this repository — it resolves to

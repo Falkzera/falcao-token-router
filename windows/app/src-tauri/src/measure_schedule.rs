@@ -22,15 +22,16 @@ use crate::state::AppState;
 
 /// Olha a agenda e, se alguma conta venceu, mede numa thread. Não faz nada com
 /// a chave desligada, com uma medição em curso (a do botão inclusive) ou com
-/// um login em andamento — a sonda poderia mexer na casa que está sendo
-/// relogada (a rotação espera pelo mesmo motivo).
+/// um RELOGIN em andamento — a sonda poderia mexer na casa que está sendo
+/// relogada (a rotação espera pelo mesmo motivo). "Adicionar conta" não segura:
+/// a casa reservada ainda não é conta, e a sonda não a mede.
 pub fn check(app: &AppHandle) {
     let on = app
         .try_state::<SettingsStore>()
         .is_some_and(|settings| settings.get().scheduled_measure);
     let signing_in = app
         .try_state::<LoginState>()
-        .is_some_and(|login| login.in_progress());
+        .is_some_and(|login| login.relogin_in_progress());
     let state = app.state::<AppState>();
     if !on || signing_in || state.measuring().is_some() {
         return;

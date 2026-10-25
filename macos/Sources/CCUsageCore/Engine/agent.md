@@ -4,7 +4,7 @@
 O motor do Falcão Router: contas, grupos, troca de credencial, medição passiva e o store que a UI observa. Sem UI, sem rede — tudo aqui lê/escreve disco e chaveiro locais.
 
 ## Arquivos
-- `RouterConfigStore.swift` — o store observável que a UI chama: CRUD de grupos/contas, login/relogin pendente, rotação, integração de shell. `config` persiste em `config.json`.
+- `RouterConfigStore.swift` — o store observável que a UI chama: CRUD de grupos/contas, login/relogin pendente, rotação, a sonda (`measureAccounts`), a escolha da status line (`statusLineChoice`, em `statusline.json`) e a integração de shell. `config` persiste em `config.json`.
 - `RotationEngine.swift` — a troca em si: ativar conta (casa→grupo), espelhar vivo→casa, relogin (casa→grupo via `pushHomeToGroup`), decidir rotação, e `probeConfigDir` (por qual perfil sondar cada conta). As regras anti-morte-de-conta moram aqui.
 - `GroupUsageReader.swift` — amostras → uso por conta. Considera TRÊS janelas: 5h, 7d e a mais apertada POR MODELO (esta vem da sonda, `Usage/ClaudeUsageProbe.swift`). Janela com reset vencido decai; conta sem amostra fica FORA do mapa (presumida fresca pelo motor). `detailByAccount` devolve `AccountUsage` (fração + de QUAL janela veio + as duas medidas); `usageByAccount` é a mesma coisa só com a fração, para a rotação.
 - `GroupUsage.swift` — `GroupUsageSample` + store de amostras por e-mail, e `UsageOrigin` (sensor × sonda). A origem é serializada como opcional: amostra gravada antes de a sonda existir só podia vir do sensor.
@@ -20,7 +20,7 @@ O motor do Falcão Router: contas, grupos, troca de credencial, medição passiv
 
 ## Padrões
 - Estado que a UI observa é propriedade armazenada `@Observable` no store — computado que lê disco não re-renderiza.
-- Toda regra de credencial tem comentário com o PORQUÊ (descobertas de agosto/2026; ver skill `falcao-router`).
+- Toda regra de credencial tem comentário com o PORQUÊ (descobertas de agosto/2026, por observação — não estão documentadas em lugar nenhum).
 - `now: Date = Date()` como parâmetro onde o tempo decide, para teste.
 
 ## Decisões recentes
@@ -47,6 +47,15 @@ O motor do Falcão Router: contas, grupos, troca de credencial, medição passiv
 
 - 2026-09-23: `ProviderEnv.credentialKeys` ganhou oito nomes que o porte Windows (issue #5, @viniventur) achou no JavaScript do Claude Code e que eu confirmei com `strings` no binário do macOS. O grave é `CLAUDE_CODE_OAUTH_TOKEN`: exportada, a sessão é servida por esse token e não pela conta do grupo — o `router launch` deixava passar. `CLAUDE_SECURESTORAGE_CONFIG_DIR` tem precedência sobre `CLAUDE_CONFIG_DIR` para achar a credencial: setada, o app escreveria o item do grupo enquanto o Claude Code lê outro.
 
+- 2026-10-04: "uma conta, um lugar" passou a contar o `~/.claude`. Depois de "deixar o ~/.claude livre" (ou de outro grupo virar o padrão), a conta que estava lá continua servindo o `claude` puro — e a rotação a ativava também no perfil dedicado novo, a partir da casa. `RotationEngine.whereElseLive` olha os perfis dos outros grupos E o `~/.claude` quando nenhum grupo o usa.
+- 2026-10-04: trocar o padrão (`clearDefault`/`makeDefault`) espelha a ativa e esvazia o perfil dedicado de destino e o que fica para trás (`RotationEngine.resetProfile`; o `~/.claude` nunca). O dedicado é sempre o mesmo caminho: voltando a ele, a identidade velha fazia o espelho gravar uma cadeia morta na casa da conta. Preço deliberado: sessão viva no dedicado que ficou para trás perde a credencial na requisição seguinte.
+- 2026-10-04: a rotação só escolhe quem `canServe` (credencial na casa, viva em nenhum outro perfil) — antes insistia na mesma recusa a cada volta e nunca tentava a seguinte. Ativa sem amostra conta como fresca (o "Usar" manual numa conta não medida era desfeito). Perfil com login que não é conta do router não é trocado pela rotação, só por escolha explícita.
+- 2026-10-04: `activate` grava segredo e identidade juntos (identidade que falha devolve o item do grupo ao que era) e não troca se o espelho da conta que sai falhar.
+- 2026-10-04: a sonda decide o perfil de cada conta na hora de medi-la, relendo do disco quem está ativa; durante a medição o app não roda a rotação nem aceita "Usar".
+- 2026-10-04: nenhuma credencial fica para trás. `discardPendingHome` apaga a casa de um login que não virou conta (cancelado, falho, duplicado — o `claude auth login` grava a credencial antes de se saber de quem é), e `discardOrphanHomes` varre na subida do app as casas que nenhuma conta cita, só com o `config.json` lido inteiro. `removeGroup` espelha a ativa e leva o item de chaveiro e a pasta do perfil dedicado (sem sessão viva; o `~/.claude` nunca). Um `config.json` ilegível vai para o lado com data (`config.unreadable-*.json`), com aviso, em vez de virar registro vazio gravado por cima.
+- 2026-10-04: issue #11 — `ProviderEnv` remove também `ANTHROPIC_CONFIG_DIR`, a identidade federada, Foundry e `AWS_BEARER_TOKEN_BEDROCK`, e as famílias `ANTHROPIC_FOUNDRY_*`/`ANTHROPIC_AWS_*` por PREFIXO (lista de nomes exatos perde, calada, para a próxima variável da família). Comparação com caixa: no macOS o nome de variável tem caixa.
+- 2026-10-04: issue #12 — relogin que volta como OUTRA conta apaga da casa a credencial e a identidade estranhas (antes ficavam lá com o nome desta), e a rotação não espelha a ativa enquanto o relogin dela está em andamento (`beginRelogin`/`endRelogin`): o espelho gravava por cima da credencial nova a morta que motivou o relogin.
+
 ## Pendências conhecidas
-- `removeAccount`/`removeGroup` não apagam o item de chaveiro nem a pasta `accounts/<uuid>`: a credencial da conta removida continua viva no chaveiro do usuário. Deliberado por ora (ver comentário em `removeGroup`), mas num produto pago "remover a conta" que deixa o refresh token para trás é promessa quebrada.
-- `wrongAccount` no relogin deixa a credencial do intruso na casa até a próxima tentativa (inofensivo; a identidade do registro não muda).
+- `removeGroup` não apaga o item de chaveiro do GRUPO nem a pasta `groups/<uuid>` (o refresh token da última conta ativa fica vivo), e não espelha antes de apagar. (`removeAccount` apaga a credencial e a casa da conta desde 18/09.)
+- `wrongAccount` no relogin deixa a credencial da OUTRA conta na casa desta: "Usar" serviria a outra conta sob o nome desta — issue #12.

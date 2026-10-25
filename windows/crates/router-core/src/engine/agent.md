@@ -4,7 +4,7 @@ Modelos, formato da amostra, leitor de uso, credencial, rotação e o store. Sem
 
 ## Arquivos
 - `provider.rs` — `Provider` (só `.anthropic` na v1), o trait `ProviderAdapter` (≙ protocolo do
-  Swift: `credential_location`, `identity`, `write_identity`, `launch_command`) e `IdentityError`.
+  Swift: `credential_location`, `identity`, `write_identity`, `clear_identity`) e `IdentityError`.
 - `config_dir.rs` — `ConfigDir {raw, isDefault}`: o perfil; assimetria do `.claude.json`
   (ao lado do padrão, dentro do dedicado) e o valor de ambiente (`None` no padrão).
 - `account_model.rs` — `AccountIdentity` (email, org, tier, `oauthAccount` cru) e `Account`.
@@ -62,8 +62,9 @@ Modelos, formato da amostra, leitor de uso, credencial, rotação e o store. Sem
   de outra máquina, confere o processo (tolerância 300 s; sem prova confia no pid), mais nova
   primeiro.
 - `router_paths.rs` — base `%LOCALAPPDATA%\com.synqo.falcao-router` (override `ROUTER_APP_SUPPORT`),
-  com `config.json`, `usage\`, o `statusline.json` (a escolha da status line) e o `history\`
-  (o histórico das medições) — os dois últimos só do Windows.
+  com `config.json`, `usage\`, o `statusline.json` (a escolha da status line — o mesmo arquivo
+  do macOS desde o #17; o modo "meu comando" é só daqui) e o `history\` (o histórico das
+  medições).
 
 - `shell_integration.rs` — ≙ `ShellIntegration`: a `statusLine` (`/` e sem aspas; com espaço, 8.3;
   sem 8.3, aspas do shell detectado — `&` no PowerShell; `--profile` nos grupos dedicados),
@@ -105,8 +106,10 @@ Modelos, formato da amostra, leitor de uso, credencial, rotação e o store. Sem
 - 22/09/2026: a status line de grupo dedicado leva `--profile`; o sensor prefere o
   `CLAUDE_CONFIG_DIR` e cai no `--profile` quando a variável não chega (subprocesso raspado).
 
-- 22/09/2026: `measure_accounts` do store é síncrono (o app o chama fora da thread da UI) e usa
-  `probe_targets` — o perfil de cada conta decidido com o config na mão (ativa → grupo).
+- 22/09/2026: `measure_accounts` do store é síncrono e usa `probe_targets` — o perfil de cada
+  conta decidido com o config na mão (ativa → grupo). Desde a fase 5 o app não o chama: usa
+  `measure_plan` → `MeasurePlan::run` (fora da trava do store) → `finish_measure`, e o
+  `measure_accounts` ficou só para os testes.
 
 - 22/09/2026 (fase 5, o que o app pede ao store):
   - `add_group_with(nome, padrão?)`: o 1º grupo pode nascer DEDICADO. O `rotation_target` ativa a
@@ -124,6 +127,25 @@ Modelos, formato da amostra, leitor de uso, credencial, rotação e o store. Sem
   na casa desta, e "Usar" serviria a outra conta com o nome desta (o macOS deixava). A credencial
   estranha sai (a conta fica sem login, o estado honesto); só age quando a casa tem mesmo outra
   identidade.
+- 04/10/2026: "uma conta, um lugar" passou a contar o `~\.claude` (≙ macOS #23). Depois de
+  "deixar o ~\.claude livre", a conta de lá continua servindo o `claude` puro, e a rotação a
+  ativava também no dedicado novo. `where_else_live` olha os outros grupos E o perfil padrão
+  quando nenhum grupo o usa (o motor recebe o perfil com `with_default_profile`; o store e a CLI
+  sempre o passam). `clear_default`/`make_default` espelham a ativa e esvaziam o dedicado de
+  destino e o que fica para trás (`reset_profile`; nunca o `~\.claude`).
+- 04/10/2026: a rotação só escolhe quem `can_serve` (login na casa, viva em nenhum outro perfil);
+  ativa sem amostra conta como fresca; login de fora num perfil não é trocado sozinho. O
+  `activate` devolve o grupo ao que era se a identidade não grava (`NotPersisted` incluído) e não
+  troca se o espelho da conta que sai falhar. O lançamento sem ativa sobe na primeira que pode
+  servir.
+- 04/10/2026: o comando da status line só vai cru com letra, dígito e `-_./:~`. Olhar só o
+  espaço deixava `'`, `&`, `(` passarem — um usuário `D'Angelo` ficava sem sensor.
+- 04/10/2026: saiu o que nada lia. `ProviderAdapter::launch_command` e `LaunchPlan.executable`:
+  quem acha o `claude` é o resolvedor único (`usage/claude_binary.rs`), e o plano só levava o
+  nome para um teste conferir. `usage_sampled_at` relia a pasta `usage\` inteira a cada refresh para
+  ninguém usar (a idade vem de `usage_detail`). Também `set_nickname`, `display_name`,
+  `LaunchError::UnknownGroup`, `SessionLauncher::engine` e `TerminalReport::blocked_by_policy`
+  (a tela lê o `policy_blocks` de cada shell).
 - 21/10/2026 (histórico de uso, decidido com o usuário):
   - Só a SONDA entra no histórico (a agenda de 5 em 5 horas, o "Medir contas" e o `router
     measure`); o sensor não. Quem grava é o `measure_into`, depois da amostra e sob a mesma

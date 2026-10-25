@@ -2,6 +2,8 @@
 //!
 //! Parte do `impl RouterConfigStore` — ver o `mod.rs` ao lado.
 
+use chrono::DateTime;
+
 use super::*;
 use crate::engine::measure_schedule::MeasureSchedule;
 use crate::engine::usage_history::UsageHistory;
@@ -150,12 +152,6 @@ impl RouterConfigStore {
         let detail = self.usage.detail_by_account(&self.config, Utc::now());
         self.usage_snapshot = detail.iter().map(|(id, u)| (*id, u.fraction)).collect();
         self.usage_detail = detail;
-        self.usage_sampled_at = self
-            .usage
-            .samples_by_account(&self.config)
-            .into_iter()
-            .map(|(id, s)| (id, s.sampled_at))
-            .collect();
         self.active_by_group = self
             .config
             .groups
