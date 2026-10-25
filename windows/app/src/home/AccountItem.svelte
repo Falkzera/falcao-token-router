@@ -2,9 +2,10 @@
   // Uma conta no cartão do grupo (≙ AccountRow de GroupsView.swift). A ordem é a
   // preferência de rotação: a alça arrasta, e com o foco nela as setas ↑/↓
   // movem — o reordenar do macOS (`onMove` fora de uma `List`) não funcionava.
-  // "Usar" fica exposto (é a ação frequente); o resto, no menu. O que o resumo
-  // mostra (5h, 7d, os resets, o limite do modelo) é escolha do usuário nos
-  // Ajustes (`hidden`); o tooltip segue com tudo.
+  // "Usar" fica exposto (é a ação frequente), e ao lado dele o atalho para o
+  // Histórico DESTA conta (21/10/2026, pedido do usuário); o resto, no menu. O
+  // que o resumo mostra (5h, 7d, os resets, o limite do modelo) é escolha do
+  // usuário nos Ajustes (`hidden`); o tooltip segue com tudo.
   import { clock } from "../lib/clock.svelte";
   import { ageSeconds, notStarted, severity, VERY_STALE_SECONDS } from "../lib/format";
   import Icon from "../lib/Icon.svelte";
@@ -22,6 +23,7 @@
     first,
     last,
     onUse,
+    onHistory,
     onRelogin,
     onRemove,
     onMove,
@@ -37,6 +39,8 @@
     first: boolean;
     last: boolean;
     onUse: () => void;
+    /** Abre a aba Histórico já nesta conta. */
+    onHistory: () => void;
     onRelogin: () => void;
     onRemove: () => void;
     onMove: (delta: number) => void;
@@ -165,6 +169,14 @@
       onclick={onUse}
     >
       {t("groups.account.use")}
+    </button>
+    <button
+      class="history"
+      title={t("groups.account.history")}
+      aria-label={t("groups.account.history")}
+      onclick={onHistory}
+    >
+      <Icon name="chart" size={14} />
     </button>
     <Menu
       title={t("groups.account.menu.help")}
@@ -331,6 +343,23 @@
     display: inline-flex;
     align-items: center;
     gap: 2px;
+  }
+  /* O atalho do Histórico: discreto como o ⋯, ao lado dele. */
+  .history {
+    display: inline-flex;
+    padding: 5px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+  .history:hover {
+    background: var(--row-hover);
+    color: var(--text);
+  }
+  .history:focus-visible {
+    outline: 2px solid var(--focus);
   }
   .placeholder {
     visibility: hidden;

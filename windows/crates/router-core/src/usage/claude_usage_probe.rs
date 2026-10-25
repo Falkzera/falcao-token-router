@@ -7,8 +7,10 @@
 //! faz a requisição é o cliente oficial, com a credencial dele — o mesmo que o
 //! usuário digitar `/usage`. O router continua sem tocar em endpoint nenhum.
 //!
-//! Custa um processo subindo do zero e uma requisição por conta: é sob demanda
-//! (`router measure`, "Medir contas"), nunca o laço.
+//! Custa um processo subindo do zero e uma requisição por conta: roda sob
+//! demanda (`router measure`, "Medir contas") e, desde 21/10/2026, de 5 em 5
+//! horas pela agenda do app (para o histórico) — nunca no laço de 3 minutos.
+//! Toda medição deixa um ponto no histórico (`engine::usage_history`).
 //!
 //! O Windows imprime diferente do macOS (captura do spike de 22/09/2026): a data
 //! vem com vírgula (`Sep 22, 8:40pm`, não `Sep 22 at 8:40pm`), as linhas
@@ -36,6 +38,7 @@ use crate::engine::config_dir::ConfigDir;
 use crate::engine::engine_lock::EngineLock;
 use crate::engine::group_usage::{GroupUsageSample, GroupUsageStore, ModelUsage, UsageOrigin};
 use crate::engine::provider_env::ProviderEnv;
+use crate::engine::usage_history::{UsageHistory, UsageHistoryPoint};
 use crate::ids::Id;
 
 /// Uma janela por modelo, como o `/usage` a nomeia.
@@ -74,8 +77,6 @@ pub struct Reading {
     pub weekly_all: Option<f64>,
     pub weekly_all_resets_at: Option<DateTime<Utc>>,
     pub models: Vec<ModelWindow>,
-    /// A linha de plano do topo, copiada como veio.
-    pub plan: Option<String>,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug, thiserror::Error)]
@@ -173,14 +174,15 @@ impl ClaudeUsageProbe {
     }
 
     /// Mede uma conta e grava a amostra da sonda (origem `probe`, com as janelas
-    /// por modelo e o carimbo delas). A escrita passa pela trava do motor: o
-    /// sensor pode estar gravando a mesma conta, e a costura que preserva o
-    /// bloco por modelo é ler-mudar-escrever.
+    /// por modelo e o carimbo delas) e o ponto do histórico. `base` é a base do
+    /// router: a trava do motor sai dela, e o histórico mora em `<base>\history`.
+    /// A escrita passa pela trava: o sensor pode estar gravando a mesma conta,
+    /// e a costura que preserva o bloco por modelo é ler-mudar-escrever.
     pub fn measure_into(
         &self,
         target: &ProbeTarget,
         usage_dir: &Path,
-        lock_base: &Path,
+        base: &Path,
         now: DateTime<Utc>,
     ) -> Result<Reading, ProbeError> {
         let reading = self.read(&target.dir, now)?;
@@ -195,9 +197,17 @@ impl ClaudeUsageProbe {
             Some(ModelUsage::new(reading.models.clone(), now)),
             UsageOrigin::Probe,
         );
-        let _lock = EngineLock::acquire(lock_base, EngineLock::WAIT);
+        let _lock = EngineLock::acquire(base, EngineLock::WAIT);
         GroupUsageStore::write(&sample, &target.email, usage_dir)
             .map_err(|e| ProbeError::Failed(e.to_string()))?;
+        // O ponto vai depois, sob a mesma trava. Falhar aqui não desfaz a
+        // medição: a amostra, que decide a rotação, já está no disco.
+        let _ = UsageHistory::append(
+            &UsageHistoryPoint::from_reading(&reading, now),
+            &target.email,
+            &UsageHistory::directory(base),
+            now,
+        );
         Ok(reading)
     }
 
@@ -265,29 +275,7 @@ impl ClaudeUsageProbe {
             weekly_all: weekly,
             weekly_all_resets_at: weekly_reset,
             models,
-            plan: Self::plan(&text),
         })
-    }
-
-    /// A linha de plano do topo, como impressa. Só as 3 primeiras linhas não
-    /// vazias (mais abaixo "Max" aparece em prosa), e por palavra inteira — um
-    /// aviso que fale de "projects" não vira plano "pro".
-    pub fn plan(text: &str) -> Option<String> {
-        let head: Vec<&str> = text
-            .lines()
-            .map(|l| l.trim_end_matches('\r'))
-            .filter(|l| !l.trim().is_empty())
-            .take(3)
-            .collect();
-        let head = head.join("\n");
-        ["Max 20x", "Max 5x", "Pro", "Team", "subscription"]
-            .iter()
-            .find_map(|phrase| {
-                Regex::new(&format!(r"(?i)\b{}\b", regex::escape(phrase)))
-                    .ok()?
-                    .find(&head)
-                    .map(|m| m.as_str().to_string())
-            })
     }
 
     /// `Sep 22, 8:40pm (America/Sao_Paulo)` (Windows) ou `Sep 18 at 7:29pm (…)`

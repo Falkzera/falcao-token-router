@@ -51,7 +51,8 @@ pub fn run(argv: &[String]) {
     };
 
     let home = shared::home();
-    let launcher = SessionLauncher::new(shared::credentials(&paths, &home), shared::adapters());
+    let launcher = SessionLauncher::new(shared::credentials(&paths, &home), shared::adapters())
+        .with_default_profile(ConfigDir::standard(&home));
     let Some(group) = SessionLauncher::group_named(name, &config).cloned() else {
         fail(&format!("grupo desconhecido: {name}"));
     };
@@ -113,7 +114,8 @@ pub fn rotate() {
         return;
     };
     let home = shared::home();
-    let engine = RotationEngine::new(shared::credentials(&paths, &home), shared::adapters());
+    let engine = RotationEngine::new(shared::credentials(&paths, &home), shared::adapters())
+        .with_default_profile(ConfigDir::standard(&home));
     let usage = GroupUsageReader::new(paths.usage_dir()).usage_by_account(&config, Utc::now());
     for group in &config.groups {
         let _lock = EngineLock::acquire(&paths.base, EngineLock::WAIT);

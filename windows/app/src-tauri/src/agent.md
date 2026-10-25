@@ -11,10 +11,25 @@
   a DESTRÓI nos dois modos (o botão sai da barra de tarefas, o app fica na bandeja; minimizar é
   o do Windows). Até 23/09/2026, com "Mostrar na barra de tarefas", o X só minimizava — o usuário
   quis o X que tira o app da barra. A janela destruída encerra o login que estivesse nela
-  (ninguém veria o desfecho).
+  (ninguém veria o desfecho). `open_home(aba, conta?)` — a conta é o atalho do Histórico do
+  cartão de uma conta no flyout (21/10/2026): vai no evento `navigate` (`Navigation {tab,
+  account}`) com a janela aberta, ou no `app_info` (`initialAccount`) da janela que vai abrir.
 - `state.rs` — `AppState`: o `RouterConfigStore` (montado como na CLI: credencial em arquivo com a
-  guarda do perfil padrão) atrás de um `Mutex` que sobrevive a envenenamento, o idioma, a home e
-  a aba pedida para a próxima abertura da janela.
+  guarda do perfil padrão) atrás de um `Mutex` que sobrevive a envenenamento, o idioma, a home,
+  o destino pedido para a próxima abertura da janela (`Navigation`: a aba — Grupos, Histórico,
+  Ajustes — e a conta do atalho do Histórico; serialização testada), o grupo sendo
+  medido (`try_start_measuring`: atômico, o botão e a agenda nunca medem juntos) e as tentativas
+  da agenda por conta (memória: o que segura uma conta deslogada).
+- `history.rs` — a aba Histórico (21/10/2026): `get_history` e o quadro dela (`build`, puro com
+  fuso e relógio por parâmetro, testado): por grupo e conta, a janela de 5h dos últimos 7 dias
+  e a semanal das últimas 4 semanas, recortadas, quebradas em buracos de mais de 7h30, com o %
+  do núcleo e as horas pelo `reset_when` (ponto, reset, "próxima às"); marcas do eixo na
+  meia-noite local (dia da semana / data a cada 7 dias); o limiar do grupo. `clear_history` — o
+  "Apagar o histórico…" dos Ajustes — apaga pelo store (sob a trava do motor), avisa as janelas
+  e devolve quantos arquivos saíram (a falha volta com o motivo).
+- `measure_schedule.rs` — a medição de 5 em 5 horas (21/10/2026): `check` olha a agenda (chave
+  ligada, nada medindo, sem login em andamento, `claude` achado), anota as tentativas e mede
+  numa thread os planos do store grupo a grupo, com o spinner do grupo; falha não abre o aviso.
 - `tray.rs` — a bandeja: anel do `gauge-mark` no tamanho exato do ícone pequeno (cache por
   `TrayKey`), tooltip, menu do botão direito (Grupos, Ajustes, Sair — as portas do rodapé do
   painel do macOS); clique esquerdo (na soltura) abre o flyout junto do ícone.
@@ -36,7 +51,8 @@
   `CloseRequested` e no `RunEvent::Exit` (o "Sair" com a janela aberta).
 - `commands.rs` — os comandos da janela de Grupos: cada ação muda o store (sob a trava), redesenha
   a bandeja, emite `snapshot-changed` e devolve o quadro novo. "Medir contas" roda a sonda numa
-  thread FORA da trava (planeja → roda → publica), uma medição por vez, com o spinner no quadro.
+  thread FORA da trava (planeja → roda → publica), uma medição por vez (a mesma marca da agenda
+  de 5 em 5 horas), com o spinner no quadro.
   Grupo novo com a escolha de padrão (`add_group_with`); login estranho no `~\.claude`
   (`foreign_default_login`); dispensar o erro. `copy_text` (plugin clipboard) mora no `lib.rs`.
 - `terminal.rs` — a integração de terminal na tela: o quadro POR SHELL (`terminal_report`, fora
@@ -47,9 +63,11 @@
   ou shell sem a linha — a política e o `.bash_profile` que ignora o `.bashrc` têm correção
   própria); `bash_login_file` nomeia o perfil de login do Git Bash. Testado (`view`).
 - `settings.rs` — ajustes do app em `<Roaming>\com.synqo.falcao-token-router\settings.json`
-  (`show_in_taskbar`, o último tamanho da janela e o resumo das contas — `hidden_summary`, os
+  (`show_in_taskbar`, o último tamanho da janela, o resumo das contas — `hidden_summary`, os
   `SummaryItem` TIRADOS: de fábrica nada, item desconhecido ignorado sem derrubar o resto,
-  gravado sem repetidos na ordem da tela, comando `set_hidden_summary`; ilegível = padrão;
+  gravado sem repetidos na ordem da tela, comando `set_hidden_summary` — e a medição de 5 em 5
+  horas — `scheduled_measure`, ligada de fábrica e quando o campo falta, comando
+  `set_scheduled_measure`, que avisa as janelas; `Default` à mão por isso); ilegível = padrão;
   `remember` muda só a memória e `flush` grava se algo mudou — `update` grava tudo na hora); "abrir no login" pelo plugin de autostart, SEMPRE relido
   do sistema, com o motivo da recusa; `open_url` só para a lista (ms-settings:developers/taskbar,
   logout do claude.ai, hosts do login oficial — testado). `SettingsStore::at` para os testes.
@@ -66,8 +84,13 @@
   unidades UTF-16 do Windows.
 - `rotation_loop.rs` — a cada 30 s relê o quadro e redesenha a bandeja; a cada 180 s (6 voltas)
   também rotaciona, como o macOS (a 1ª volta, com rotação, é na subida). Emite
-  `snapshot-changed` para as janelas. Com um login em andamento a rotação fica para a próxima
-  volta: ela espelha grupo → casa da conta ativa e pisaria na credencial nova de um relogin.
+  `snapshot-changed` para as janelas. Com um RELOGIN em andamento a rotação fica para a próxima
+  volta (ela espelha grupo → casa da conta ativa e pisaria na credencial nova); "Adicionar
+  conta" não a segura — a casa reservada não é de ninguém. Durante uma medição ("Medir contas"
+  ou a agenda) também espera: a medição decide por qual perfil sondar cada conta, e trocar a
+  ativa no meio a faria sondar a casa de uma conta ativa. A partir da 2ª volta de rotação (3 min
+  depois da subida) olha também a agenda da medição de 5 em 5 horas (`measure_schedule::check`)
+  — na abertura do Windows não disputa a máquina.
 - `login_output.rs` — o que a saída do `claude auth login` diz, lida através do ConPTY (puro,
   testado, com o fluxo REAL gravado): limpa VT/ANSI em fluxo (sequência cortada entre pedaços
   não vaza), pega o link pelo texto visível (só completo, só nos dois hosts oficiais, nunca
@@ -138,7 +161,18 @@
   e nenhum `claude` fica vivo) e relogin com outra conta (ao fechar, a credencial estranha sai
   da casa; a conta continua registrada).
 
+- 04/10/2026: `open_home` virou comando `async`. Síncrono, ele roda na thread principal dentro
+  do handler de requisição do WebView2, e com a janela de Grupos fechada `show_home` a cria de
+  novo — o que trava o app inteiro no Windows (o `WebviewWindowBuilder` do tauri 2.11 documenta
+  o deadlock e manda usar comando `async`). O caminho do menu da bandeja não passa por handler do
+  WebView2 e não travava; o do rodapé do flyout, sim. "Usar" durante "Medir contas" devolve o
+  quadro sem trocar.
+
 ## Pendências (próximas fatias)
+- `capabilities/default.json` ainda dá `core:default` às duas janelas; o front só precisa de
+  eventos e das chamadas de janela que faz. Enxugar pede rodar o app para conferir cada uma.
+- `mock.ts` entra no bundle de produção (import estático em `api.ts`); um import dinâmico sob
+  `import.meta.env.DEV` o tira — pede conferir o app rodando.
 - O login com o `claude` de verdade (navegador, conta real) é do teste ponta a ponta (fase 7).
 - Conferir à mão o flyout no clique real da bandeja (posição com a barra embaixo e no excedente
   do Windows 11, sumir ao perder o foco, clique que fecha não reabre) — o clique no ícone não

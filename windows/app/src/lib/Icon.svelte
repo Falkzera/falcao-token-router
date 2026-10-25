@@ -15,7 +15,8 @@
     | "pencil"
     | "plus"
     | "warning"
-    | "info";
+    | "info"
+    | "chart";
 </script>
 
 <script lang="ts">
@@ -75,6 +76,10 @@
   {:else if name === "info"}
     <circle cx="8" cy="8" r="6.25" />
     <path d="M8 7.25v4M8 4.9v.2" />
+  {:else if name === "chart"}
+    <!-- O atalho do Histórico: eixos e uma linha que sobe. -->
+    <path d="M2.25 2.5v11.25h11.5" />
+    <path d="M4.75 10.5l2.5-3 2.25 1.75 3.5-4.5" />
   {/if}
 </svg>
 

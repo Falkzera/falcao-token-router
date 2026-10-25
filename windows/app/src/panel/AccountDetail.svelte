@@ -3,7 +3,8 @@
   // 5h e 7d com barra e reset, quem mediu e há quanto tempo, e — se alguém
   // sondou — a janela POR MODELO embaixo, com carimbo próprio (ela pode ser de
   // ontem enquanto as duas de cima são de agora). Deliberadamente pobre: sem
-  // tokens/min nem valor, que o porte não mede.
+  // tokens/min nem valor, que o porte não mede. Embaixo, o atalho para o
+  // Histórico desta conta (21/10/2026): abre a janela já no cartão dela.
   import { clock } from "../lib/clock.svelte";
   import { ageSeconds, duration } from "../lib/format";
   import Icon from "../lib/Icon.svelte";
@@ -11,7 +12,11 @@
   import type { AccountView } from "../lib/types";
   import Gauge from "./Gauge.svelte";
 
-  let { account, onClose }: { account: AccountView; onClose: () => void } = $props();
+  let {
+    account,
+    onClose,
+    onHistory,
+  }: { account: AccountView; onClose: () => void; onHistory: (accountId: string) => void } = $props();
 
   const usage = $derived(account.usage);
 </script>
@@ -50,6 +55,9 @@
   {:else if !account.signedOut}
     <p class="ready">{t("panel.accounts.ready.help.probe")}</p>
   {/if}
+  <button class="history" onclick={() => onHistory(account.id)}>
+    <Icon name="chart" size={12} />{t("panel.account.history")}
+  </button>
 </section>
 
 <style>
@@ -124,5 +132,25 @@
   .signed-out :global(svg) {
     flex: none;
     margin-top: 2px;
+  }
+  .history {
+    display: inline-flex;
+    align-self: flex-start;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 0;
+    border: none;
+    background: none;
+    font: inherit;
+    font-size: var(--font-small);
+    color: var(--accent);
+    cursor: pointer;
+  }
+  .history:hover {
+    text-decoration: underline;
+  }
+  .history:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
   }
 </style>

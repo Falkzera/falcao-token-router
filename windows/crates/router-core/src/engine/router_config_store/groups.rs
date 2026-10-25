@@ -139,9 +139,7 @@ impl RouterConfigStore {
     pub fn clear_default(&mut self) {
         for i in 0..self.config.groups.len() {
             if self.config.groups[i].config_dir.is_default {
-                let id = self.config.groups[i].id;
-                self.config.groups[i].config_dir =
-                    self.paths.group_config_dir(id, false, &self.home);
+                self.move_group(i, false);
             }
         }
         self.save();
@@ -150,13 +148,35 @@ impl RouterConfigStore {
     /// Torna um grupo o padrão (`~\.claude`), tirando de quem era. No máximo um.
     pub fn make_default(&mut self, id: Id) {
         for i in 0..self.config.groups.len() {
-            let group_id = self.config.groups[i].id;
-            let should_be = group_id == id;
+            let should_be = self.config.groups[i].id == id;
             if self.config.groups[i].config_dir.is_default != should_be {
-                self.config.groups[i].config_dir =
-                    self.paths.group_config_dir(group_id, should_be, &self.home);
+                self.move_group(i, should_be);
             }
         }
         self.save();
+    }
+
+    /// Troca o perfil de um grupo sem deixar uma conta viva em dois lugares.
+    ///
+    /// Trocar o padrão só mudava o caminho, e a rotação, na volta seguinte,
+    /// ativava no perfil novo a mesma conta que continuava viva no antigo — duas
+    /// cópias de um refresh token que gira. E o perfil dedicado de um grupo é
+    /// sempre o mesmo caminho: voltando a ele, a identidade velha fazia o
+    /// espelho gravar uma cadeia morta na casa da conta (o macOS tinha os dois).
+    ///
+    /// Então: espelha a ativa (a casa fica com o token vivo), esvazia o perfil
+    /// dedicado de destino e o dedicado que fica para trás. Preço deliberado:
+    /// uma sessão viva no dedicado que ficou para trás perde a credencial. O
+    /// `~\.claude` nunca é esvaziado — o login dele é do `claude` puro.
+    fn move_group(&mut self, i: usize, to_default: bool) {
+        let group = self.config.groups[i].clone();
+        let _lock = EngineLock::acquire(&self.paths.base, EngineLock::WAIT);
+        self.engine.mirror_active(&group, &self.config);
+        let target = self
+            .paths
+            .group_config_dir(group.id, to_default, &self.home);
+        self.engine.reset_profile(&target, group.provider);
+        self.engine.reset_profile(&group.config_dir, group.provider);
+        self.config.groups[i].config_dir = target;
     }
 }

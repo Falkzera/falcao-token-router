@@ -14,6 +14,8 @@
 //!   saída do app (`flush`).
 //! - O resumo das contas na aba Grupos (`SummaryItem`): o que cada linha
 //!   mostra, escolhido pelo usuário — de fábrica, tudo; guardam-se os TIRADOS.
+//! - "Medir as contas a cada 5 horas" (21/10/2026, para a aba Histórico):
+//!   ligada de fábrica; a agenda (`measure_schedule`) lê o ajuste a cada volta.
 //! - `open_url` só abre o que está na lista: as páginas de Configurações que a
 //!   tela sugere, o logout do claude.ai e o login oficial.
 
@@ -23,11 +25,12 @@ use std::sync::Mutex;
 
 use router_core::platform::atomic_write::{read_retrying, write_atomic};
 use serde::{Deserialize, Deserializer, Serialize};
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_opener::OpenerExt;
 
 use crate::home_window::WindowSize;
+use crate::rotation_loop::SNAPSHOT_CHANGED;
 
 /// Um item do resumo de cada conta na aba Grupos — o usuário escolhe o que vê
 /// ali (pedido de 23/09/2026); de fábrica, tudo. O tooltip da linha não muda:
@@ -78,7 +81,7 @@ fn known_items<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Vec<Summary
     })
 }
 
-#[derive(Clone, Default, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppSettings {
     #[serde(default)]
@@ -93,6 +96,25 @@ pub struct AppSettings {
         deserialize_with = "known_items"
     )]
     pub hidden_summary: Vec<SummaryItem>,
+    /// "Medir as contas a cada 5 horas": ligada de fábrica — e um
+    /// `settings.json` de antes dela, sem o campo, também conta como ligada.
+    #[serde(default = "default_on")]
+    pub scheduled_measure: bool,
+}
+
+fn default_on() -> bool {
+    true
+}
+
+impl Default for AppSettings {
+    fn default() -> Self {
+        AppSettings {
+            show_in_taskbar: false,
+            home_window: None,
+            hidden_summary: Vec::new(),
+            scheduled_measure: true,
+        }
+    }
 }
 
 impl AppSettings {
@@ -202,6 +224,7 @@ pub struct SettingsView {
     pub autostart_failure: Option<String>,
     pub show_in_taskbar: bool,
     pub hidden_summary: Vec<SummaryItem>,
+    pub scheduled_measure: bool,
     pub version: String,
 }
 
@@ -212,6 +235,7 @@ fn view(app: &AppHandle, store: &SettingsStore) -> SettingsView {
         autostart_failure: lock(&store.autostart_failure).clone(),
         show_in_taskbar: settings.show_in_taskbar,
         hidden_summary: settings.hidden_summary,
+        scheduled_measure: settings.scheduled_measure,
         version: app.package_info().version.to_string(),
     }
 }
@@ -257,6 +281,21 @@ pub fn set_hidden_summary(
     store
         .update(|s| s.hidden_summary = SummaryItem::normalized(&hidden))
         .map_err(|e| e.to_string())?;
+    Ok(view(&app, &store))
+}
+
+/// "Medir as contas a cada 5 horas". A agenda lê o ajuste a cada volta; a aba
+/// Histórico — que diz "próxima às…" ou "desligada" — relê no evento.
+#[tauri::command]
+pub fn set_scheduled_measure(
+    app: AppHandle,
+    store: State<'_, SettingsStore>,
+    on: bool,
+) -> Result<SettingsView, String> {
+    store
+        .update(|s| s.scheduled_measure = on)
+        .map_err(|e| e.to_string())?;
+    let _ = app.emit(SNAPSHOT_CHANGED, ());
     Ok(view(&app, &store))
 }
 
@@ -399,6 +438,21 @@ mod tests {
         let settings = SettingsStore::at(Some(path)).get();
         assert!(settings.show_in_taskbar);
         assert!(settings.hidden_summary.is_empty());
+    }
+
+    /// A medição de 5 em 5 horas vem ligada de fábrica — e um `settings.json`
+    /// de antes dela (sem o campo) também a liga. Desligada, fica desligada.
+    #[test]
+    fn the_scheduled_measure_is_on_unless_turned_off() {
+        assert!(AppSettings::default().scheduled_measure);
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("settings.json");
+        std::fs::write(&path, br#"{"showInTaskbar": true}"#).unwrap();
+        let store = SettingsStore::at(Some(path.clone()));
+        assert!(store.get().scheduled_measure);
+
+        store.update(|s| s.scheduled_measure = false).unwrap();
+        assert!(!SettingsStore::at(Some(path)).get().scheduled_measure);
     }
 
     /// O `settings.json` de antes do tamanho guardado continua valendo.

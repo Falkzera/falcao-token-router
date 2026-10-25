@@ -26,7 +26,7 @@ case "launch":
 case "is-group":
     exit(Launcher.isGroup(args.dropFirst().first) ? 0 : 1)
 case "rotate":
-    Launcher.rotate()
+    exit(Launcher.rotate() ? 0 : 1)
 case "doctor":
     exit(Doctor.run() ? 0 : 1)
 case "measure":
@@ -163,17 +163,31 @@ enum Launcher {
     }
 
     /// Uma volta da rotação em todos os grupos, para um agente periódico.
-    static func rotate() {
-        guard let config = loadConfig() else { return }
+    ///
+    /// Sai com 1 sem configuração legível ou quando uma troca falha, dizendo
+    /// qual no stderr: é o que o cabeçalho promete, e um agente que roda isto
+    /// às cegas só percebe uma troca que não aconteceu pelo código de saída.
+    static func rotate() -> Bool {
+        guard let config = loadConfig() else {
+            FileHandle.standardError.write(Data("router: sem configuração legível — nada a rotacionar\n".utf8))
+            return false
+        }
         let keychain = SecurityCLIKeychain()
         let engine = RotationEngine(keychain: keychain)
         let usage = GroupUsageReader(usageDir: RouterPaths().usageDir).usageByAccount(config)
+        var ok = true
         for group in config.groups {
             engine.mirrorActive(in: group, config: config)
             guard let target = engine.rotationTarget(for: group, config: config, usage: usage)
             else { continue }
-            try? engine.activate(target, in: group, config: config)
+            do {
+                try engine.activate(target, in: group, config: config)
+            } catch {
+                FileHandle.standardError.write(Data("router: \(group.name): não trocou para \(target.label): \(error)\n".utf8))
+                ok = false
+            }
         }
+        return ok
     }
 
     static func fail(_ message: String) -> Never {
@@ -344,7 +358,8 @@ enum Doctor {
 /// que é o que estoura primeiro.
 ///
 /// Custa um processo Node por conta e uma requisição de verdade em cada uma,
-/// então é comando, não laço.
+/// então aqui é comando, não laço; a medição de 5 em 5 horas é do app
+/// (21/10/2026). Toda medição deixa um ponto no histórico, a desta CLI também.
 enum Measure {
     static func run(_ argv: [String]) -> Bool {
         guard let config = Launcher.loadConfig() else {
@@ -373,7 +388,7 @@ enum Measure {
             return true
         }
 
-        let dir = RouterPaths().usageDir
+        let paths = RouterPaths()
         var falhas = 0
         for conta in contas {
             // A regra que não pode ser quebrada: conta ativa é sondada pelo
@@ -381,18 +396,14 @@ enum Measure {
             let perfil = engine.probeConfigDir(for: conta, config: config)
             do {
                 let leitura = try probe.read(configDir: perfil)
-                let agora = Date()
-                let amostra = GroupUsageSample(
-                    configDirRaw: perfil.raw, email: conta.identity.email,
-                    fiveHourPercent: leitura.session, fiveHourResetsAt: leitura.sessionResetsAt,
-                    sevenDayPercent: leitura.weeklyAll, sevenDayResetsAt: leitura.weeklyAllResetsAt,
-                    sampledAt: agora,
-                    models: ModelUsage(windows: leitura.models, sampledAt: agora),
-                    origin: .probe)
-                try GroupUsageStore.write(amostra, forEmail: conta.identity.email, in: dir)
+                try ProbeRecord.write(leitura, email: conta.identity.email, configDir: perfil,
+                                      usageDir: paths.usageDir, historyDir: paths.historyDir)
                 print("  \(conta.label): \(descreve(leitura))")
             } catch ClaudeUsageProbe.ProbeError.notSignedIn {
                 print("  \(conta.label): sem login neste perfil — use Relogar no app")
+                falhas += 1
+            } catch ClaudeUsageProbe.ProbeError.failed(let status) {
+                print("  \(conta.label): o claude saiu com código \(status) — sem rede ou limite do servidor? Tente de novo antes de relogar")
                 falhas += 1
             } catch {
                 print("  \(conta.label): falhou (\(error))")

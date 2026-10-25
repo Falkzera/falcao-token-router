@@ -148,8 +148,6 @@ pub struct RouterConfigStore {
     config: RouterConfig,
     /// Uso 0–1 por conta, lido das amostras.
     usage_snapshot: HashMap<Id, f64>,
-    /// Quando a amostra de cada conta foi colhida — a idade que a UI mostra.
-    usage_sampled_at: HashMap<Id, DateTime<Utc>>,
     /// O mesmo uso, com a janela e a origem de onde o número veio.
     usage_detail: HashMap<Id, AccountUsage>,
     /// A conta ativa de cada grupo (grupo → conta).
@@ -203,7 +201,6 @@ impl RouterConfigStore {
         let mut store = RouterConfigStore {
             config,
             usage_snapshot: HashMap::new(),
-            usage_sampled_at: HashMap::new(),
             usage_detail: HashMap::new(),
             active_by_group: HashMap::new(),
             live_sessions: HashMap::new(),
@@ -213,7 +210,8 @@ impl RouterConfigStore {
             unreadable_on_disk,
             router_path: None,
             usage: GroupUsageReader::new(paths.usage_dir()),
-            engine: RotationEngine::new(credentials.clone(), adapters),
+            engine: RotationEngine::new(credentials.clone(), adapters)
+                .with_default_profile(ConfigDir::standard(&home)),
             login: AccountLoginService::new(adapter, credentials.clone()),
             credentials,
             paths,
@@ -237,10 +235,6 @@ impl RouterConfigStore {
 
     pub fn usage_snapshot(&self) -> &HashMap<Id, f64> {
         &self.usage_snapshot
-    }
-
-    pub fn usage_sampled_at(&self) -> &HashMap<Id, DateTime<Utc>> {
-        &self.usage_sampled_at
     }
 
     pub fn usage_detail(&self) -> &HashMap<Id, AccountUsage> {

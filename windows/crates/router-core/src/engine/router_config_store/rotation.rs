@@ -3,6 +3,8 @@
 //! Parte do `impl RouterConfigStore` — ver o `mod.rs` ao lado.
 
 use super::*;
+use crate::engine::measure_schedule::MeasureSchedule;
+use crate::engine::usage_history::UsageHistory;
 
 impl RouterConfigStore {
     // MARK: - Rotação (ações que tocam credencial)
@@ -56,7 +58,9 @@ impl RouterConfigStore {
     ///
     /// É o que o sensor passivo não consegue: conta ociosa nunca serviu mensagem
     /// (sem amostra, "pronta") e o limite POR MODELO não chega no `rate_limits`.
-    /// Sob demanda, não no laço: cada conta custa um processo e uma requisição.
+    /// Sob demanda (este botão) — e, com o app aberto, de 5 em 5 horas pela
+    /// agenda (`scheduled_measure_plans`, 21/10/2026). Nunca no laço de 3
+    /// minutos: cada conta custa um processo e uma requisição.
     /// Síncrona: o app a chama fora da thread da interface.
     pub fn measure_accounts(
         &mut self,
@@ -84,19 +88,78 @@ impl RouterConfigStore {
         }
     }
 
+    /// A medição automática (de 5 em 5 horas, 21/10/2026): por grupo, na ordem
+    /// da lista, um plano só com as contas VENCIDAS (`MeasureSchedule`). Cada
+    /// conta vai uma vez — a que está em dois grupos, no primeiro —, e grupo
+    /// sem conta vencida fica de fora. `attempts` é a última tentativa da
+    /// agenda em cada conta nesta execução do app (quem guarda é o app). A
+    /// conta ativa vai pelo perfil do grupo, como no "Medir contas".
+    pub fn scheduled_measure_plans(
+        &self,
+        now: DateTime<Utc>,
+        attempts: &HashMap<Id, DateTime<Utc>>,
+    ) -> Vec<(Id, MeasurePlan)> {
+        let history = self.paths.history_dir();
+        let mut planned: HashSet<Id> = HashSet::new();
+        let mut plans = Vec::new();
+        for group in &self.config.groups {
+            let targets: Vec<ProbeTarget> = self
+                .probe_targets(group)
+                .into_iter()
+                .filter(|target| {
+                    !planned.contains(&target.account_id)
+                        && MeasureSchedule::is_due(
+                            UsageHistory::last_sampled_at(&target.email, &history),
+                            attempts.get(&target.account_id).copied(),
+                            now,
+                        )
+                })
+                .collect();
+            if targets.is_empty() {
+                continue;
+            }
+            planned.extend(targets.iter().map(|t| t.account_id));
+            plans.push((
+                group.id,
+                MeasurePlan {
+                    targets,
+                    usage_dir: self.paths.usage_dir(),
+                    base: self.paths.base.clone(),
+                },
+            ));
+        }
+        plans
+    }
+
+    /// "Apagar o histórico…" (Ajustes, 21/10/2026): os pontos de todas as
+    /// contas saem do disco, sob a trava do motor (a sonda grava o ponto sob
+    /// ela). As medições continuam: cada conta ganha um novo primeiro ponto na
+    /// próxima. Devolve quantos arquivos saíram.
+    pub fn clear_history(&self) -> io::Result<usize> {
+        let _lock = EngineLock::acquire(&self.paths.base, EngineLock::WAIT);
+        UsageHistory::clear(&self.paths.history_dir())
+    }
+
     /// Publica o saldo de uma medição: o erro (contas que não responderam), QUAIS
     /// estão sem login, e o quadro relido com as amostras novas. A conta que
     /// falhou por outro motivo (prazo, formato novo) fica como estava: a falha
     /// não diz nada sobre o login dela.
     pub fn finish_measure(&mut self, summary: MeasureSummary) {
         self.last_error = (summary.failed > 0).then_some(StoreError::ProbeFailures(summary.failed));
+        self.note_login_state(&summary);
+        self.refresh_usage();
+    }
+
+    /// O que uma medição disse sobre o login de cada conta: quem respondeu
+    /// perde a marca, quem a sonda achou sem login ganha. A medição de 5 em 5
+    /// horas passa só por aqui — o aviso vermelho é da última ação do usuário.
+    pub fn note_login_state(&mut self, summary: &MeasureSummary) {
         for id in &summary.measured {
             self.signed_out.remove(id);
         }
         let now = Utc::now();
         self.signed_out
             .extend(summary.signed_out.iter().map(|id| (*id, now)));
-        self.refresh_usage();
     }
 
     /// Sem `claude` instalado não há sonda — um erro com nome, para a UI.
@@ -110,19 +173,23 @@ impl RouterConfigStore {
         let detail = self.usage.detail_by_account(&self.config, Utc::now());
         self.usage_snapshot = detail.iter().map(|(id, u)| (*id, u.fraction)).collect();
         self.usage_detail = detail;
-        self.usage_sampled_at = self
-            .usage
-            .samples_by_account(&self.config)
-            .into_iter()
-            .map(|(id, s)| (id, s.sampled_at))
-            .collect();
         // Amostra mais nova que a marca: a conta serviu uma sessão DEPOIS de se
         // mostrar sem login (um `/login` no próprio terminal, sem o app) — o
         // login voltou. A data da amostra vai ao disco sem fração de segundo,
         // então uma do mesmo segundo da marca não conta: fica para a próxima.
-        let sampled_at = &self.usage_sampled_at;
-        self.signed_out
-            .retain(|id, marked| sampled_at.get(id).is_none_or(|at| at <= marked));
+        // As datas só são lidas com alguma marca posta: reler a pasta `usage\`
+        // inteira a cada refresh, para ninguém usar, foi o que tirou o campo
+        // `usage_sampled_at` daqui.
+        if !self.signed_out.is_empty() {
+            let sampled_at: HashMap<Id, DateTime<Utc>> = self
+                .usage
+                .samples_by_account(&self.config)
+                .into_iter()
+                .map(|(id, s)| (id, s.sampled_at))
+                .collect();
+            self.signed_out
+                .retain(|id, marked| sampled_at.get(id).is_none_or(|at| at <= marked));
+        }
         self.active_by_group = self
             .config
             .groups

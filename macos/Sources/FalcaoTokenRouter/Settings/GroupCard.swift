@@ -6,6 +6,8 @@ struct GroupCard: View {
     let group: AccountGroup
     let onAddAccount: () -> Void
     let onRelogin: (Account) -> Void
+    /// O atalho de cada conta para o Histórico, já neste grupo (21/10/2026).
+    let onHistory: (Account) -> Void
 
     @ViewState private var editingName = false
     @ViewState private var draftName = ""
@@ -24,6 +26,12 @@ struct GroupCard: View {
     /// Da fonte observável, não relendo o disco a cada frame.
     private var active: Account? {
         store.activeByGroup[group.id].flatMap { id in store.config.account(id) }
+    }
+    /// Em uso e com outra no grupo: ao sair, o grupo passa para a próxima (o
+    /// motor escolhe qual) — a confirmação diz isso, e não "continuam até o
+    /// token vencer".
+    private func handsOver(_ account: Account) -> Bool {
+        active?.id == account.id && accounts.count > 1
     }
 
     var body: some View {
@@ -64,8 +72,10 @@ struct GroupCard: View {
             }
             Button("groups.cancel", role: .cancel) { pendingDelete = nil }
         } message: { account in
-            Text(String(format: String(localized: "groups.account.delete.message.format"),
-                        account.label))
+            let format = handsOver(account)
+                ? String(localized: "groups.account.delete.messageActive.format")
+                : String(localized: "groups.account.delete.message.format")
+            Text(String(format: format, account.label))
         }
         .confirmationDialog("groups.delete.confirm.title",
                             isPresented: $confirmingGroupDelete) {
@@ -167,7 +177,9 @@ struct GroupCard: View {
                            isActive: account.id == active?.id,
                            usage: store.usageDetail[account.id],
                            sampledAt: store.usageSampledAt[account.id],
+                           isMeasuring: store.measuringGroup != nil,
                            onSwitch: { store.activate(account, in: group) },
+                           onHistory: { onHistory(account) },
                            onRelogin: { onRelogin(account) },
                            onRemove: { pendingDelete = account })
             }

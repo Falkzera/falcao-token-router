@@ -104,8 +104,10 @@ and `router doctor` reports it when set.
 
 ## The user's choice of status line
 
-Windows only (the macOS app always shows its own line). **Settings → Status line**
-writes `<data dir>\statusline.json`, and `router statusline` reads it on every render,
+Shared with the macOS app, which reads and writes the same file since #16 and #17 —
+it honours `mode: "app"` and `hidden`; running the user's command (`mode:
+"command"`) is Windows-only for now. **Settings → Status line** writes
+`<data dir>\statusline.json`, and `router statusline` reads it on every render,
 after recording the sample — the sensor is the same in every mode:
 
 ```json
@@ -136,6 +138,43 @@ after recording the sample — the sensor is the same in every mode:
 - `router doctor` runs each group's sensor with `ROUTER_STATUSLINE_CHAINED` set (it
   checks the sensor runs, and an empty line passes), reports the choice, and in
   command mode runs the user's command against a sample session.
+
+## The measurement history
+
+Windows only (2026-10-21). Every probe measurement — **Measure accounts**,
+`router measure`, and the app's own every-5-hours schedule — leaves a point in
+`<data dir>\history\<e-mail>.jsonl`. The engine writes it inside the probe
+(`measure_into`), after the sample and under the same engine lock:
+
+```json
+{"sampledAt":"2026-10-21T12:00:00Z","fiveHourPercent":0.29,"fiveHourResetsAt":"2026-10-21T14:05:00Z","sevenDayPercent":0.33,"sevenDayResetsAt":"2026-10-27T09:00:00Z","models":[{"name":"Fable","percent":0.12}]}
+```
+
+- The file name is the `usage\` one with `.jsonl`. A window the reading didn't
+  have is absent, never zero. Points older than 90 days go when the next one is
+  written; the file is rewritten whole (temp + rename), so a crash never leaves
+  half a line, and a line that doesn't parse is skipped without the others.
+- A failure writing the history doesn't fail the measurement: the sample in
+  `usage\`, which drives the rotation, is already on disk.
+- **Settings → History → Delete history…** removes every `.jsonl` in the folder —
+  and nothing else — under the engine lock, after a confirmation. With no point
+  left, every account is due again (unless the schedule tried it in the last 5
+  hours), so the history starts over with the next measurement.
+- The sensor writes nothing here, and the macOS app neither reads nor writes the
+  folder: `usage\<e-mail>.json` and `config.json` stay the shared contract.
+- **The schedule** lives in the app: Settings → History → "Measure accounts every 5
+  hours", on by default, kept as `scheduledMeasure` in the app's `settings.json`.
+  An account is due when the newest of its last point and the app's last scheduled
+  attempt on it is 5 hours old or more — the attempt is what keeps a signed-out
+  account from being probed on every pass. The check runs with the rotation, every
+  180 s, from the second pass on (3 minutes after the app starts). It waits while a
+  sign-in is in progress or another measurement runs, measures group by group (an
+  account in two groups once, the active one through its group's profile), and
+  stays quiet: no error banner, since nobody asked.
+- **The History tab** draws the 5-hour window over the last 7 days and the weekly
+  window over the last 4 weeks. The series come from the backend already cut,
+  split where two points are more than 7 h 30 min apart, with the percentages from
+  `UsagePercent` and the times written by the status line's `reset_when`.
 
 ## PowerShell and Git Bash
 
@@ -280,7 +319,8 @@ folder. A real profile always has the folder, and the sandbox now creates it.
 | Shell integration | zsh function in `~/.zshrc` | `shell.ps1` in both `$PROFILE`s, `shell.sh` in `~/.bashrc` (Git Bash) |
 | Data directory | `~/Library/Application Support/com.synqo.falcao-router` | `%LOCALAPPDATA%\com.synqo.falcao-router` (Local, not Roaming) |
 | Finding `claude` | three separate searches | one resolver: `ROUTER_CLAUDE_BIN`, `~\.local\bin\claude.exe`, `PATH`, `%APPDATA%\npm` (an npm `claude.cmd` shim is read and run as `node cli.js`, never through `cmd.exe`); Claude Desktop's copy and WindowsApps aliases are skipped |
-| Group status line | always the router's line | the router's line with the items the user keeps, or the user's own command after the sensor (`statusline.json`) |
+| Group status line | the router's line with the items the user keeps (`statusline.json`) | the same, or the user's own command after the sensor |
+| The probe | a button and `router measure` | the same, plus every 5 hours while the app runs; each reading kept in `history\<e-mail>.jsonl` for the History tab |
 
 ## Deliberate differences
 
@@ -292,19 +332,13 @@ The port does not reproduce these macOS behaviours (each has a regression test):
   ends, and a silent fall-through when the `router` binary is gone;
 - three different searches for the `claude` binary;
 - the sensor ignoring `ROUTER_APP_SUPPORT`;
-- `ProviderEnv` letting through `ANTHROPIC_CONFIG_DIR`, `ANTHROPIC_IDENTITY_TOKEN(_FILE)`,
-  `ANTHROPIC_FEDERATION_RULE_ID`, `ANTHROPIC_ORGANIZATION_ID`, `CLAUDE_CODE_USE_FOUNDRY`,
-  `ANTHROPIC_FOUNDRY_*`, `ANTHROPIC_AWS_*` and `AWS_BEARER_TOKEN_BEDROCK` (all read in the
-  JS of 2.1.280). The token and credential-redirect variables — `CLAUDE_CODE_OAUTH_TOKEN`
-  and its variants, `CLAUDE_SECURESTORAGE_CONFIG_DIR` — are stripped on macOS too since #6;
 - no lock between the app and the CLI (the port uses a named mutex around every
   credential write);
-- a group's status line reduced to `account 5h 7d`, which replaced whatever status
-  line the user had with less than it showed. The port's line shows the group, the
-  model and its effort, the branch, the context window, both windows with the time
-  they reset, the session's cost and the active account's e-mail; each item can be
-  turned off in Settings, or the user's own status line command can run instead,
-  after the sensor (the sensor behind it is unchanged);
+- a group's status line that takes the place of the user's own command. The port
+  can run that command after the sensor (the sensor behind it is unchanged). Since
+  #16 and #17 macOS draws the same full line — group, model and effort, branch,
+  context, both windows with their resets, cost, e-mail — with the same items to
+  turn off, but has no command mode yet;
 - reordering accounts dropping one that the requested order forgot.
 
 And these in the app (checked in the browser against the mocked backend, and in the
@@ -318,9 +352,3 @@ app itself inside a sandbox):
   code, and the text comes from the UI's catalogs);
 - a login spinner that never stops when the account doesn't show up on disk (the
   port shows a named state with "Check again");
-- a relogin that comes back as **another** account leaving that account's
-  credential in this account's home, where "Use" would serve the other account
-  under this one's name (the port removes it);
-- the rotation pass running during a sign-in, where mirroring an active account
-  (group → home) could overwrite the credential a relogin just wrote (the port
-  waits until the sign-in ends).
