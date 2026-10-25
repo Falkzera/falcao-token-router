@@ -42,7 +42,8 @@ tudo vive sob `windows/`, mais dois workflows: `windows.yml` (filtrado por camin
   confere o que saiu, a CI publicando o instalador como artefato, e o `README.md` em inglês
   para quem nunca viu o app (instalar → grupo → duas contas → integração → `claude <grupo>`
   → ver a troca → `router doctor`, problemas conhecidos, desinstalar).
-- **Release `windows-v1.0.0`** publicada em 24/09/2026 (`windows-release.yml`).
+- **Release `windows-v1.0.0`** publicada em 24/09/2026 (`windows-release.yml`); `windows-v1.1.0` em
+  25/10/2026, junto com a `macos-v1.1.0`.
 - **Histórico de uso** (21/10/2026, pedido do usuário; desenho em
   `docs/specs/2026-10-21-usage-history-design.md`): toda medição da sonda vira um ponto em
   `<base>\history\<email>.jsonl` (no contrato com o macOS desde o #36); o app mede cada

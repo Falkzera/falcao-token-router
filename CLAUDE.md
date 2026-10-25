@@ -98,6 +98,7 @@ Ao entrar numa pasta pra trabalhar, leia o `agent.md`. Ao sair com mudança sign
 ## Roadmap curto
 
 - v1 (release `v1.0.0`, 22/09/2026): grupos + rodízio + sensor + integração de terminal — **validada em uso real**.
+- 1.1 (`macos-v1.1.0` e `windows-v1.1.0`, 25/10/2026): histórico de uso com medição de 5 em 5 horas, selo de conta sem login, status line completa e escolhível, e as correções de outubro.
 - Pré-venda: ícone definitivo, licença Ed25519 offline, Sparkle, notarização (Developer ID). Nome resolvido em 18/09/2026; Ajustes+Grupos já unificados em abas.
 - ~~Lacuna: o limite POR MODELO não chega no `rate_limits`~~ — **fechada em 18/09/2026** pela sonda ativa (`router measure` / botão "Medir contas"), que pergunta ao binário oficial. Ela também mede conta OCIOSA, que o sensor passivo nunca enxerga.
 

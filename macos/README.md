@@ -11,7 +11,7 @@ on a Mac.
 ## Install
 
 Grab `FalcaoTokenRouter-<version>.dmg` from the
-[current macOS release, `v1.0.0`](../../../releases/tag/v1.0.0), open it, and drag
+[current macOS release, `macos-v1.1.0`](../../../releases/tag/macos-v1.1.0), open it, and drag
 the app onto *Applications*. The binary is universal — Apple Silicon and Intel.
 
 > This repository tags each platform separately, so GitHub's *latest release*
