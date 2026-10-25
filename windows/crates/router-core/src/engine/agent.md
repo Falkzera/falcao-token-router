@@ -50,7 +50,8 @@ Modelos, formato da amostra, leitor de uso, credencial, rotação e o store. Sem
   de outra máquina, confere o processo (tolerância 300 s; sem prova confia no pid), mais nova
   primeiro.
 - `router_paths.rs` — base `%LOCALAPPDATA%\com.synqo.falcao-router` (override `ROUTER_APP_SUPPORT`),
-  com `config.json`, `usage\` e o `statusline.json` (a escolha da status line, só do Windows).
+  com `config.json`, `usage\` e o `statusline.json` (a escolha da status line — o mesmo arquivo
+  do macOS desde o #17; o modo "meu comando" é só daqui).
 
 - `shell_integration.rs` — ≙ `ShellIntegration`: a `statusLine` (`/` e sem aspas; com espaço, 8.3;
   sem 8.3, aspas do shell detectado — `&` no PowerShell; `--profile` nos grupos dedicados),
@@ -92,8 +93,10 @@ Modelos, formato da amostra, leitor de uso, credencial, rotação e o store. Sem
 - 22/09/2026: a status line de grupo dedicado leva `--profile`; o sensor prefere o
   `CLAUDE_CONFIG_DIR` e cai no `--profile` quando a variável não chega (subprocesso raspado).
 
-- 22/09/2026: `measure_accounts` do store é síncrono (o app o chama fora da thread da UI) e usa
-  `probe_targets` — o perfil de cada conta decidido com o config na mão (ativa → grupo).
+- 22/09/2026: `measure_accounts` do store é síncrono e usa `probe_targets` — o perfil de cada
+  conta decidido com o config na mão (ativa → grupo). Desde a fase 5 o app não o chama: usa
+  `measure_plan` → `MeasurePlan::run` (fora da trava do store) → `finish_measure`, e o
+  `measure_accounts` ficou só para os testes.
 
 - 22/09/2026 (fase 5, o que o app pede ao store):
   - `add_group_with(nome, padrão?)`: o 1º grupo pode nascer DEDICADO. O `rotation_target` ativa a

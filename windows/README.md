@@ -3,10 +3,11 @@
 A notification-area app that keeps several Claude Code accounts in **groups** and
 switches the active one for you when it runs out — without ending your session.
 
-This is the Windows port of the [macOS app](../README.md): the same idea, the same
-rules and the same files, rewritten in Rust with a Tauri tray app. It covers the
-router — groups, the automatic switch, the sensor, the probe and the `router`
-command. The macOS app's token and cost meter is not part of it.
+This is the Windows app of [Falcão Token Router](../README.md): the same idea, the
+same rules and the same files as the [macOS app](../macos/README.md), written in
+Rust with a Tauri tray app. It covers the router — groups, the automatic switch,
+the sensor, the probe and the `router` command. The macOS app's token and cost
+meter is not part of it.
 
 ```
 claude work       → a session on the "work" group's accounts; switches at the threshold
@@ -31,11 +32,13 @@ claude            → plain Claude Code, as before
 ## Install
 
 Download `FalcaoTokenRouter_<version>_x64-setup.exe` from the
-[latest Windows release](../../../releases/tag/windows-v1.0.0) and run it.
+[current Windows release, `windows-v1.0.0`](../../../releases/tag/windows-v1.0.0),
+and run it.
 
 > This repository releases each platform on its own tag, so the GitHub
 > *latest release* link is ambiguous here — it may point at a macOS release.
-> [All Windows releases](../../../releases?q=windows-v) are tagged `windows-v*`.
+> Windows releases are tagged `windows-v*`, and the
+> [releases page](../../../releases) names the system in every title.
 
 To try an unreleased change instead, open the latest successful run of the
 [*Windows* workflow](../../../actions/workflows/windows.yml) and download the
@@ -149,8 +152,9 @@ that didn't, and the last line is `tudo certo.` (all good) or `há problemas aci
 
 ## Using the app
 
-- **The tray icon** is a ring filled with the active account's usage — green, then
-  yellow from 66%, red from 90%. Its tooltip has one line per group: account,
+- **The tray icon** is a ring filled with the active account's usage — in the
+  taskbar's own color (white or near-black), then yellow from 66% and red from
+  90%. Its tooltip has one line per group: account,
   window, percentage, where the number came from and how old it is.
 - **Left click** opens the accounts table next to the icon; click an account for
   its details. **Right click** has Groups, Settings and Quit.
@@ -198,7 +202,8 @@ Every number carries its window, its source and its age: the tooltip reads
   never reaches the status line. It takes a few seconds per account, so it's a
   button, never a loop.
 
-The switch compares the **larger** of the 5-hour and 7-day windows with the
+The switch compares the **largest** of the 5-hour window, the 7-day window and —
+once the account has been measured — its tightest per-model window with the
 threshold.
 
 ## Known issues
@@ -228,7 +233,7 @@ threshold.
 |---|---|
 | The app and `router.exe` | `%LOCALAPPDATA%\FalcaoTokenRouter` |
 | Groups, accounts, their profiles, the samples | `%LOCALAPPDATA%\com.synqo.falcao-router` — the same layout as the macOS app's `Application Support` folder |
-| The status line choice | `statusline.json` in that same folder (Windows only) |
+| The status line choice | `statusline.json` in that same folder — the macOS app reads the same items; running your own command is Windows-only for now |
 | The app's own settings, and its window's cache | `%APPDATA%\com.synqo.falcao-token-router`, and the same name under `%LOCALAPPDATA%` |
 | The terminal integration | one line in each `$PROFILE` and in `~/.bashrc`, pointing at `shell.ps1` / `shell.sh` in the router's folder |
 

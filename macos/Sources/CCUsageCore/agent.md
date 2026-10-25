@@ -9,7 +9,7 @@ O topo do motor: o que a UI observa e o que transforma eventos crus em tela. Nad
 - `CCUsageCore.swift` — ponto de entrada do módulo.
 
 ## Padrões
-- `now: Date` entra por parâmetro onde o tempo decide. Nenhuma função aqui lê o relógio por conta própria.
+- `now: Date` entra por parâmetro onde o tempo decide. O `SnapshotBuilder` não lê o relógio; o `UsageStore`, que é a borda, lê (`Date()`) e passa adiante.
 - Falha de leitura mantém o último snapshot bom em vez de publicar um vazio: disco indisponível não é motivo para a tela zerar.
 
 ## Decisões recentes

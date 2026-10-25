@@ -4,8 +4,8 @@
 A CLI embutida no .app (`Contents/MacOS/router`) que o shell e a status line chamam. Fina de propósito: decide via `CCUsageCore` e executa.
 
 ## Arquivos
-- `main.swift` — os quatro comandos:
-  - `statusline` — o SENSOR: lê `rate_limits` do stdin (o Claude Code entrega), grava a amostra por e-mail e imprime a linha colorida.
+- `main.swift` — os seis comandos:
+  - `statusline` — o SENSOR: lê `rate_limits` do stdin (o Claude Code entrega), grava a amostra por e-mail e imprime a linha completa (grupo, modelo e esforço, branch, contexto, as duas janelas com o reset, custo, e-mail), menos os itens que o usuário escondeu em `statusline.json`.
   - `launch <grupo> -- <args>` — escolhe/ativa a conta (`SessionLauncher`), garante status line + ProfileSharing no perfil, e `execvp` o claude com `CLAUDE_CONFIG_DIR` (ou sem, no grupo padrão).
   - `is-group <nome>` — a função de shell pergunta antes de rotear.
   - `rotate` — uma volta de espelhamento + rotação (para agente periódico externo; o app tem laço próprio).
@@ -23,6 +23,8 @@ A CLI embutida no .app (`Contents/MacOS/router`) que o shell e a status line cha
 - 2026-09-18: entrou o `doctor`. Todos os modos de falha daqui são silenciosos — a função de shell apontando para um `.app` renomeado não dá erro, só abre na conta errada — e a seção "Diagnóstico" da skill era uma lista de comandos manuais que ninguém lembra na hora. Um comando que NOMEIA o problema vale mais que seis que exibem estado.
 
 - 2026-09-18: entra o `measure`. O sensor passivo só mede quem está servindo, e só 5h/7d; a sonda cobre as duas lacunas. É comando e não laço porque cada conta custa um processo Node subindo do zero (~3s) e uma requisição de verdade.
+
+- 2026-09-24: a linha do `statusline` virou a completa (#16) e passou a respeitar a escolha do usuário (#17), relida de `statusline.json` a cada render — o mesmo arquivo e formato do porte Windows. O desenho mora em `CCUsageCore/StatusLine`.
 
 ## Pendências conhecidas
 - Nenhuma.

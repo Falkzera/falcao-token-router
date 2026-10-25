@@ -10,7 +10,7 @@ apps, reading and writing the same files. A group you set up on one means the
 same thing on the other.
 
 ```
-◐ 81%  equipe-2   ← which account is serving you, and how much of it is spent
+◐ 81% equ2   ← which account is serving you (its name, shortened), and how much of it is spent
 ```
 
 ## What it does
@@ -20,7 +20,7 @@ in through Anthropic's own login flow, inside the app. You set the order and the
 threshold. From then on:
 
 ```
-claude trabalho   → the freest account in the "trabalho" group; swaps at the threshold
+claude trabalho   → a session on the "trabalho" group's accounts; swaps at the threshold
 claude pessoal    → same, for the "pessoal" group
 claude            → straight through to the binary, in ~/.claude
 ```
@@ -42,7 +42,7 @@ Anthropic's terms reserve the OAuth token to the official client. So:
 - **The app never refreshes OAuth.** It copies a secret between keychain items;
   it never mints one.
 
-The price of that is honest and visible: **an idle account shows `pronta`, not a
+The price of that is honest and visible: **an idle account shows `ready`, not a
 number.** There is no sample until that account serves a message. The app says so
 rather than inventing a percentage.
 
@@ -74,7 +74,11 @@ Two rules are what separate this from a shell script that gets it wrong:
 ## What it measures
 
 The sensor writes one sample per account, keyed by e-mail. The rotation compares
-the **larger** of the 5-hour and 7-day windows against the group's threshold.
+the **largest** of the 5-hour window, the 7-day window and — once the account has
+been probed — its tightest per-model window against the group's threshold. The
+active account stays while it is under the threshold; past it, the group moves to
+the first account in your order that is under it — or that has no sample yet, which
+counts as fresh.
 
 A window whose reset has already passed is discarded rather than kept — otherwise
 an old sample would leave an account looking permanently full.
@@ -95,16 +99,21 @@ or `router measure [group]`:
 
 ```
 $ router measure trabalho
-  equipe-1: 5h 2%   7d 3%    Fable 0%
-  equipe-2: 5h 26%  7d 38%   Fable 0%
-  equipe-3: 5h 10%  7d 70%   Fable 0%
+  equipe-1: 5h 4%   7d 12%   Fable 0%
+  equipe-2: 5h 31%  7d 45%   Fable 20%
+  equipe-3: 5h 0%   7d 81%   Fable 96%
 ```
 
 It asks the official binary (`claude --print /usage`) — the same thing that
 happens when you type `/usage` yourself. Still no network call of our own, still
 no token read. It costs a Node cold start per account, so it is a button and a
-command, never a loop; the passive sensor remains the thing that runs every
-minute.
+command, never a loop; the passive sensor, which runs on every status-line update,
+remains the everyday source.
+
+`router` is the command-line tool inside the app:
+`/Applications/FalcaoTokenRouter.app/Contents/MacOS/router` on macOS and
+`%LOCALAPPDATA%\FalcaoTokenRouter\router.exe` on Windows. It isn't on your `PATH`,
+and it prints in Portuguese.
 
 Per-model numbers carry their own timestamp, separate from the sensor's, because
 the two age at different rates. An account active in a group is always probed
@@ -116,17 +125,19 @@ drop the live session into "Login expired".
 
 | | | |
 |---|---|---|
-| **macOS 26+** | [`FalcaoTokenRouter-<version>.dmg`](../../releases?q=macos-v) | [install guide](macos/README.md) |
-| **Windows 10/11** | [`FalcaoTokenRouter_<version>_x64-setup.exe`](../../releases?q=windows-v) | [install guide](windows/README.md) |
+| **macOS 26+** | [`FalcaoTokenRouter-1.0.0.dmg`](../../releases/tag/v1.0.0) | [install guide](macos/README.md) |
+| **Windows 11** (10 untested) | [`FalcaoTokenRouter_1.0.0_x64-setup.exe`](../../releases/tag/windows-v1.0.0) | [install guide](windows/README.md) |
 
 Neither build is signed by a paid developer account yet, so each system stops it
 once on first run — macOS with the quarantine flag, Windows with SmartScreen.
 Each platform's guide says exactly what to click.
 
 > **Releases are tagged per platform** — `macos-v*` and `windows-v*` — so a fix
-> on one never waits for the other's calendar. The consequence: GitHub's *latest
-> release* link is **ambiguous** here, because it resolves to whichever platform
-> released last. Follow a tag, and read the release title: it names the system.
+> on one never waits for the other's calendar. (The first macOS release predates
+> the split and is tagged `v1.0.0`.) The consequence: GitHub's *latest release*
+> link is **ambiguous** here, because it resolves to whichever platform released
+> last. The links above name the current release of each; the
+> [releases page](../../releases) names the system in every title.
 
 After installing, the shape is the same on both: create a group, sign accounts
 in through Anthropic's own flow inside the app, turn on the terminal
@@ -162,7 +173,8 @@ type with a field for one, so no code path can reach a refresh token.
 ## Development
 
 Two projects, two toolchains, no shared build. Each one's README has its
-commands, and each folder has an `agent.md`.
+commands, and each folder has an `agent.md` (in Portuguese, like the code
+comments).
 
 | | | |
 |---|---|---|
@@ -170,8 +182,8 @@ commands, and each folder has an `agent.md`.
 | [`windows/`](windows/README.md) | Rust / Tauri 2 / Svelte 5 | `.\scripts\test.ps1` |
 
 What they share is not code — it is the **file format on disk**. `config.json`,
-the per-account homes and `usage/<email>.json` are written by whichever app is
-running, and read by the other. That is the contract a third platform would
+the per-account homes, `usage/<email>.json` and `statusline.json` are written by
+whichever app is running, and read by the other. That is the contract a third platform would
 implement; [`docs/PORTING.md`](docs/PORTING.md) writes it down.
 
 Code comments are in Portuguese on both sides, by choice — it is the
@@ -192,8 +204,8 @@ are built the same way — an engine with no UI, the app, and a CLI the app ship
 
 Everything provider-specific sits behind `ProviderAdapter` on both sides — where
 the credential lives for a given profile, the `.claude.json` beside or inside
-it, the launch command. `RotationEngine` talks only to that interface, so a
-second provider is a new adapter, not a new engine — and it is the same seam a
+it, the launch command. `RotationEngine` reaches the provider only through that
+interface, so a second provider is a new adapter, not a new engine — and it is the same seam a
 third platform implements.
 
 `AlertPolicy` is pure and takes no clock: the same sequence of snapshots produces
@@ -242,8 +254,9 @@ Issues and pull requests are welcome, and the project is set up for it:
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — how the swap, the sensor, the
   probe and the sessions registry actually work, and which parts are decided by
   the system you are on.
-- Every folder has an `agent.md`: what it's for, what each file does, the
-  decisions taken there and why. Read it before touching the folder.
+- Every folder with code has an `agent.md`, in Portuguese: what it's for, what
+  each file does, the decisions taken there and why. Read it before touching the
+  folder.
 - Issue templates for [bugs](../../issues/new?template=bug_report.yml),
   [features](../../issues/new?template=feature_request.yml) and
   [ports](../../issues/new?template=port.yml). `good first issue` and
@@ -258,9 +271,10 @@ Two things the project won't trade away: **no network calls of its own**, and
 
 ## Lineage
 
-Forked from [ClaudeTokenCounter](https://github.com/Ulpio/ClaudeTokenCounter) by
-Ulpio (MIT), which was the meter this grew out of. The rotation engine, the
-groups, the passive sensor and the CLI are new.
+Forked from ClaudeTokenCounter by Ulpio (MIT), which was the meter this grew out
+of. The original repository is no longer public; its copyright notice is kept in
+[LICENSE](LICENSE). The rotation engine, the groups, the passive sensor and the
+CLI are new.
 
 ## License
 

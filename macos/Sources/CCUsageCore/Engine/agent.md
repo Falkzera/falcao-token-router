@@ -4,7 +4,7 @@
 O motor do Falcão Router: contas, grupos, troca de credencial, medição passiva e o store que a UI observa. Sem UI, sem rede — tudo aqui lê/escreve disco e chaveiro locais.
 
 ## Arquivos
-- `RouterConfigStore.swift` — o store observável que a UI chama: CRUD de grupos/contas, login/relogin pendente, rotação, integração de shell. `config` persiste em `config.json`.
+- `RouterConfigStore.swift` — o store observável que a UI chama: CRUD de grupos/contas, login/relogin pendente, rotação, a sonda (`measureAccounts`), a escolha da status line (`statusLineChoice`, em `statusline.json`) e a integração de shell. `config` persiste em `config.json`.
 - `RotationEngine.swift` — a troca em si: ativar conta (casa→grupo), espelhar vivo→casa, relogin (casa→grupo via `pushHomeToGroup`), decidir rotação, e `probeConfigDir` (por qual perfil sondar cada conta). As regras anti-morte-de-conta moram aqui.
 - `GroupUsageReader.swift` — amostras → uso por conta. Considera TRÊS janelas: 5h, 7d e a mais apertada POR MODELO (esta vem da sonda, `Usage/ClaudeUsageProbe.swift`). Janela com reset vencido decai; conta sem amostra fica FORA do mapa (presumida fresca pelo motor). `detailByAccount` devolve `AccountUsage` (fração + de QUAL janela veio + as duas medidas); `usageByAccount` é a mesma coisa só com a fração, para a rotação.
 - `GroupUsage.swift` — `GroupUsageSample` + store de amostras por e-mail, e `UsageOrigin` (sensor × sonda). A origem é serializada como opcional: amostra gravada antes de a sonda existir só podia vir do sensor.
@@ -20,7 +20,7 @@ O motor do Falcão Router: contas, grupos, troca de credencial, medição passiv
 
 ## Padrões
 - Estado que a UI observa é propriedade armazenada `@Observable` no store — computado que lê disco não re-renderiza.
-- Toda regra de credencial tem comentário com o PORQUÊ (descobertas de agosto/2026; ver skill `falcao-router`).
+- Toda regra de credencial tem comentário com o PORQUÊ (descobertas de agosto/2026, por observação — não estão documentadas em lugar nenhum).
 - `now: Date = Date()` como parâmetro onde o tempo decide, para teste.
 
 ## Decisões recentes
@@ -57,5 +57,5 @@ O motor do Falcão Router: contas, grupos, troca de credencial, medição passiv
 - 2026-10-04: issue #12 — relogin que volta como OUTRA conta apaga da casa a credencial e a identidade estranhas (antes ficavam lá com o nome desta), e a rotação não espelha a ativa enquanto o relogin dela está em andamento (`beginRelogin`/`endRelogin`): o espelho gravava por cima da credencial nova a morta que motivou o relogin.
 
 ## Pendências conhecidas
-- `removeAccount`/`removeGroup` não apagam o item de chaveiro nem a pasta `accounts/<uuid>`: a credencial da conta removida continua viva no chaveiro do usuário. Deliberado por ora (ver comentário em `removeGroup`), mas num produto pago "remover a conta" que deixa o refresh token para trás é promessa quebrada.
-- `wrongAccount` no relogin deixa a credencial do intruso na casa até a próxima tentativa (inofensivo; a identidade do registro não muda).
+- `removeGroup` não apaga o item de chaveiro do GRUPO nem a pasta `groups/<uuid>` (o refresh token da última conta ativa fica vivo), e não espelha antes de apagar. (`removeAccount` apaga a credencial e a casa da conta desde 18/09.)
+- `wrongAccount` no relogin deixa a credencial da OUTRA conta na casa desta: "Usar" serviria a outra conta sob o nome desta — issue #12.
