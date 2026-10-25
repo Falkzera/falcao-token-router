@@ -16,7 +16,8 @@ A janela única, em três abas: **Grupos** (o produto — rodízio, contas, inte
   uso, com outra no grupo, diz que o grupo passa para a próxima).
 - `AccountRow.swift` — uma conta na lista: uso por janela com a idade e a procedência da
   amostra, o atalho para o Histórico dela (botão de gráfico), o botão Usar e o menu ⋯
-  (Relogar, Remover).
+  (Relogar, Remover). Conta sem login (`store.isSignedOut`): o `SignedOutBadge` ao lado do
+  nome, que é um botão para o Relogar (23/10/2026 — o aviso da medição dizia quantas, não qual).
 - `LoginSheet.swift` — a folha do login oficial (pty): link, código, e os desfechos
   (sucesso, conta errada, duplicada, falha). Enquanto ela existe, `store.signingIn` segura
   a medição de 5 em 5 horas.

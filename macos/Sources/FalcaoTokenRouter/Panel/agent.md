@@ -5,14 +5,15 @@ O painel do menu bar: a tabela de contas por grupo, o detalhamento da conta sele
 
 ## Arquivos
 - `UsagePanel.swift` — a composição. `selectedAccount` mora aqui e desce como `Binding`: com seleção o cartão de baixo fala da CONTA, sem seleção fala da sessão do perfil medido. O cartão da conta termina em "Ver histórico", que abre a janela no Histórico dela (21/10/2026).
-- `AccountsSection.swift` — a tabela de contas. Define também `AccountHelp` (o tooltip da linha, compartilhado com Grupos), `ModelBadge`, `SessionsBadge` e `UsageAge` (limiares de 1h e 12h).
+- `AccountsSection.swift` — a tabela de contas. Define também `AccountHelp` (o tooltip da linha, compartilhado com Grupos), `ModelBadge`, `SignedOutBadge` (o selo "sem login", compartilhado com Grupos), `SessionsBadge` e `UsageAge` (limiares de 1h e 12h).
 - `WindowReading.swift` — uma janela do `rate_limits` numa linha: rótulo e valor. As DUAS aparecem sempre; a que manda se distingue por peso e cor, não por ser a única visível.
 - `UsageColor.swift` — o semáforo de consumo, definido uma vez. Painel e barra leem os mesmos limiares daqui: com limiares separados, um diria "tranquilo" enquanto o outro já alertava. Também a cor da linha dos gráficos do Histórico (`chartLine`, um tom por aparência).
 - `Formatters.swift` — formatação de duração, percentual e valor.
 
 ## Padrões
 - **Número sem procedência não vai para a tela.** Toda medida carrega de qual janela veio, quem a mediu (sensor × sonda) e há quanto tempo.
-- **Ausência não é zero.** Janela sem medida válida deixa a trilha vazia; conta sem amostra mostra "pronta", não "—".
+- **Ausência não é zero.** Janela sem medida válida deixa a trilha vazia; conta sem amostra mostra "pronta", não "—" — a menos que esteja sem login, e aí é "—" com o selo.
+- **"Sem login" é um selo, não um ponto amarelo** (23/10/2026): o ponto da linha já é o da ativa, e em `warning` ele é amarelo — um segundo ponto leria como "ativa a 80%". O cartão da conta abre com o aviso em âmbar.
 - A linha inteira é alvo de clique (`contentShape`) e o tooltip é da linha, não do número: mirar 34 pontos com o mouse é pedir precisão que ninguém tem.
 - Larguras de coluna vivem em `AccountsLayout`, usadas pelo cabeçalho, pelas linhas e pelo bloco "pronta" — senão nada alinha de conta para conta.
 

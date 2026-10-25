@@ -654,4 +654,138 @@ struct RouterConfigStoreTests {
         #expect(store.config.defaultGroup == nil)
         #expect(store.config.groups.allSatisfy { !$0.configDir.isDefault })
     }
+
+    // MARK: - A conta sem login
+
+    /// Uma conta logada pelo fluxo simulado, já no grupo.
+    private func addAccount(_ email: String, to groupID: UUID, store: RouterConfigStore,
+                            kc: FakeKeychain, adapter: FakeAdapter,
+                            paths: RouterPaths) -> Account? {
+        let id = UUID(); let home = paths.accountHome(id)
+        seedLogin(email, home: home, kc: kc, adapter: adapter)
+        guard case .added(let account) = store.finishPendingLogin(
+            home: home, accountID: id, into: groupID) else { return nil }
+        return account
+    }
+
+    /// Uma sonda de mentira: os perfis em `semLogin` respondem como deslogados
+    /// (o `claude` sai com código ≠ 0), os outros com o quadro do `/usage`.
+    private func probe(semLogin: Set<String> = []) -> ClaudeUsageProbe {
+        ClaudeUsageProbe { dir in
+            if semLogin.contains(dir.raw) { throw ClaudeUsageProbe.ProbeError.notSignedIn }
+            return "Current session: 10% used\nCurrent week (all models): 20% used\n"
+        }
+    }
+
+    /// O aviso da medição dizia só QUANTAS: a conta deslogada tem de ficar
+    /// marcada, e só ela.
+    @Test("a medição marca a conta sem login, e só ela")
+    func measuringMarksTheSignedOutAccount() async throws {
+        let (store, kc, adapter, paths) = makeStore()
+        let group = store.addGroup(name: "pessoal")
+        let a = try #require(addAccount("conta1@exemplo.com", to: group.id, store: store,
+                                        kc: kc, adapter: adapter, paths: paths))
+        let b = try #require(addAccount("conta2@exemplo.com", to: group.id, store: store,
+                                        kc: kc, adapter: adapter, paths: paths))
+
+        await store.measureAccounts(in: store.config.groups[0],
+                                    using: probe(semLogin: [b.home.raw]))
+
+        #expect(store.isSignedOut(b.id), "a deslogada não ficou marcada")
+        #expect(!store.isSignedOut(a.id))
+        #expect(store.lastError != nil, "o aviso da contagem continua")
+        #expect(store.usageDetail[a.id]?.origin == .probe)
+    }
+
+    /// A marca é o veredito da última medição QUE DISSE algo sobre o login: um
+    /// prazo estourado não a põe nem a tira; responder de novo a tira.
+    @Test("prazo estourado não mexe na marca; responder de novo a tira")
+    func timeoutKeepsTheMarkAndAnsweringClearsIt() async throws {
+        let (store, kc, adapter, paths) = makeStore()
+        let group = store.addGroup(name: "pessoal")
+        let a = try #require(addAccount("conta1@exemplo.com", to: group.id, store: store,
+                                        kc: kc, adapter: adapter, paths: paths))
+        let b = try #require(addAccount("conta2@exemplo.com", to: group.id, store: store,
+                                        kc: kc, adapter: adapter, paths: paths))
+        await store.measureAccounts(in: store.config.groups[0],
+                                    using: probe(semLogin: [b.home.raw]))
+        #expect(store.isSignedOut(b.id))
+
+        let travada = ClaudeUsageProbe { _ in throw ClaudeUsageProbe.ProbeError.timedOut }
+        await store.measureAccounts(in: store.config.groups[0], using: travada)
+        #expect(store.isSignedOut(b.id), "um prazo estourado tirou a marca")
+        #expect(!store.isSignedOut(a.id), "um prazo estourado pôs a marca")
+
+        await store.measureAccounts(in: store.config.groups[0], using: probe())
+        #expect(!store.isSignedOut(b.id), "respondeu e seguiu marcada")
+    }
+
+    /// A sessão que serviu a conta DEPOIS da marca prova que o login voltou (um
+    /// `/login` no próprio terminal, sem passar pelo app). Uma amostra de antes
+    /// da marca, não.
+    @Test("amostra do sensor mais nova que a marca a tira; uma mais velha, não")
+    func newerSensorSampleClearsTheMark() async throws {
+        let (store, kc, adapter, paths) = makeStore()
+        let group = store.addGroup(name: "g")
+        let conta = try #require(addAccount("conta1@exemplo.com", to: group.id, store: store,
+                                            kc: kc, adapter: adapter, paths: paths))
+        func gravarAmostra(_ quando: Date) throws {
+            let sample = GroupUsageSample(
+                configDirRaw: group.configDir.raw, email: "conta1@exemplo.com",
+                fiveHourPercent: 0.1, fiveHourResetsAt: nil,
+                sevenDayPercent: 0.2, sevenDayResetsAt: nil, sampledAt: quando)
+            try GroupUsageStore.write(sample, forEmail: "conta1@exemplo.com", in: paths.usageDir)
+        }
+        try gravarAmostra(Date().addingTimeInterval(-300))
+        await store.measureAccounts(in: store.config.groups[0],
+                                    using: probe(semLogin: [conta.home.raw]))
+        #expect(store.isSignedOut(conta.id), "a amostra velha tirou a marca")
+
+        // A data vai ao disco sem fração de segundo: a "depois" fica bem depois.
+        try gravarAmostra(Date().addingTimeInterval(2))
+        store.refreshUsage()
+        #expect(!store.isSignedOut(conta.id))
+    }
+
+    /// Relogar com sucesso tira a marca na hora, sem esperar medição; remover a
+    /// conta também (a marca não sobrevive à conta).
+    @Test("relogin renovado e conta removida não deixam marca")
+    func reloginOrRemovalClearsTheMark() async throws {
+        let (store, kc, adapter, paths) = makeStore()
+        let group = store.addGroup(name: "g")
+        let renovada = try #require(addAccount("conta1@exemplo.com", to: group.id, store: store,
+                                               kc: kc, adapter: adapter, paths: paths))
+        let removida = try #require(addAccount("conta2@exemplo.com", to: group.id, store: store,
+                                               kc: kc, adapter: adapter, paths: paths))
+        await store.measureAccounts(in: store.config.groups[0],
+                                    using: probe(semLogin: [renovada.home.raw, removida.home.raw]))
+        #expect(store.isSignedOut(renovada.id) && store.isSignedOut(removida.id))
+
+        try kc.write("cred-NOVA", service: adapter.keychainService(forConfigDir: renovada.home))
+        guard case .renewed = store.finishRelogin(accountID: renovada.id) else {
+            Issue.record("o relogin não renovou"); return
+        }
+        #expect(!store.isSignedOut(renovada.id))
+
+        store.removeAccount(removida.id)
+        #expect(!store.isSignedOut(removida.id))
+    }
+
+    /// "Usar" numa conta sem credencial na casa: ela está sem login neste Mac —
+    /// marcada como a sonda a marcaria, além do aviso.
+    @Test("usar uma conta sem credencial na casa a marca sem login")
+    func useWithoutCredentialMarks() throws {
+        let (store, kc, adapter, paths) = makeStore()
+        _ = store.addGroup(name: "padrao")
+        let group = store.addGroup(name: "pessoal")  // dedicado: nada no ~/.claude
+        let conta = try #require(addAccount("conta1@exemplo.com", to: group.id, store: store,
+                                            kc: kc, adapter: adapter, paths: paths))
+        kc.delete(service: adapter.keychainService(forConfigDir: conta.home))
+
+        let atual = try #require(store.config.groups.first(where: { $0.id == group.id }))
+        store.activate(conta, in: atual)
+
+        #expect(store.lastError != nil)
+        #expect(store.isSignedOut(conta.id))
+    }
 }

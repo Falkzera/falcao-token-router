@@ -83,6 +83,12 @@ struct UsagePanel: View {
                 .help(String(localized: "panel.account.back"))
             }
 
+            if router.isSignedOut(account.id) {
+                Label(String(localized: "panel.accounts.signedOut.help"),
+                      systemImage: "exclamationmark.triangle")
+                    .font(.caption2)
+                    .foregroundStyle(UsageColor.warning)
+            }
             if let usage {
                 sensorGauge(title: String(localized: "panel.gauge.current"),
                             fraction: usage.fiveHour, resetsAt: usage.fiveHourResetsAt)
@@ -117,7 +123,7 @@ struct UsagePanel: View {
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }
-            } else {
+            } else if !router.isSignedOut(account.id) {
                 Text("panel.accounts.ready.help.probe")
                     .font(.caption2)
                     .foregroundStyle(.secondary)

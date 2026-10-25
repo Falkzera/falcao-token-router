@@ -64,6 +64,7 @@ struct AccountsSection: View {
                                 isActive: store.activeByGroup[group.id] == account.id,
                                 usage: store.usageDetail[account.id],
                                 sampledAt: store.usageSampledAt[account.id],
+                                isSignedOut: store.isSignedOut(account.id),
                                 isSelected: selection == account.id,
                                 // Clicar de novo na mesma conta volta para a
                                 // sessão: sem isso o painel entra no modo conta
@@ -109,6 +110,8 @@ private struct RouterAccountRow: View {
     /// semanal, porque o painel mostra o maior dos dois.
     let usage: AccountUsage?
     let sampledAt: Date?
+    /// A sonda (ou o "Usar") achou a conta sem login neste Mac.
+    let isSignedOut: Bool
     let isSelected: Bool
     let onTap: () -> Void
 
@@ -127,7 +130,7 @@ private struct RouterAccountRow: View {
 
     /// O quadro inteiro no tooltip: as duas janelas do sensor, a do modelo
     /// quando alguém sondou, e a idade de cada origem.
-    private var usageHelp: String { AccountHelp.text(for: usage) }
+    private var usageHelp: String { AccountHelp.text(for: usage, signedOut: isSignedOut) }
 
     /// Selecionada manda no fundo: enquanto o detalhamento embaixo é dela, a
     /// linha precisa dizer de quem ele fala — mais forte que a marca de ativa,
@@ -159,6 +162,10 @@ private struct RouterAccountRow: View {
                 Text(verbatim: label)
                     .font(.caption).fontWeight(isActive ? .semibold : .regular)
                     .lineLimit(1).truncationMode(.middle)
+                if isSignedOut {
+                    SignedOutBadge()
+                        .help(String(localized: "panel.accounts.signedOut.help"))
+                }
                 if case .model = usage?.window, let modelo = usage?.model {
                     ModelBadge(window: modelo)
                 }
@@ -189,11 +196,18 @@ private struct RouterAccountRow: View {
                                   layout: .column)
                 } else {
                     // Sem amostra a conta está PRONTA (presumida fresca, entra no
-                    // rodízio sozinha) — um traço leria como "quebrada". Ocupa a
+                    // rodízio sozinha) — um traço leria como "quebrada", a menos
+                    // que ela ESTEJA sem login, e aí o traço é a verdade. Ocupa a
                     // largura das três colunas para não desalinhar as de cima.
-                    Text("panel.accounts.ready")
-                        .font(.caption2).foregroundStyle(.tertiary)
-                        .frame(width: AccountsLayout.readings, alignment: .trailing)
+                    Group {
+                        if isSignedOut {
+                            Text("panel.accounts.window.absent")
+                        } else {
+                            Text("panel.accounts.ready")
+                        }
+                    }
+                    .font(.caption2).foregroundStyle(.tertiary)
+                    .frame(width: AccountsLayout.readings, alignment: .trailing)
                 }
             }
         }
@@ -222,14 +236,21 @@ private struct RouterAccountRow: View {
 /// Dizer uma idade só para as duas seria afirmar que o número do Fable é tão
 /// fresco quanto o das 5 horas — e é justamente o do Fable que trava a conta.
 enum AccountHelp {
-    static func text(for usage: AccountUsage?) -> String {
-        guard let usage else { return String(localized: "panel.accounts.ready.help.probe") }
+    /// `signedOut`: a conta se mostrou sem login — isso vem primeiro, e sem
+    /// amostra ela NÃO está "pronta" (o texto de pronta mandaria medir, e medir
+    /// dá no mesmo "sem login").
+    static func text(for usage: AccountUsage?, signedOut: Bool = false) -> String {
+        let semLogin = signedOut ? [String(localized: "panel.accounts.signedOut.help")] : []
+        guard let usage else {
+            return semLogin.first ?? String(localized: "panel.accounts.ready.help.probe")
+        }
         let ausente = String(localized: "panel.accounts.window.absent")
-        var linhas = [String(
+        var linhas = semLogin
+        linhas.append(String(
             format: String(localized: "panel.accounts.usage.help.format"),
             usage.fiveHour.map(UsagePercent.text) ?? ausente,
             usage.sevenDay.map(UsagePercent.text) ?? ausente,
-            Format.duration(Date().timeIntervalSince(usage.sampledAt)))]
+            Format.duration(Date().timeIntervalSince(usage.sampledAt))))
         // QUEM mediu, e não só quando. As duas fontes são oficiais e dizem
         // coisas diferentes: o sensor é o gasto que a conta viu ao atender uma
         // requisição; a sonda é uma consulta de um instante, e é a única que
@@ -262,6 +283,20 @@ struct ModelBadge: View {
             .padding(.horizontal, 5).padding(.vertical, 1)
             .background(UsageColor.bar(window.percent).opacity(0.22), in: .capsule)
             .foregroundStyle(UsageColor.bar(window.percent))
+    }
+}
+
+/// A marca de conta SEM LOGIN neste Mac — o aviso da medição diz quantas, o
+/// selo diz QUAL. Um selo com texto, e não um ponto amarelo: o ponto da linha já
+/// é o da conta ativa, e em `warning` ele é amarelo — um segundo ponto leria
+/// como "ativa a 80%". O âmbar e a forma são os do `ModelBadge`.
+struct SignedOutBadge: View {
+    var body: some View {
+        Text("panel.accounts.signedOut")
+            .font(.caption2)
+            .padding(.horizontal, 5).padding(.vertical, 1)
+            .background(UsageColor.warning.opacity(0.22), in: .capsule)
+            .foregroundStyle(UsageColor.warning)
     }
 }
 

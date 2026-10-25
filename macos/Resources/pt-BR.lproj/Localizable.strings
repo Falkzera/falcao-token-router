@@ -94,6 +94,8 @@
 "panel.accounts.window.fiveHour" = "5h";
 "panel.accounts.window.sevenDay" = "7d";
 "panel.accounts.window.absent" = "—";
+"panel.accounts.signedOut" = "sem login";
+"panel.accounts.signedOut.help" = "Esta conta está sem login neste Mac — relogue pelo menu ⋯ dela, em Grupos → Relogar…";
 "panel.accounts.usage.help.format" = "5h %1$@ · 7d %2$@ — medido há %3$@. O painel mostra o maior dos dois, que é o que dispara a troca.";
 "panel.accounts.stale.help.sensor.format" = "Sem medir há %@. O sensor só lê quando a conta serve uma mensagem — em conta compartilhada, este número pode estar otimista. \u201cMedir contas\u201d atualiza agora.";
 "panel.accounts.stale.help.probe.format" = "Sondado há %@. Era uma consulta de um instante, e o que foi gasto depois não está aqui. \u201cMedir contas\u201d atualiza agora.";
@@ -163,6 +165,7 @@
 "groups.account.relogin" = "Relogar…";
 "groups.account.remove" = "Remover conta";
 "groups.account.menu.help" = "Mais ações";
+"groups.account.signedOut.help" = "Esta conta está sem login neste Mac. Clique para relogar.";
 "groups.relogin.waiting.title" = "Renovando o login";
 "groups.relogin.done" = "Login renovado!";
 "groups.relogin.wrong.title" = "Veio outra conta";

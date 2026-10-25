@@ -81,6 +81,16 @@ All notable changes to this project are documented here. The format follows
   account, after a confirmation. Measuring goes on, and the history starts over
   with the next measurement.
 
+### Fixed
+
+- **A signed-out account is now named, not just counted.** "Measure accounts"
+  used to say only how many accounts didn't answer. The account the probe finds
+  signed out (or that "Use" finds with no login on this Mac) now carries a
+  yellow "signed out" tag in the Groups list, the menu bar panel and the account
+  card; in Groups the tag opens "Log in again". It clears when the account
+  answers a measurement, a login is renewed, or a session it serves reports
+  usage again.
+
 ## [1.0.0] — 2026-09-22
 
 First stable release of the router. Version numbers restart at 1.0.0 because
