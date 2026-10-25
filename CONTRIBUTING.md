@@ -57,8 +57,8 @@ cost two weeks of commits that were never compiled.
 
 Write **`@ViewState`** instead (`macos/Sources/FalcaoTokenRouter/ViewState.swift`): a
 typealias to `SwiftUICore.State`, the property wrapper the macro wraps, which *is*
-in the SDK. Same type, same `$binding`, no plugin. CI builds without Xcode, so a
-PR that reintroduces `@State` fails there too.
+in the SDK. Same type, same `$binding`, no plugin. CI runs with Xcode, where
+`@State` does compile — so a dedicated step fails any PR that writes it.
 
 `@Observable` is unaffected — its plugin does ship in CLT.
 
@@ -233,9 +233,10 @@ design:
   *any* endpoint will be declined regardless of quality. If something needs the
   network, the answer is "ask the official binary to do it".
 - **The app never refreshes OAuth, and `refreshToken` has no reader.** The
-  guarantee is structural: `ClaudeCredentials` has no field to hold it. Don't
-  add one. Rotation copies a keychain *blob* between items; it never decodes it
-  to use a token.
+  guarantee is structural: rotation copies the credential between profiles as
+  an opaque blob, and no type in either engine has a field that could hold a
+  token. Don't add one. (The plan the meter needs comes from `.claude.json`,
+  not from the keychain.)
 - **One account, one place.** The engine refuses to activate an account already
   active in another group. Two live copies of a rotating refresh token kill one
   of them silently — that killed real accounts before this rule existed.
@@ -247,8 +248,7 @@ design:
   the chain and drop the user's live session into "Login expired".
 - **Keychain access goes through `/usr/bin/security`**, the same binary Claude
   Code uses to write the items — that is what keeps macOS from prompting on every
-  read. `PlanDetector` is the one exception, and it's listed as a known gap, not a
-  pattern to copy.
+  read. Nothing in the app reads the keychain any other way.
 - **A number on screen always says where it came from** — which window, which
   source (sensor or probe), how old. A proposal that simplifies the display by
   dropping provenance is the wrong trade for this app.

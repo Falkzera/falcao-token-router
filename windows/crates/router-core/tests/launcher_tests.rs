@@ -96,7 +96,6 @@ fn starts_with_the_first_account_on_a_cold_start() {
     assert_eq!(plan.account.id, f.a.id);
     // O grupo padrão não exporta CLAUDE_CONFIG_DIR.
     assert_eq!(plan.config_dir_env, None);
-    assert_eq!(plan.executable, "claude");
 }
 
 #[test]

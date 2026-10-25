@@ -29,6 +29,7 @@
   "groups.empty.detail": "Crie um grupo — por exemplo, trabalho e pessoal — e adicione as contas Claude que devem se revezar dentro dele.",
   "groups.empty.title": "Nenhum grupo ainda",
   "groups.error.activate.busyElsewhere.format": "Esta conta já está ativa no grupo %@ — uma conta serve um grupo por vez.",
+  "groups.error.activate.liveInDefaultProfile": "Esta conta é a do claude puro, no ~\\.claude, e nenhum grupo usa esse perfil — ativá-la aqui deixaria o login dela em dois lugares.",
   "groups.error.activate.noCredential": "Esta conta não tem login neste computador — use Relogar.",
   "groups.error.activate.writeFailed.format": "Não foi possível trocar de conta: %@",
   "groups.error.dismiss": "Dispensar",

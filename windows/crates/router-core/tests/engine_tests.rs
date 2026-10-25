@@ -55,7 +55,7 @@ fn dedicated_profile_exports_env_and_json_inside() {
 
 #[test]
 fn router_config_round_trips() {
-    let mut a = account("a@k.com", "C:/Users/exemplo/.claude-a");
+    let mut a = account("a@exemplo.com", "C:/Users/exemplo/.claude-a");
     a.nickname = Some("principal".to_string());
     let mut group = AccountGroup::new("trabalho", ConfigDir::standard("C:/Users/exemplo"));
     group.account_ids = vec![a.id];
@@ -80,7 +80,7 @@ fn router_config_round_trips() {
 #[test]
 fn config_keys_are_camel_case_with_uppercase_ids() {
     let mut group = AccountGroup::new("g", ConfigDir::standard("C:/Users/exemplo"));
-    group.account_ids = vec![account("a@k.com", "C:/x").id];
+    group.account_ids = vec![account("a@exemplo.com", "C:/x").id];
     let config = RouterConfig {
         groups: vec![group],
         ..Default::default()
@@ -108,7 +108,7 @@ fn preserves_unknown_oauth_fields() {
     let mut raw = serde_json::Map::new();
     raw.insert(
         "emailAddress".into(),
-        serde_json::Value::String("a@k.com".into()),
+        serde_json::Value::String("a@exemplo.com".into()),
     );
     raw.insert(
         "organizationUuid".into(),
@@ -118,7 +118,7 @@ fn preserves_unknown_oauth_fields() {
         "campoNovoQueNaoConhecemos".into(),
         serde_json::Value::Bool(true),
     );
-    let mut identity = ident("a@k.com");
+    let mut identity = ident("a@exemplo.com");
     identity.raw = raw;
 
     let data = serde_json::to_vec(&identity).unwrap();

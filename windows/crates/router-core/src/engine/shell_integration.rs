@@ -103,20 +103,30 @@ fn quote(text: &str, shell: StatusShell) -> String {
     }
 }
 
-/// Um caminho pronto para a linha de comando: sem espaço vai cru; com espaço,
-/// o nome 8.3 se houver; senão, entre aspas.
+/// Um caminho pronto para a linha de comando: só com caracteres inofensivos vai
+/// cru; senão, o nome 8.3 se ele for inofensivo; senão, entre aspas.
 enum Spelling {
     Plain(String),
     NeedsQuotes(String),
 }
 
+/// Pode ir cru para o `bash -c` e para o `-Command` do PowerShell: letra, dígito
+/// e `-_./:~`. Olhar só o espaço deixava passar `'`, `(`, `)`, `&`, `$`, crase e
+/// `;`, que partem ou desviam o comando nos dois shells — um usuário `D'Angelo`
+/// (ou um nome 8.3 como `JOAO(T~1`) deixava o sensor sem rodar, e a rotação às
+/// cegas.
+fn is_plain(text: &str) -> bool {
+    text.chars()
+        .all(|c| c.is_alphanumeric() || "-_./:~".contains(c))
+}
+
 fn spell(path: &Path, short: &dyn Fn(&Path) -> Option<PathBuf>) -> Spelling {
     let long = forward(path);
-    if !long.contains(' ') {
+    if is_plain(&long) {
         return Spelling::Plain(long);
     }
     if let Some(short) = short(path).map(|s| forward(&s)) {
-        if !short.contains(' ') {
+        if is_plain(&short) {
             return Spelling::Plain(short);
         }
     }
@@ -259,6 +269,15 @@ function global:claude {{
 # Gerado pelo app; não edite à mão (ele regrava este arquivo quando muda de lugar).
 # Sem `exec`: a sessão roda como filha do shell, que continua aberto quando ela acaba.
 
+# Um alias `claude` venceria a função: o bash expande alias antes de procurar
+# função — e até na definição `claude() {{`, que vira erro de sintaxe e deixa a
+# função sem existir (o instalador antigo do Claude Code deixava um). Guarda e
+# desfaz; o `claude` sem grupo continua passando por ele.
+if [ -n "${{BASH_ALIASES[claude]+x}}" ]; then
+  __falcao_claude_alias="${{BASH_ALIASES[claude]}}"
+  unalias claude
+fi
+
 # Uma função `claude` que já existia continua valendo para o `claude` sem grupo.
 # Só com o próprio bash (sem grep/sed, que podem faltar no PATH).
 __falcao_def="$(declare -f claude 2>/dev/null)"
@@ -279,6 +298,11 @@ claude() {{
   fi
   if declare -F falcao_claude_anterior >/dev/null 2>&1; then
     falcao_claude_anterior "$@"
+  elif [ -n "${{__falcao_claude_alias-}}" ]; then
+    case "$__falcao_claude_alias" in
+      claude|claude[[:space:]]*) eval "command $__falcao_claude_alias \"\$@\"" ;;
+      *) eval "$__falcao_claude_alias \"\$@\"" ;;
+    esac
   else
     command claude "$@"
   fi

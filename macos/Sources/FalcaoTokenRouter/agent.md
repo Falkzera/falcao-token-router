@@ -84,4 +84,4 @@ O app SwiftUI de menu bar: painel de uso e UMA janela com duas abas — Grupos (
 - A etiqueta do menu bar (ícone + % + nome) custa ~70 pontos. Em barra disputada ela é a primeira a sair, e não há API para saber que isso aconteceu. O Dock é a saída; encurtar a etiqueta é a alternativa, ao custo de tirar da barra justamente o nome da conta.
 - O detalhamento por conta não tem tokens/min nem valor (o sensor não colhe isso); só sairia da medição local, que é de um perfil só.
 - Seção Sessão/Valor mede só o perfil padrão; medir por grupo é evolução futura.
-- `setNickname` existe no store sem UI correspondente.
+- O apelido da conta (`nickname` no `config.json`) vira o rótulo dela quando existe, mas não há UI para defini-lo — só editando o arquivo. O `setNickname` do store saiu em 04/10/2026 por não ter chamador.

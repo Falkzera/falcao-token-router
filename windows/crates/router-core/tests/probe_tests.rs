@@ -117,18 +117,6 @@ fn the_reset_year_is_the_candidate_nearest_to_now() {
     assert_eq!(reset.year(), 2027);
 }
 
-#[test]
-fn the_plan_comes_from_the_first_lines_as_printed() {
-    assert_eq!(
-        ClaudeUsageProbe::plan(MACOS_OUTPUT).as_deref(),
-        Some("subscription")
-    );
-    assert_eq!(
-        ClaudeUsageProbe::plan("Max 20x plan\n\nCurrent session: 1% used").as_deref(),
-        Some("Max 20x")
-    );
-}
-
 // --- Regressões do Windows ---
 
 /// A captura real do Windows: CRLF, `·` (U+00B7) e data com vírgula — com e
@@ -150,7 +138,6 @@ fn reads_the_windows_output_with_comma_dates_and_crlf() {
             Some(utc(2026, 9, 23, 7, 0))
         )]
     );
-    assert_eq!(r.plan.as_deref(), Some("subscription"));
 }
 
 /// A zona sai ANTES de mexer em am/pm: `America/…` começa com "Am".
@@ -216,17 +203,6 @@ fn a_good_output_with_exit_code_zero_is_a_reading() {
     };
     let r = ClaudeUsageProbe::interpret(&out, utc(2026, 9, 22, 20, 0)).unwrap();
     assert_eq!(r.session, Some(0.12));
-}
-
-/// Uma linha de aviso antes do resumo (o de confiança de pasta, por exemplo,
-/// que fala de "projects") não vira plano "pro".
-#[test]
-fn a_warning_line_does_not_turn_into_a_plan() {
-    let text = "Ignoring 4 permissions.allow entries: this workspace has not been trusted, or set projects[x]\r\nYou are currently using your subscription to power your Claude Code usage\r\n";
-    assert_eq!(
-        ClaudeUsageProbe::plan(text).as_deref(),
-        Some("subscription")
-    );
 }
 
 // --- "Por modelo entra na decisão" e "Procedência" (o resto do ProbeTests.swift) ---

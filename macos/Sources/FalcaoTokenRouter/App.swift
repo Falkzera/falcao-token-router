@@ -61,6 +61,10 @@ struct FalcaoTokenRouterApp: App {
         // errada. Aqui é o único momento em que se sabe onde o binário está
         // AGORA, então é aqui que se conserta.
         Self.router.healShellIntegration()
+        // Casas de logins interrompidos (o app fechado no meio de um), com a
+        // credencial que o `claude auth login` já tinha gravado. Na subida,
+        // nenhum login está em andamento.
+        Self.router.discardOrphanHomes()
         // Duas portas de propósito. O `Task` roda assim que a fila principal
         // gira, o que já é depois de o NSApplication existir; o delegate é a
         // garantia para o caso de o SwiftUI reordenar a subida. As duas são
