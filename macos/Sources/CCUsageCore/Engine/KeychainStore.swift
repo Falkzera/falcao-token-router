@@ -40,6 +40,9 @@ public struct SecurityCLIKeychain: KeychainStore {
     /// processo. Precisa bater exatamente, ou apontaríamos para outro item.
     private let account: String
     private static let security = "/usr/bin/security"
+    /// A linha mais longa que o `security -i` engole inteira, com folga — o
+    /// mesmo número do Claude Code. Ver `write`.
+    static let stdinLineLimit = 4032
 
     public init(account: String = SecurityCLIKeychain.currentUser()) {
         self.account = account
@@ -76,9 +79,20 @@ public struct SecurityCLIKeychain: KeychainStore {
         // Valor em hex, entregue pelo stdin do `security -i`, para o segredo
         // nunca aparecer em `argv` (onde um monitor de processos o veria). O
         // mesmo cuidado do Claude Code e do cswap.
+        //
+        // Só que o `security -i` lê a linha num buffer de 4096 bytes, e acima
+        // disso NÃO recusa: executa o primeiro pedaço — grava o item com o hex
+        // truncado, JSON inválido — e só depois reclama do resto como "unknown
+        // command". Visto em 04/11/2026: a credencial passou de 5 KB ao ganhar
+        // `mcpOAuth` de plugin, e o espelho grupo→casa corrompeu a casa da conta
+        // que saía. Acima do limite, então, vai por argv, como o Claude Code faz
+        // (2.1.318: `s.length<=4032`, senão "using argv"): exposição breve em
+        // `ps`, só para o mesmo usuário, contra credencial destruída.
         let hex = Data(secret.utf8).map { String(format: "%02x", $0) }.joined()
         let command = "add-generic-password -U -a \(quote(account)) -s \(quote(service)) -X \(hex)\n"
-        let result = run(["-i"], stdin: command)
+        let result = command.utf8.count <= Self.stdinLineLimit
+            ? run(["-i"], stdin: command)
+            : run(["add-generic-password", "-U", "-a", account, "-s", service, "-X", hex])
         if result.code != 0 {
             throw KeychainError.writeFailed(result.err.isEmpty
                                             ? "código \(result.code)" : result.err)

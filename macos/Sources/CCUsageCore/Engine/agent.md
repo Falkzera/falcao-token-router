@@ -73,5 +73,7 @@ O motor do Falcão Router: contas, grupos, troca de credencial, medição passiv
 - 2026-10-25: o `RouterConfigStore.swift` chegou a 772 linhas com os PRs de outubro e foi partido em `+Accounts`, `+Measure` e `+Terminal` (o `+History` já existia). Os membros que as extensões usam deixaram de ser `private` e passaram a `internal`/`internal(set)` — fora do módulo nada muda.
 - 2026-10-25: o `handOver` pula a conta marcada sem login. A credencial da casa dela a sonda já viu morta, e sem amostra ela vinha primeiro na fila: passar o grupo para ela derrubava as sessões que a conta removida ainda atendia.
 
+- 2026-11-04: `SecurityCLIKeychain.write` passa por argv quando a linha do `security -i` excederia 4032 bytes (o limite do próprio Claude Code). Acima de ~4 KB o `security -i` gravava o hex TRUNCADO e só então falhava com "unknown command": a credencial cresceu com `mcpOAuth` de plugin e o espelho grupo→casa corrompeu a casa da conta que saía. A troca abortava certo (o espelho falhou antes), e o próximo espelho recupera a casa.
+
 ## Pendências conhecidas
 - Sem trava entre processos: o app e um `router measure`/`router rotate` rodando ao mesmo tempo não se esperam (o Windows tem o `EngineLock`). Dentro do app, a rotação e o "Usar" esperam a medição; entre processos, não.

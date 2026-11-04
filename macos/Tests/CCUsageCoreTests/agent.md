@@ -15,6 +15,7 @@ Testes do motor e do store — chaveiro/adapter falsos em memória, caminhos tem
 - `HistoryStoreTests.swift` — o store com o histórico: o plano só com as vencidas, grupo a grupo; conta em dois grupos medida uma vez; a tentativa recente; a ativa pelo perfil do grupo; login aberto segura a agenda; apagar.
 - `UsageHistoryChartTests.swift` — as séries dos gráficos, num fuso fixo (UTC−3): períodos de 7 e 28 dias, buraco de mais de 7h30, ausência fora do gráfico, marcas e nomes dos dias.
 - `StatusLineTests.swift` — a linha que o sensor imprime: a completa na ordem, o que não veio some sem marcador, as cores por severidade e por grupo, o "quando" do reset (5h só a hora, semanal com o dia) e a pintura com e sem truecolor.
+- `KeychainStoreTests.swift` — o ÚNICO teste no chaveiro real (item descartável, fora da CI): segredo de 100 B a 6 KB volta inteiro (o truncamento do `security -i` de 04/11/2026).
 - Demais suites herdadas do medidor (UsageStore, parsers, pricing).
 - *(`PanoramaTests.swift` saiu em 18/09/2026 junto com o subsistema que testava.)*
 
