@@ -127,7 +127,7 @@ drop the live session into "Login expired".
 
 | | | |
 |---|---|---|
-| **macOS 26+** | [`FalcaoTokenRouter-1.1.0.dmg`](../../releases/tag/macos-v1.1.0) | [install guide](macos/README.md) |
+| **macOS 26+** | [`FalcaoTokenRouter-1.1.1.dmg`](../../releases/tag/macos-v1.1.1) | [install guide](macos/README.md) |
 | **Windows 11** (10 untested) | [`FalcaoTokenRouter_1.1.0_x64-setup.exe`](../../releases/tag/windows-v1.1.0) | [install guide](windows/README.md) |
 
 Neither build is signed by a paid developer account yet, so each system stops it
