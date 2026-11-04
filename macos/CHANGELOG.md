@@ -6,6 +6,21 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.1.1] — 2026-11-04
+
+### Fixed
+
+- **Switching accounts no longer fails, or corrupts a credential, once it
+  grows past 4 KB.** A credential that carries MCP server tokens (from a
+  plugin, for instance) can pass that size, and the macOS `security` tool
+  silently cut it in half: the switch stopped with
+  `writeFailed("security: unknown command …")` and a wall of hex, and the
+  account being switched away from was left with an unreadable copy in its
+  home. Large credentials are now written whole, the same way Claude Code
+  writes them. A copy damaged by 1.1.0 is repaired by itself on the next
+  switch or background sync — no new sign-in needed
+  ([#45](https://github.com/Falkzera/falcao-token-router/pull/45)).
+
 ## [1.1.0] — 2026-10-25
 
 The first update since 1.0.0: a usage history, a status line that is yours to
@@ -181,6 +196,7 @@ lives on as the *Meter* tab.
 - Keychain "Always Allow" does not survive an update, because an ad-hoc
   signature changes with every build.
 
-[Unreleased]: https://github.com/Falkzera/falcao-token-router/compare/macos-v1.1.0...HEAD
+[Unreleased]: https://github.com/Falkzera/falcao-token-router/compare/macos-v1.1.1...HEAD
+[1.1.1]: https://github.com/Falkzera/falcao-token-router/releases/tag/macos-v1.1.1
 [1.1.0]: https://github.com/Falkzera/falcao-token-router/releases/tag/macos-v1.1.0
 [1.0.0]: https://github.com/Falkzera/falcao-token-router/releases/tag/v1.0.0
